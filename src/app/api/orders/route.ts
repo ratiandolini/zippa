@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/api";
 import { handle, ok } from "@/lib/api";
 import { createOrderSchema } from "@/lib/validation";
-import { calculatePrice, resolveCityId } from "@/lib/pricing";
+import { calculatePrice, resolveCityId, estimateDelivery } from "@/lib/pricing";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { generateTrackingNumber } from "@/lib/utils";
 import { notifyDispatchers } from "@/lib/notify";
@@ -48,19 +48,21 @@ export function POST(req: Request) {
       delivery: data.delivery,
       weightKg: data.weightKg,
       paymentMethod: data.paymentMethod,
-      pickupCityId,
       deliveryCityId,
     });
 
     const codAmount =
       data.paymentMethod === "CASH" ? price.totalPrice + (data.parcelValue ?? 0) : 0;
+    const eta = await estimateDelivery(price.zone);
 
     const order = await prisma.order.create({
       data: {
         trackingNumber: generateTrackingNumber(),
         customerId: session.sub,
         status: "PENDING",
-        kind: price.kind,
+        kind: price.zone === "TBILISI" ? "INTRA_CITY" : "INTER_CITY",
+        zone: price.zone,
+        estimatedDeliveryAt: eta,
 
         senderName: data.sender.name,
         senderPhone: data.sender.phone,
@@ -83,12 +85,10 @@ export function POST(req: Request) {
         parcelValue: data.parcelValue,
 
         distanceKm: price.distanceKm,
-        basePrice: price.basePrice,
-        distancePrice: price.distancePrice,
-        weightPrice: price.weightPrice,
+        deliveryPrice: price.deliveryPrice,
         codFee: price.codFee,
         totalPrice: price.totalPrice,
-        pricingRuleId: price.pricingRuleId,
+        driverFee: price.driverFee,
 
         paymentMethod: data.paymentMethod,
         paymentStatus: "UNPAID",

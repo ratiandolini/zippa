@@ -80,28 +80,21 @@ export function useDriverMe(refreshInterval = 20000) {
   return { driver: data?.driver ?? null, error, isLoading, mutate };
 }
 
-export interface PricingRule {
-  id: string;
-  name: string;
-  kind: "INTRA_CITY" | "INTER_CITY";
-  cityId: string | null;
-  cityName: string | null;
-  isActive: boolean;
-  priority: number;
-  basePrice: number;
-  pricePerKm: number;
-  pricePerKg: number;
-  freeWeightKg: number;
-  minPrice: number;
-  codFee: number;
-  driverPayoutPercent: number;
+export interface WeightBracket {
+  maxKg: number;
+  price: number;
 }
 
-export interface City {
+export interface PricingRule {
   id: string;
-  name: string;
-  centerLat: number;
-  centerLng: number;
+  zone: "TBILISI" | "REGIONAL_CITY" | "TOWN_VILLAGE";
+  isActive: boolean;
+  weightBrackets: WeightBracket[];
+  codFee: number;
+  driverFlatFee: number;
+  driverPayoutPercent: number | null;
+  sameDayCutoffHour: number | null;
+  deliveryDays: number;
 }
 
 export function usePricingRules() {
@@ -110,11 +103,6 @@ export function usePricingRules() {
     jsonFetcher,
   );
   return { rules: data?.rules ?? [], isLoading, mutate };
-}
-
-export function useCities() {
-  const { data } = useSWR<{ cities: City[] }>("/api/cities", jsonFetcher);
-  return { cities: data?.cities ?? [] };
 }
 
 export interface NotificationItem {

@@ -36,7 +36,7 @@ async function sendViaSmsOffice(to: string, text: string): Promise<SmsResult> {
 export async function sendSms(to: string, text: string): Promise<SmsResult> {
   if (PROVIDER === "SMSOFFICE") return sendViaSmsOffice(to, text);
   // LOG (ნაგულისხმევი)
-  console.log(`[SMS→${to}] ${text}`);
+  if (process.env.NODE_ENV !== "test") console.log(`[SMS→${to}] ${text}`);
   return { ok: true, provider: "LOG" };
 }
 

@@ -74,7 +74,7 @@ export default function EarningsPage() {
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-5 py-2 font-medium">თარიღი</th>
                   <th className="px-5 py-2 font-medium">ტრეკინგი</th>
-                  <th className="px-5 py-2 font-medium">ფასი</th>
+                  <th className="px-5 py-2 font-medium">შენ მიიღე</th>
                   <th className="px-5 py-2 font-medium">გადახდა</th>
                 </tr>
               </thead>
@@ -85,7 +85,7 @@ export default function EarningsPage() {
                       {o.deliveredAt ? fmtDate(o.deliveredAt) : "—"}
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{o.trackingNumber}</td>
-                    <td className="px-5 py-3 tabular-nums">{GEL(o.price.total)}</td>
+                    <td className="px-5 py-3 font-medium tabular-nums">{GEL(o.price.driverFee)}</td>
                     <td className="px-5 py-3 text-muted-foreground">
                       {o.paymentMethod === "CASH" ? "ნაღდი" : "ბარათი"}
                     </td>

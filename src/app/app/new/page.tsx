@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AddressField, type AddressValue } from "@/components/address-field";
-import { GEL, PAYMENT_METHOD_LABEL } from "@/lib/domain";
+import { GEL, PAYMENT_METHOD_LABEL, DELIVERY_ZONE_LABEL, fmtDate } from "@/lib/domain";
 import { api } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
 import type { OrderDTO } from "@/lib/serialize";
@@ -16,14 +16,14 @@ import type { OrderDTO } from "@/lib/serialize";
 const empty: AddressValue = { address: "", lat: null, lng: null };
 
 interface Quote {
+  zone: "TBILISI" | "REGIONAL_CITY" | "TOWN_VILLAGE";
   distanceKm: number;
-  basePrice: number;
-  distancePrice: number;
-  weightPrice: number;
+  deliveryPrice: number;
   codFee: number;
   totalPrice: number;
   codAmount: number;
-  kind: "INTRA_CITY" | "INTER_CITY";
+  overWeight: boolean;
+  estimatedDeliveryAt: string;
 }
 
 export default function NewOrderPage() {
@@ -197,12 +197,22 @@ export default function NewOrderPage() {
               {ready && quoting && <p className="text-muted-foreground">ვთვლი…</p>}
               {ready && !quoting && quote && (
                 <>
-                  <Row label="საბაზისო" value={GEL(quote.basePrice)} />
-                  <Row label={`მანძილი ${quote.distanceKm} კმ`} value={GEL(quote.distancePrice)} />
-                  <Row label="წონის დანამატი" value={GEL(quote.weightPrice)} />
+                  <Row label={`ზონა: ${DELIVERY_ZONE_LABEL[quote.zone]}`} value={`${quote.distanceKm} კმ`} />
+                  <Row label={`მიტანა (${weightNum} კგ)`} value={GEL(quote.deliveryPrice)} />
                   {quote.codFee > 0 && <Row label="ნაღდის საკომისიო" value={GEL(quote.codFee)} />}
                   <div className="my-2 border-t border-border" />
                   <Row label="სულ გადასახდელი" value={GEL(quote.totalPrice)} bold />
+                  <div className="mt-1 rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent">
+                    მიტანა: {fmtDate(quote.estimatedDeliveryAt)}
+                    {quote.zone === "TBILISI" &&
+                      new Date(quote.estimatedDeliveryAt).toDateString() === new Date().toDateString() &&
+                      " (დღეს)"}
+                  </div>
+                  {quote.overWeight && (
+                    <p className="text-xs text-destructive">
+                      წონა კალათებს სცდება — დაუკავშირდით დისპეჩერს ზუსტი ფასისთვის
+                    </p>
+                  )}
                   {payment === "CASH" && (
                     <p className="text-xs text-muted-foreground">
                       კურიერი ნაღდად აიღებს {GEL(quote.codAmount)}

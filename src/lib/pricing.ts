@@ -1,86 +1,44 @@
 import { prisma } from "@/lib/db";
 import { haversineKm } from "@/lib/geo";
-import type { DeliveryKind, PaymentMethod } from "@prisma/client";
+import type { DeliveryZone, PaymentMethod } from "@prisma/client";
+
+export interface WeightBracket {
+  maxKg: number;
+  price: number;
+}
 
 export interface PriceInput {
   pickup: { lat: number; lng: number };
   delivery: { lat: number; lng: number };
   weightKg: number;
   paymentMethod: PaymentMethod;
-  pickupCityId?: string | null;
   deliveryCityId?: string | null;
 }
 
 export interface PriceBreakdown {
-  kind: DeliveryKind;
+  zone: DeliveryZone;
   distanceKm: number;
-  basePrice: number;
-  distancePrice: number;
-  weightPrice: number;
+  deliveryPrice: number; // წონა-კალათის ფასი
   codFee: number;
   totalPrice: number;
-  pricingRuleId: string;
-  driverPayoutPercent: number;
+  driverFee: number; // კურიერს ერგება ამ მიტანაზე
+  overWeight: boolean; // წონა ბოლო კალათას სცდება
 }
 
 const n = (v: unknown) => Number(v);
 
-/** ფასის გამოთვლა მოქმედი ტარიფის წესის მიხედვით (სნეპშოტი შეკვეთაზე შესანახად) */
-export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown> {
-  const kind: DeliveryKind =
-    input.pickupCityId && input.deliveryCityId && input.pickupCityId !== input.deliveryCityId
-      ? "INTER_CITY"
-      : "INTRA_CITY";
-
-  const cityId = kind === "INTRA_CITY" ? input.pickupCityId ?? undefined : undefined;
-
-  // ჯერ ქალაქზე მიბმული წესი, მერე ზოგადი (cityId=null), priority-ის მიხედვით
-  const rule =
-    (cityId
-      ? await prisma.pricingRule.findFirst({
-          where: { isActive: true, kind, cityId },
-          orderBy: { priority: "desc" },
-        })
-      : null) ??
-    (await prisma.pricingRule.findFirst({
-      where: { isActive: true, kind, cityId: null },
-      orderBy: { priority: "desc" },
-    }));
-
-  if (!rule) throw new Error("ტარიფის წესი ვერ მოიძებნა");
-
-  const distanceKm = Math.round(haversineKm(input.pickup, input.delivery) * 100) / 100;
-
-  const basePrice = n(rule.basePrice);
-  const distancePrice = Math.round(distanceKm * n(rule.pricePerKm) * 100) / 100;
-
-  const billableWeight = Math.max(0, input.weightKg - n(rule.freeWeightKg));
-  const weightPrice = Math.round(billableWeight * n(rule.pricePerKg) * 100) / 100;
-
-  const codFee = input.paymentMethod === "CASH" ? n(rule.codFee) : 0;
-
-  let totalPrice = basePrice + distancePrice + weightPrice + codFee;
-  totalPrice = Math.max(totalPrice, n(rule.minPrice));
-  totalPrice = Math.round(totalPrice * 100) / 100;
-
-  return {
-    kind,
-    distanceKm,
-    basePrice,
-    distancePrice,
-    weightPrice,
-    codFee,
-    totalPrice,
-    pricingRuleId: rule.id,
-    driverPayoutPercent: rule.driverPayoutPercent,
-  };
+/** მიტანის ზონა — მიტანის მისამართის ქალაქის მიხედვით */
+export async function resolveZone(deliveryCityId: string | null | undefined): Promise<DeliveryZone> {
+  if (!deliveryCityId) return "TOWN_VILLAGE";
+  const tbilisi = await prisma.city.findUnique({ where: { name: "თბილისი" }, select: { id: true } });
+  if (deliveryCityId === tbilisi?.id) return "TBILISI";
+  return "REGIONAL_CITY";
 }
 
-/** უახლოესი ქალაქის მიხედვით cityId-ის მიახლოებითი დადგენა კოორდინატებიდან */
+/** უახლოესი ქალაქის id კოორდინატებიდან (40 კმ-მდე), თორემ null */
 export async function resolveCityId(pt: { lat: number; lng: number }): Promise<string | null> {
   const cities = await prisma.city.findMany({ where: { isActive: true } });
-  if (!cities.length) return null;
-  let best = cities[0];
+  let best: (typeof cities)[number] | null = null;
   let bestD = Infinity;
   for (const c of cities) {
     const d = haversineKm(pt, { lat: c.centerLat, lng: c.centerLng });
@@ -89,6 +47,54 @@ export async function resolveCityId(pt: { lat: number; lng: number }): Promise<s
       best = c;
     }
   }
-  // 40 კმ-ზე შორს — ქალაქს არ ვაბამთ
-  return bestD <= 40 ? best.id : null;
+  return best && bestD <= 40 ? best.id : null;
+}
+
+function bracketPrice(brackets: WeightBracket[], weightKg: number): { price: number; over: boolean } {
+  const sorted = [...brackets].sort((a, b) => a.maxKg - b.maxKg);
+  for (const b of sorted) if (weightKg <= b.maxKg) return { price: b.price, over: false };
+  const last = sorted[sorted.length - 1];
+  return { price: last?.price ?? 0, over: true };
+}
+
+export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown> {
+  const zone = await resolveZone(input.deliveryCityId);
+  const rule = await prisma.pricingRule.findUnique({ where: { zone } });
+  if (!rule) throw new Error(`ტარიფის წესი ვერ მოიძებნა ზონისთვის ${zone}`);
+
+  const brackets = (rule.weightBrackets as unknown as WeightBracket[]) ?? [];
+  const { price: deliveryPrice, over } = bracketPrice(brackets, input.weightKg);
+
+  const codFee = input.paymentMethod === "CASH" ? n(rule.codFee) : 0;
+  const totalPrice = Math.round((deliveryPrice + codFee) * 100) / 100;
+
+  const driverFee =
+    n(rule.driverFlatFee) > 0
+      ? n(rule.driverFlatFee)
+      : Math.round(deliveryPrice * ((rule.driverPayoutPercent ?? 70) / 100) * 100) / 100;
+
+  const distanceKm = Math.round(haversineKm(input.pickup, input.delivery) * 100) / 100;
+
+  return { zone, distanceKm, deliveryPrice, codFee, totalPrice, driverFee, overWeight: over };
+}
+
+/** სავარაუდო მიტანის დრო ზონის წესის მიხედვით (თბილისის დროით) */
+export async function estimateDelivery(zone: DeliveryZone, from = new Date()): Promise<Date> {
+  const rule = await prisma.pricingRule.findUnique({ where: { zone } });
+  const cutoff = rule?.sameDayCutoffHour ?? null;
+  const days = rule?.deliveryDays ?? 1;
+
+  // თბილისის დრო (UTC+4)
+  const tb = new Date(from.getTime() + 4 * 3600 * 1000);
+  const hour = tb.getUTCHours();
+
+  let addDays = days;
+  if (days === 0) {
+    addDays = cutoff != null && hour < cutoff ? 0 : 1;
+  }
+
+  const target = new Date(from);
+  target.setDate(target.getDate() + addDays);
+  target.setHours(21, 0, 0, 0); // დღის ბოლომდე
+  return target;
 }

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ka">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ხაზგარეშე — საკურიერო პრო</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, "Noto Sans Georgian", sans-serif;
+        background: #f4f5f6;
+        color: #1a1d21;
+        text-align: center;
+        padding: 24px;
+      }
+      .box { max-width: 320px }
+      .icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: #178f68;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 16px;
+      }
+      h1 { font-size: 18px; margin: 0 0 8px }
+      p { color: #6b7280; font-size: 14px; margin: 0 0 20px }
+      button {
+        border: 0;
+        background: #178f68;
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h11v10H3zM14 10h4l3 3v4h-7" />
+          <circle cx="7" cy="18" r="2" />
+          <circle cx="17" cy="18" r="2" />
+        </svg>
+      </div>
+      <h1>ინტერნეტი არ არის</h1>
+      <p>შეამოწმე კავშირი და სცადე თავიდან.</p>
+      <button onclick="location.reload()">გადატვირთვა</button>
+    </div>
+  </body>
+</html>

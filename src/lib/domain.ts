@@ -6,6 +6,7 @@ import type {
   DriverStatus,
   VehicleType,
   DeliveryKind,
+  DeliveryZone,
 } from "@prisma/client";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -69,6 +70,12 @@ export const VEHICLE_LABEL: Record<VehicleType, string> = {
 export const DELIVERY_KIND_LABEL: Record<DeliveryKind, string> = {
   INTRA_CITY: "ქალაქში",
   INTER_CITY: "ქალაქებს შორის",
+};
+
+export const DELIVERY_ZONE_LABEL: Record<DeliveryZone, string> = {
+  TBILISI: "თბილისი",
+  REGIONAL_CITY: "რეგიონული ქალაქი",
+  TOWN_VILLAGE: "დაბა / სოფელი",
 };
 
 /** დეტერმინისტული ფორმატირება (SSR-ის და ბრაუზერის იდენტური შედეგი) */

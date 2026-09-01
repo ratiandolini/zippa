@@ -18,6 +18,7 @@ export function serializeOrder(o: OrderWith) {
     trackingNumber: o.trackingNumber,
     status: o.status,
     kind: o.kind,
+    zone: o.zone,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
     deliveredAt: o.deliveredAt?.toISOString() ?? null,
@@ -51,11 +52,10 @@ export function serializeOrder(o: OrderWith) {
 
     distanceKm: num(o.distanceKm),
     price: {
-      base: num(o.basePrice),
-      distance: num(o.distancePrice),
-      weight: num(o.weightPrice),
+      delivery: num(o.deliveryPrice),
       codFee: num(o.codFee),
       total: num(o.totalPrice),
+      driverFee: num(o.driverFee),
     },
 
     paymentMethod: o.paymentMethod,

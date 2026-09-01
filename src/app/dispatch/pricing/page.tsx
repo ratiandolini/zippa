@@ -6,240 +6,191 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { usePricingRules, useCities, type PricingRule } from "@/lib/hooks";
+import { usePricingRules, type PricingRule, type WeightBracket } from "@/lib/hooks";
 import { api } from "@/lib/fetcher";
-import { GEL, DELIVERY_KIND_LABEL } from "@/lib/domain";
-
-type Draft = Omit<PricingRule, "id" | "cityName">;
-
-const blank: Draft = {
-  name: "",
-  kind: "INTRA_CITY",
-  cityId: null,
-  isActive: true,
-  priority: 1,
-  basePrice: 5,
-  pricePerKm: 1,
-  pricePerKg: 0.5,
-  freeWeightKg: 5,
-  minPrice: 5,
-  codFee: 1,
-  driverPayoutPercent: 80,
-};
+import { GEL, DELIVERY_ZONE_LABEL } from "@/lib/domain";
 
 export default function PricingPage() {
   const { rules, isLoading, mutate } = usePricingRules();
-  const [editing, setEditing] = useState<string | "new" | null>(null);
 
   return (
     <>
       <PageHeader
         title="ტარიფები"
-        description="ფასის წესები — რომელი გამოიყენება, დამოკიდებულია ქალაქზე, ტიპსა და priority-ზე"
-        action={
-          <Button size="sm" onClick={() => setEditing("new")}>
-            წესის დამატება
-          </Button>
-        }
+        description="ფასი წონის მიხედვით, ზონებით. ზონა განისაზღვრება მიტანის მისამართით."
       />
-
-      {editing === "new" && (
-        <RuleForm
-          initial={blank}
-          onCancel={() => setEditing(null)}
-          onSave={async (d) => {
-            await api("/api/pricing/rules", "POST", d);
-            setEditing(null);
-            mutate();
-          }}
-        />
-      )}
-
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {rules.map((r) =>
-          editing === r.id ? (
-            <div key={r.id} className="md:col-span-2 xl:col-span-3">
-              <RuleForm
-                initial={r}
-                onCancel={() => setEditing(null)}
-                onSave={async (d) => {
-                  await api(`/api/pricing/rules/${r.id}`, "PATCH", d);
-                  setEditing(null);
-                  mutate();
-                }}
-                onDelete={async () => {
-                  await api(`/api/pricing/rules/${r.id}`, "DELETE");
-                  setEditing(null);
-                  mutate();
-                }}
-              />
-            </div>
-          ) : (
-            <Card key={r.id}>
-              <CardHeader className="flex-row items-start justify-between">
-                <div>
-                  <CardTitle>{r.name}</CardTitle>
-                  <div className="mt-1 flex gap-1">
-                    <Badge tone="neutral">{DELIVERY_KIND_LABEL[r.kind]}</Badge>
-                    {r.cityName && <Badge tone="neutral">{r.cityName}</Badge>}
-                    <Badge tone={r.isActive ? "green" : "red"}>
-                      {r.isActive ? "აქტიური" : "გამორთული"}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-1.5 text-sm">
-                <Line label="საბაზისო" value={GEL(r.basePrice)} />
-                <Line label="1 კმ" value={GEL(r.pricePerKm)} />
-                <Line label={`1 კგ (>${r.freeWeightKg}კგ)`} value={GEL(r.pricePerKg)} />
-                <Line label="მინ. ფასი" value={GEL(r.minPrice)} />
-                <Line label="ნაღდის საკომისიო" value={GEL(r.codFee)} />
-                <Line label="კურიერის წილი" value={`${r.driverPayoutPercent}%`} />
-                <Line label="priority" value={String(r.priority)} />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full"
-                  onClick={() => setEditing(r.id)}
-                >
-                  რედაქტირება
-                </Button>
-              </CardContent>
-            </Card>
-          ),
-        )}
+      <div className="space-y-4">
+        {rules.map((r) => (
+          <RuleCard key={r.id} rule={r} onSaved={mutate} />
+        ))}
       </div>
+      <p className="mt-6 text-xs text-muted-foreground">
+        „კურიერს ერგება" — ბონუსი თითო მიტანაზე. ბაზური ხელფასი ცალკე ირიცხება (payroll).
+      </p>
     </>
   );
 }
 
-function Line({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function RuleForm({
-  initial,
-  onSave,
-  onCancel,
-  onDelete,
-}: {
-  initial: Draft;
-  onSave: (d: Draft) => Promise<void>;
-  onCancel: () => void;
-  onDelete?: () => Promise<void>;
-}) {
-  const { cities } = useCities();
-  const [d, setD] = useState<Draft>(initial);
+function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [brackets, setBrackets] = useState<WeightBracket[]>(rule.weightBrackets);
+  const [codFee, setCodFee] = useState(String(rule.codFee));
+  const [driverFee, setDriverFee] = useState(String(rule.driverFlatFee));
+  const [cutoff, setCutoff] = useState(rule.sameDayCutoffHour == null ? "" : String(rule.sameDayCutoffHour));
+  const [days, setDays] = useState(String(rule.deliveryDays));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((s) => ({ ...s, [k]: v }));
-  const numField = (k: keyof Draft, label: string) => (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input
-        type="number"
-        step="0.1"
-        value={String(d[k] as number)}
-        onChange={(e) => set(k, Number(e.target.value) as never)}
-      />
-    </div>
-  );
+  function reset() {
+    setBrackets(rule.weightBrackets);
+    setCodFee(String(rule.codFee));
+    setDriverFee(String(rule.driverFlatFee));
+    setCutoff(rule.sameDayCutoffHour == null ? "" : String(rule.sameDayCutoffHour));
+    setDays(String(rule.deliveryDays));
+    setEditing(false);
+    setErr(null);
+  }
 
   async function save() {
     setBusy(true);
     setErr(null);
     try {
-      await onSave(d);
+      await api(`/api/pricing/rules/${rule.id}`, "PATCH", {
+        weightBrackets: brackets.map((b) => ({ maxKg: Number(b.maxKg), price: Number(b.price) })),
+        codFee: Number(codFee),
+        driverFlatFee: Number(driverFee),
+        sameDayCutoffHour: cutoff === "" ? null : Number(cutoff),
+        deliveryDays: Number(days),
+      });
+      setEditing(false);
+      onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "შეცდომა");
+    } finally {
       setBusy(false);
     }
   }
 
+  const setBracket = (i: number, key: "maxKg" | "price", v: string) =>
+    setBrackets((bs) => bs.map((b, j) => (j === i ? { ...b, [key]: Number(v) } : b)));
+
+  const rangeLabel = (i: number) => {
+    const lo = i === 0 ? 0 : brackets[i - 1].maxKg;
+    return `${lo}–${brackets[i].maxKg} კგ`;
+  };
+
   return (
-    <Card className="mb-4">
-      <CardHeader>
-        <CardTitle>{initial.name ? "წესის რედაქტირება" : "ახალი წესი"}</CardTitle>
+    <Card>
+      <CardHeader className="flex-row items-start justify-between">
+        <div>
+          <CardTitle>{DELIVERY_ZONE_LABEL[rule.zone]}</CardTitle>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <Badge tone={rule.isActive ? "green" : "red"}>{rule.isActive ? "აქტიური" : "გამორთული"}</Badge>
+            {rule.zone === "TBILISI" && rule.sameDayCutoffHour != null && (
+              <Badge tone="accent">{rule.sameDayCutoffHour}:00-მდე → იმ დღესვე</Badge>
+            )}
+            {rule.deliveryDays > 0 && <Badge tone="neutral">+{rule.deliveryDays} დღე</Badge>}
+          </div>
+        </div>
+        {!editing && (
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            რედაქტირება
+          </Button>
+        )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>დასახელება</Label>
-            <Input value={d.name} onChange={(e) => set("name", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>ტიპი</Label>
-            <Select value={d.kind} onChange={(e) => set("kind", e.target.value as Draft["kind"])}>
-              <option value="INTRA_CITY">ქალაქში</option>
-              <option value="INTER_CITY">ქალაქებს შორის</option>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>ქალაქი</Label>
-            <Select
-              value={d.cityId ?? ""}
-              onChange={(e) => set("cityId", e.target.value || null)}
-              disabled={d.kind === "INTER_CITY"}
-            >
-              <option value="">ყველა (ზოგადი)</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="py-2 pr-4 font-medium">წონა</th>
+                <th className="py-2 pr-4 font-medium">კლიენტი იხდის</th>
+                {editing && <th className="py-2 font-medium">ზედა ზღვარი (კგ)</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {brackets.map((b, i) => (
+                <tr key={i} className="border-b border-border last:border-0">
+                  <td className="py-2 pr-4 text-muted-foreground">{rangeLabel(i)}</td>
+                  <td className="py-2 pr-4">
+                    {editing ? (
+                      <Input
+                        type="number"
+                        step="0.5"
+                        className="h-8 w-24"
+                        value={String(b.price)}
+                        onChange={(e) => setBracket(i, "price", e.target.value)}
+                      />
+                    ) : (
+                      <span className="font-medium tabular-nums">{GEL(b.price)}</span>
+                    )}
+                  </td>
+                  {editing && (
+                    <td className="py-2">
+                      <Input
+                        type="number"
+                        className="h-8 w-24"
+                        value={String(b.maxKg)}
+                        onChange={(e) => setBracket(i, "maxKg", e.target.value)}
+                      />
+                    </td>
+                  )}
+                </tr>
               ))}
-            </Select>
-          </div>
-          {numField("basePrice", "საბაზისო ₾")}
-          {numField("pricePerKm", "1 კმ ₾")}
-          {numField("pricePerKg", "1 კგ ₾")}
-          {numField("freeWeightKg", "უფასო წონა კგ")}
-          {numField("minPrice", "მინ. ფასი ₾")}
-          {numField("codFee", "ნაღდის საკომისიო ₾")}
-          {numField("driverPayoutPercent", "კურიერის წილი %")}
-          {numField("priority", "priority")}
-          <div className="flex items-end gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={d.isActive}
-                onChange={(e) => set("isActive", e.target.checked)}
-              />
-              აქტიური
-            </label>
-          </div>
+            </tbody>
+          </table>
         </div>
 
-        {err && <p className="text-sm text-destructive">{err}</p>}
-
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled={busy} onClick={save}>
-            {busy ? "ინახება…" : "შენახვა"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={onCancel}>
-            გაუქმება
-          </Button>
-          {onDelete && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-auto text-destructive"
-              onClick={onDelete}
-            >
-              წაშლა
-            </Button>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="ნაღდის საკომისიო ₾" value={codFee} onChange={setCodFee} edit={editing} display={GEL(rule.codFee)} />
+          <Field label="კურიერს ერგება ₾ (მიტანაზე)" value={driverFee} onChange={setDriverFee} edit={editing} display={GEL(rule.driverFlatFee)} />
+          {rule.zone === "TBILISI" && (
+            <Field label="იმ-დღეს cut-off (საათი)" value={cutoff} onChange={setCutoff} edit={editing} display={rule.sameDayCutoffHour == null ? "—" : `${rule.sameDayCutoffHour}:00`} />
           )}
+          <Field label="მინ. დღეები" value={days} onChange={setDays} edit={editing} display={String(rule.deliveryDays)} />
         </div>
+
+        {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
+
+        {editing && (
+          <div className="mt-4 flex gap-2">
+            <Button size="sm" disabled={busy} onClick={save}>
+              {busy ? "ინახება…" : "შენახვა"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={reset}>
+              გაუქმება
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  edit,
+  display,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  edit: boolean;
+  display: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {edit ? (
+        <Input type="number" step="0.5" className="h-8" value={value} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <div className="text-sm font-medium tabular-nums">{display}</div>
+      )}
+    </div>
   );
 }

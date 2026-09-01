@@ -37,3 +37,6 @@ _legacy/
 
 # ts build cache
 *.tsbuildinfo
+
+# vitest
+/test-results/

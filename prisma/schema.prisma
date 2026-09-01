@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
@@ -31,11 +32,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  driverProfile   DriverProfile?
-  ordersAsCustomer Order[]        @relation("CustomerOrders")
-  notifications   Notification[]
-  reviewsWritten  Review[]        @relation("ReviewAuthor")
-  passwordResets  PasswordReset[]
+  driverProfile    DriverProfile?
+  ordersAsCustomer Order[]         @relation("CustomerOrders")
+  notifications    Notification[]
+  reviewsWritten   Review[]        @relation("ReviewAuthor")
+  passwordResets   PasswordReset[]
 
   @@index([role])
 }
@@ -89,21 +90,21 @@ model DriverProfile {
   cityId String?
   city   City?   @relation(fields: [cityId], references: [id])
 
-  ratingAvg      Float @default(5)
-  ratingCount    Int   @default(0)
-  totalDeliveries Int  @default(0)
+  ratingAvg       Float @default(5)
+  ratingCount     Int   @default(0)
+  totalDeliveries Int   @default(0)
 
   // ფინანსური ბალანსი
-  cashOnHand   Decimal @default(0) @db.Decimal(10, 2) // ხელზე აღებული ნაღდი, კომპანიას ჩასაბარებელი
+  cashOnHand     Decimal @default(0) @db.Decimal(10, 2) // ხელზე აღებული ნაღდი, კომპანიას ჩასაბარებელი
   unpaidEarnings Decimal @default(0) @db.Decimal(10, 2) // დარიცხული, გადაუხდელი ანაზღაურება
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders       Order[]
-  earnings     DriverEarning[]
-  settlements  CashSettlement[]
-  payouts      Payout[]
+  orders      Order[]
+  earnings    DriverEarning[]
+  settlements CashSettlement[]
+  payouts     Payout[]
 
   @@index([status])
   @@index([cityId])
@@ -121,50 +122,52 @@ model City {
   centerLng Float
   createdAt DateTime @default(now())
 
-  zones          Zone[]
-  drivers        DriverProfile[]
-  pricingRules   PricingRule[]
+  zones   Zone[]
+  drivers DriverProfile[]
 }
 
 // ზონა ქალაქის შიგნით (მიახლოებით, GeoJSON polygon წერტილების მასივი)
 model Zone {
-  id       String @id @default(cuid())
-  cityId   String
-  city     City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  name     String
-  polygon  Json   // [[lat,lng], ...]
+  id        String   @id @default(cuid())
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name      String
+  polygon   Json // [[lat,lng], ...]
   createdAt DateTime @default(now())
 }
 
 enum DeliveryKind {
-  INTRA_CITY   // ქალაქის შიგნით
-  INTER_CITY   // ქალაქებს შორის
+  INTRA_CITY // ქალაქის შიგნით
+  INTER_CITY // ქალაქებს შორის
 }
 
-// ტარიფის წესი. თუ cityId=null — ეს ინტერსიტი/გლობალური წესია.
+// მიტანის ზონა (განისაზღვრება მიტანის მისამართით)
+enum DeliveryZone {
+  TBILISI // თბილისი
+  REGIONAL_CITY // რეგიონული ქალაქი (ბათუმი, ქუთაისი, რუსთავი…)
+  TOWN_VILLAGE // დაბა / სოფელი
+}
+
+// ტარიფის წესი — თითო ზონაზე ერთი. ფასი წონა-კალათებით (ფიქსი, არა კმ-ზე).
 model PricingRule {
-  id             String       @id @default(cuid())
-  name           String
-  kind           DeliveryKind @default(INTRA_CITY)
-  cityId         String?
-  city           City?        @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  isActive       Boolean      @default(true)
-  priority       Int          @default(0) // მაღალი priority ჯერ მოწმდება
+  id       String       @id @default(cuid())
+  zone     DeliveryZone @unique
+  isActive Boolean      @default(true)
 
-  basePrice      Decimal @db.Decimal(10, 2) @default(5)
-  pricePerKm     Decimal @db.Decimal(10, 2) @default(1.5)
-  pricePerKg     Decimal @db.Decimal(10, 2) @default(0.5)
-  freeWeightKg   Decimal @db.Decimal(10, 2) @default(5)   // ამ წონამდე წონის დანამატი არ ერიცხება
-  minPrice       Decimal @db.Decimal(10, 2) @default(4)
-  codFee         Decimal @db.Decimal(10, 2) @default(0)   // ნაღდით გადახდის საკომისიო
+  // [{ "maxKg": 6, "price": 5 }, { "maxKg": 11, "price": 5 }, ...] — ზრდადი
+  weightBrackets Json
 
-  // კურიერის ანაზღაურება ამ შეკვეთაზე
-  driverPayoutPercent Int @default(80) // შემოსავლის %
+  codFee Decimal @default(0) @db.Decimal(10, 2) // ნაღდით გადახდის საკომისიო
 
-  createdAt DateTime @default(now())
+  // კურიერის ანაზღაურება ამ ზონის მიტანაზე (ჰიბრიდი: ბაზა ცალკეა, ეს არის ბონუსი მიტანაზე)
+  driverFlatFee       Decimal @default(0) @db.Decimal(10, 2)
+  driverPayoutPercent Int? // ალტერნატივა — შემოსავლის %, თუ driverFlatFee = 0
+
+  // მიტანის ვადა
+  sameDayCutoffHour Int? // მაგ. 16 → ამ საათამდე გაფორმებული იმ დღესვე მიდის
+  deliveryDays      Int  @default(1) // მინიმალური დღეები (0 = იმ დღესვე შესაძლებელია)
+
   updatedAt DateTime @updatedAt
-
-  @@index([kind, cityId, isActive])
 }
 
 // ─────────────────────────────────────────────
@@ -173,24 +176,24 @@ model PricingRule {
 
 enum OrderStatus {
   DRAFT
-  PENDING        // შექმნილია, კურიერი არ ჰყავს
-  ASSIGNED       // კურიერი მინიჭებულია
-  ACCEPTED       // კურიერმა მიიღო
-  PICKED_UP      // ამანათი აღებულია
-  IN_TRANSIT     // გზაშია
-  DELIVERED      // ჩაბარებულია
+  PENDING // შექმნილია, კურიერი არ ჰყავს
+  ASSIGNED // კურიერი მინიჭებულია
+  ACCEPTED // კურიერმა მიიღო
+  PICKED_UP // ამანათი აღებულია
+  IN_TRANSIT // გზაშია
+  DELIVERED // ჩაბარებულია
   CANCELLED
-  FAILED         // მიტანა ჩაიშალა
+  FAILED // მიტანა ჩაიშალა
 }
 
 enum PaymentMethod {
-  CASH   // ხელზე / ნაღდით (COD)
-  CARD   // ონლაინ ბარათით
+  CASH // ხელზე / ნაღდით (COD)
+  CARD // ონლაინ ბარათით
 }
 
 enum PaymentStatus {
   UNPAID
-  PENDING       // ონლაინ გადახდა დაწყებულია
+  PENDING // ონლაინ გადახდა დაწყებულია
   PAID
   REFUNDED
   FAILED
@@ -202,8 +205,8 @@ enum PayerSide {
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  trackingNumber String      @unique
+  id             String @id @default(cuid())
+  trackingNumber String @unique
 
   customerId String
   customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])
@@ -211,8 +214,9 @@ model Order {
   driverId String?
   driver   DriverProfile? @relation(fields: [driverId], references: [id])
 
-  status OrderStatus @default(PENDING)
+  status OrderStatus  @default(PENDING)
   kind   DeliveryKind @default(INTRA_CITY)
+  zone   DeliveryZone @default(TBILISI)
 
   // ამგზავნი
   senderName    String
@@ -224,33 +228,31 @@ model Order {
   pickupNote    String?
 
   // მიმღები
-  recipientName    String
-  recipientPhone   String
-  deliveryAddress  String
-  deliveryLat      Float
-  deliveryLng      Float
-  deliveryCityId   String?
-  deliveryNote     String?
+  recipientName   String
+  recipientPhone  String
+  deliveryAddress String
+  deliveryLat     Float
+  deliveryLng     Float
+  deliveryCityId  String?
+  deliveryNote    String?
 
   // ამანათი
-  weightKg    Decimal @db.Decimal(10, 2) @default(1)
+  weightKg    Decimal  @default(1) @db.Decimal(10, 2)
   description String?
   parcelValue Decimal? @db.Decimal(10, 2) // გამოცხადებული ღირებულება (COD-სთვის)
 
-  // ფასი (გამოთვლილი შექმნისას, PricingRule-ის სნეპშოტი)
-  distanceKm   Decimal @db.Decimal(10, 2) @default(0)
-  basePrice    Decimal @db.Decimal(10, 2) @default(0)
-  distancePrice Decimal @db.Decimal(10, 2) @default(0)
-  weightPrice  Decimal @db.Decimal(10, 2) @default(0)
-  codFee       Decimal @db.Decimal(10, 2) @default(0)
-  totalPrice   Decimal @db.Decimal(10, 2) @default(0)
-  pricingRuleId String?
+  // ფასი (გამოთვლილი შექმნისას — სნეპშოტი)
+  distanceKm    Decimal @default(0) @db.Decimal(10, 2) // მხოლოდ ინფორმაციული (მარშრუტი/ETA)
+  deliveryPrice Decimal @default(0) @db.Decimal(10, 2) // წონა-კალათის ფასი
+  codFee        Decimal @default(0) @db.Decimal(10, 2)
+  totalPrice    Decimal @default(0) @db.Decimal(10, 2)
+  driverFee     Decimal @default(0) @db.Decimal(10, 2) // კურიერს ერგება ამ მიტანაზე (სნეპშოტი)
 
   // გადახდა
   paymentMethod PaymentMethod @default(CASH)
   paymentStatus PaymentStatus @default(UNPAID)
   payerSide     PayerSide     @default(SENDER)
-  codAmount     Decimal       @db.Decimal(10, 2) @default(0) // ნაღდად ასაღები თანხა (მიტანის საფასური ან/და parcelValue)
+  codAmount     Decimal       @default(0) @db.Decimal(10, 2) // ნაღდად ასაღები თანხა (მიტანის საფასური ან/და parcelValue)
 
   // მიტანის დადასტურება
   proofPhotoUrl String?
@@ -263,10 +265,10 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events   OrderEvent[]
-  payment  Payment?
-  review   Review?
-  earning  DriverEarning?
+  events  OrderEvent[]
+  payment Payment?
+  review  Review?
+  earning DriverEarning?
 
   @@index([status])
   @@index([customerId])
@@ -282,7 +284,7 @@ model OrderEvent {
   note      String?
   lat       Float?
   lng       Float?
-  actorId   String?     // ვინ შეცვალა
+  actorId   String? // ვინ შეცვალა
   createdAt DateTime    @default(now())
 
   @@index([orderId])
@@ -293,8 +295,8 @@ model OrderEvent {
 // ─────────────────────────────────────────────
 
 enum PaymentProvider {
-  BOG    // საქართველოს ბანკი
-  TBC    // თი-ბი-სი
+  BOG // საქართველოს ბანკი
+  TBC // თი-ბი-სი
   MANUAL // ხელით მონიშნული / ნაღდი
 }
 
@@ -303,11 +305,11 @@ model Payment {
   orderId     String          @unique
   order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   provider    PaymentProvider @default(MANUAL)
-  providerRef String?         // პროვაიდერის ტრანზაქციის ID
+  providerRef String? // პროვაიდერის ტრანზაქციის ID
   amount      Decimal         @db.Decimal(10, 2)
   currency    String          @default("GEL")
   status      PaymentStatus   @default(PENDING)
-  redirectUrl String?         // ჰოსტინგ გვერდის URL
+  redirectUrl String? // ჰოსტინგ გვერდის URL
   rawPayload  Json?
   paidAt      DateTime?
   createdAt   DateTime        @default(now())
@@ -320,45 +322,45 @@ model Payment {
 
 // თითო მიტანილ შეკვეთაზე დარიცხული ანაზღაურება
 model DriverEarning {
-  id         String        @id @default(cuid())
-  driverId   String
-  driver     DriverProfile @relation(fields: [driverId], references: [id])
-  orderId    String        @unique
-  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  grossPrice Decimal       @db.Decimal(10, 2) // შეკვეთის სრული ფასი
-  driverAmount Decimal     @db.Decimal(10, 2) // კურიერს ერგება
-  companyAmount Decimal    @db.Decimal(10, 2) // კომპანიის საკომისიო
-  collectedInCash Boolean  @default(false)    // კურიერმა ნაღდი აიღო?
-  isSettled  Boolean       @default(false)    // ჩათვლილია payout-ში
-  createdAt  DateTime      @default(now())
+  id              String        @id @default(cuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  grossPrice      Decimal       @db.Decimal(10, 2) // შეკვეთის სრული ფასი
+  driverAmount    Decimal       @db.Decimal(10, 2) // კურიერს ერგება
+  companyAmount   Decimal       @db.Decimal(10, 2) // კომპანიის საკომისიო
+  collectedInCash Boolean       @default(false) // კურიერმა ნაღდი აიღო?
+  isSettled       Boolean       @default(false) // ჩათვლილია payout-ში
+  createdAt       DateTime      @default(now())
 
   @@index([driverId, isSettled])
 }
 
 // ნაღდი ფულის ჩაბარება კურიერისგან კომპანიაში
 model CashSettlement {
-  id        String        @id @default(cuid())
-  driverId  String
-  driver    DriverProfile @relation(fields: [driverId], references: [id])
-  amount    Decimal       @db.Decimal(10, 2)
-  note      String?
-  confirmedById String?   // დისპეჩერი
-  createdAt DateTime      @default(now())
+  id            String        @id @default(cuid())
+  driverId      String
+  driver        DriverProfile @relation(fields: [driverId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  note          String?
+  confirmedById String? // დისპეჩერი
+  createdAt     DateTime      @default(now())
 
   @@index([driverId])
 }
 
 // ანაზღაურების გადახდა კურიერზე
 model Payout {
-  id        String        @id @default(cuid())
-  driverId  String
-  driver    DriverProfile @relation(fields: [driverId], references: [id])
-  amount    Decimal       @db.Decimal(10, 2)
-  periodFrom DateTime
-  periodTo   DateTime
-  note      String?
+  id          String        @id @default(cuid())
+  driverId    String
+  driver      DriverProfile @relation(fields: [driverId], references: [id])
+  amount      Decimal       @db.Decimal(10, 2)
+  periodFrom  DateTime
+  periodTo    DateTime
+  note        String?
   createdById String?
-  createdAt DateTime      @default(now())
+  createdAt   DateTime      @default(now())
 
   @@index([driverId])
 }
@@ -374,7 +376,7 @@ model Review {
   authorId  String
   author    User     @relation("ReviewAuthor", fields: [authorId], references: [id])
   driverId  String
-  rating    Int      // 1..5
+  rating    Int // 1..5
   comment   String?
   createdAt DateTime @default(now())
 

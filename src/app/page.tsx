@@ -109,9 +109,13 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-8 text-sm text-muted-foreground sm:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo className="text-foreground" />
-          <span>© 2026 საკურიერო პრო · ფოტოები: Pexels</span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
+            <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>
+            <span>© 2026 საკურიერო პრო</span>
+          </div>
         </div>
       </footer>
     </div>

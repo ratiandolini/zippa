@@ -1,118 +1,60 @@
-// public/sw.js
-// Basic Service Worker for PWA
+/* საკურიერო პრო — service worker (მინიმალური, უსაფრთხო) */
+const STATIC_CACHE = "skr-static-v1";
+const PAGE_CACHE = "skr-pages-v1";
+const OFFLINE_URL = "/offline.html";
 
-const CACHE_NAME = 'sakuriero-pro-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/login',
-  '/register',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
-];
-
-// Install event - cache static assets
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(STATIC_CACHE).then((c) => c.addAll([OFFLINE_URL, "/icons/icon-192.png"])),
   );
   self.skipWaiting();
 });
 
-// Activate event - clean old caches
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
-
-  // Skip API requests
-  if (event.request.url.includes('/api/')) return;
-
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        // Return cached version but fetch update in background
-        fetch(event.request).then((response) => {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response);
-          });
-        }).catch(() => {});
-        return cached;
-      }
-
-      return fetch(event.request).then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
-      }).catch(() => {
-        // Offline fallback
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
-      });
-    })
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => ![STATIC_CACHE, PAGE_CACHE].includes(k)).map((k) => caches.delete(k)),
+        ),
+      )
+      .then(() => self.clients.claim()),
   );
 });
 
-// Push notifications
-self.addEventListener('push', (event) => {
-  const data = event.data?.json() || {};
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
 
-  const options = {
-    body: data.body || 'ახალი შეტყობინება',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    tag: data.tag || 'default',
-    requireInteraction: true,
-    data: data.data || {},
-    actions: [
-      {
-        action: 'open',
-        title: 'გახსნა'
-      },
-      {
-        action: 'close',
-        title: 'დახურვა'
-      }
-    ]
-  };
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
-  event.waitUntil(
-    self.registration.showNotification(
-      data.title || 'საკურიერო პრო',
-      options
-    )
-  );
-});
+  // API და ავტორიზაცია — ქეშირების გარეშე, ყოველთვის ქსელი
+  if (url.pathname.startsWith("/api/")) return;
 
-// Notification click
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
+  // static assets — cache-first
+  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/photos/")) {
+    event.respondWith(
+      caches.match(request).then((cached) => cached || fetch(request).then((res) => {
+        const copy = res.clone();
+        caches.open(STATIC_CACHE).then((c) => c.put(request, copy));
+        return res;
+      })),
+    );
+    return;
+  }
 
-  if (event.action === 'open' || event.action === '') {
-    const url = event.notification.data?.url || '/';
-    event.waitUntil(
-      self.clients.openWindow(url)
+  // ნავიგაცია — network-first, offline fallback
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(PAGE_CACHE).then((c) => c.put(request, copy));
+          return res;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match(OFFLINE_URL))),
     );
   }
 });

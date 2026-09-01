@@ -70,12 +70,8 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       });
 
       if (body.status === "DELIVERED" && order.driverId) {
-        const rule = order.pricingRuleId
-          ? await tx.pricingRule.findUnique({ where: { id: order.pricingRuleId } })
-          : null;
-        const payoutPct = rule?.driverPayoutPercent ?? 80;
         const gross = Number(order.totalPrice);
-        const driverAmount = Math.round(gross * (payoutPct / 100) * 100) / 100;
+        const driverAmount = Number(order.driverFee); // სნეპშოტი შეკვეთის შექმნიდან
         const companyAmount = Math.round((gross - driverAmount) * 100) / 100;
         const cash = order.paymentMethod === "CASH";
 

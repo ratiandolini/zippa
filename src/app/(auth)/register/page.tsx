@@ -27,11 +27,16 @@ function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [role, setRole] = useState(params.get("role") === "DRIVER" ? "DRIVER" : "CUSTOMER");
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!agreed) {
+      setError("გასაგრძელებლად დაეთანხმეთ წესებსა და კონფიდენციალურობის პოლიტიკას");
+      return;
+    }
     setError(null);
     setLoading(true);
     const form = new FormData(e.currentTarget);
@@ -101,10 +106,24 @@ function RegisterForm() {
             <Label htmlFor="password">პაროლი</Label>
             <Input id="password" name="password" type="password" placeholder="მინიმუმ 8 სიმბოლო" required />
           </div>
+          <label className="flex items-start gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              ვეთანხმები{" "}
+              <Link href="/terms" target="_blank" className="text-accent hover:underline">წესებსა და პირობებს</Link>{" "}
+              და{" "}
+              <Link href="/privacy" target="_blank" className="text-accent hover:underline">კონფიდენციალურობის პოლიტიკას</Link>
+            </span>
+          </label>
           {error && (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
-          <Button className="w-full" type="submit" disabled={loading}>
+          <Button className="w-full" type="submit" disabled={loading || !agreed}>
             {loading ? "მუშავდება…" : "ანგარიშის შექმნა"}
           </Button>
         </form>

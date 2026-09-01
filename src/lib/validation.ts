@@ -64,18 +64,16 @@ export const assignDriverSchema = z.object({ driverId: z.string().cuid() });
 const money = z.number().nonnegative().max(100000);
 
 export const pricingRuleSchema = z.object({
-  name: z.string().trim().min(2, "დასახელება").max(80),
-  kind: z.enum(["INTRA_CITY", "INTER_CITY"]),
-  cityId: z.string().cuid().nullable().optional(),
+  zone: z.enum(["TBILISI", "REGIONAL_CITY", "TOWN_VILLAGE"]),
   isActive: z.boolean().default(true),
-  priority: z.number().int().min(0).max(1000).default(1),
-  basePrice: money,
-  pricePerKm: money,
-  pricePerKg: money,
-  freeWeightKg: money,
-  minPrice: money,
+  weightBrackets: z
+    .array(z.object({ maxKg: z.number().positive().max(1000), price: money }))
+    .min(1, "მინიმუმ ერთი წონა-კალათა"),
   codFee: money,
-  driverPayoutPercent: z.number().int().min(0).max(100),
+  driverFlatFee: money,
+  driverPayoutPercent: z.number().int().min(0).max(100).nullable().optional(),
+  sameDayCutoffHour: z.number().int().min(0).max(23).nullable().optional(),
+  deliveryDays: z.number().int().min(0).max(14).default(1),
 });
 
 export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;

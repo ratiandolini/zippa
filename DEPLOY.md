@@ -112,8 +112,62 @@ docker compose -f docker-compose.prod.yml logs -f caddy    # SSL პრობლ
 - Rate limiting ამჟამად in-memory-ია (ერთი კონტეინერისთვის). მრავალინსტანსზე გადასვლისას Redis.
 - ალტერნატივები VPS-ის ნაცვლად: **Railway** / **Render** (managed Postgres, git push deploy) — უფრო მარტივი, ოდნავ ძვირი. იგივე Dockerfile მუშაობს.
 
-## ალტერნატიულ პლატფორმებზე (Railway / Render / Fly.io)
+---
 
-- დაამატე PostgreSQL plugin/addon → აიღე `DATABASE_URL`
-- დააყენე იგივე env ცვლადები (`.env.production.example`-დან), `DATABASE_URL`-ის გარდა რასაც პლატფორმა თავად აძლevს
-- Build: `npm run build` · Start: `npm run db:deploy && node .next/standalone/server.js` (ან პლატფორმა თავად აღმოაჩენს Dockerfile-ს)
+# უფასო გაშვება: Vercel + Neon (ტესტ-რეჟიმი)
+
+საჩვენებლად და ტესტისთვის — $0. (რეალური ბიზნესისთვის VPS სჯობს.)
+
+## 1. ბაზა — Neon
+
+1. [neon.tech](https://neon.tech) → ახალი პროექტი, რეგიონი **Frankfurt (eu-central-1)**
+2. Dashboard → Connection string. აიღე **ორივე**:
+   - **Pooled** (შეიცავს `-pooler`-ს) → ეს იქნება `DATABASE_URL`
+   - **Direct** (pooler-ის გარეშე) → ეს იქნება `DIRECT_URL`
+
+## 2. კოდი — GitHub
+
+```bash
+git push   # კოდი GitHub-ზე უნდა იყოს
+```
+
+## 3. Vercel
+
+1. [vercel.com](https://vercel.com) → Add New Project → აირჩიე რეპო
+2. Framework: **Next.js** (თავად ამოიცნობს). Build command უკვე გაწერილია `vercel.json`-ში
+3. **Environment Variables** (Settings → Environment Variables):
+
+| ცვლადი | მნიშვნელობა |
+|---|---|
+| `DATABASE_URL` | Neon-ის **pooled** connection string |
+| `DIRECT_URL` | Neon-ის **direct** connection string |
+| `AUTH_SECRET` | `openssl rand -base64 32` |
+| `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` (Deploy-ის შემდეგ განაახლე რეალურით) |
+| `SMS_PROVIDER` | `LOG` |
+| `ADMIN_EMAIL` / `ADMIN_PHONE` / `ADMIN_PASSWORD` | პირველი დისპეჩერი |
+| `ADMIN_NAME` | დისპეჩერი |
+
+4. **Deploy**. Build ავტომატურად გაატარებს მიგრაციებს (`prisma migrate deploy`)
+
+## 4. საწყისი მონაცემები (ერთხელ)
+
+Deploy-ის შემდეგ, ლოკალურ მანქანაზე:
+
+```bash
+# .env-ში დროებით ჩასვი Neon-ის URL-ები, მერე:
+NODE_ENV=production npx tsx prisma/seed.ts
+```
+
+ეს დაამატებს ქალაქებს, ტარიფებს და დისპეჩერს (`ADMIN_*`-იდან). **უსაფრთხოა ხელახლა გაშვება** — არსებულს არ შლის.
+
+შედი დისპეჩერის ანგარიშით, **პაროლი შეცვალე**.
+
+## შეზღუდვები
+
+- Neon უფასო: 0.5 GB, ავტო-პაუზა უმოქმედობისას (პირველი მოთხოვნა ~1 წმ ნელი)
+- Vercel უფასო (Hobby): ტექნიკურად არაკომერციული; ცივი სტარტები
+- **რეალური კლიენტებისთვის** — გადადი VPS-ზე (ზემოთ) ან Vercel Pro + Neon-ის ფასიან ტარიფზე
+
+## სხვა პლატფორმები (Railway / Render / Fly.io)
+
+იგივე პრინციპი — Postgres addon → `DATABASE_URL`/`DIRECT_URL`, იგივе env, Build: `npm run build:vercel`.

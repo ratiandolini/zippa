@@ -9,6 +9,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Logo />
         </Link>
         {children}
+        <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground">წესები</Link>
+          <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>
+        </div>
       </div>
     </div>
   );

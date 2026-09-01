@@ -18,49 +18,36 @@ async function main() {
   }
   const tbilisi = await prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } });
 
-  // ტარიფის წესები
-  await prisma.pricingRule.deleteMany();
-  await prisma.pricingRule.createMany({
-    data: [
+  // ტარიფის წესები — ზონა + წონა-კალათები.
+  // არსებულს არ ვშლით (დისპეჩერის რედაქტირება რომ არ დაიკარგოს) — ვამატებთ მხოლოდ ნაკლულ ზონას.
+  const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));
+  const existingZones = new Set((await prisma.pricingRule.findMany({ select: { zone: true } })).map((r) => r.zone));
+  const seedRules = [
       {
-        name: "თბილისი — ქალაქში",
-        kind: "INTRA_CITY",
-        cityId: tbilisi.id,
-        priority: 10,
-        basePrice: "4.00",
-        pricePerKm: "0.80",
-        pricePerKg: "0.50",
-        freeWeightKg: "5",
-        minPrice: "4.00",
+        zone: "TBILISI",
+        weightBrackets: B([[6, 5], [11, 5], [16, 7], [21, 10], [31, 13], [41, 16], [51, 20]]),
         codFee: "1.00",
-        driverPayoutPercent: 80,
+        driverFlatFee: "2.00",
+        sameDayCutoffHour: 16,
+        deliveryDays: 0,
       },
       {
-        name: "სტანდარტული — ქალაქში",
-        kind: "INTRA_CITY",
-        priority: 1,
-        basePrice: "5.00",
-        pricePerKm: "1.00",
-        pricePerKg: "0.50",
-        freeWeightKg: "5",
-        minPrice: "5.00",
-        codFee: "1.00",
-        driverPayoutPercent: 78,
-      },
-      {
-        name: "ქალაქებს შორის",
-        kind: "INTER_CITY",
-        priority: 1,
-        basePrice: "10.00",
-        pricePerKm: "0.55",
-        pricePerKg: "0.80",
-        freeWeightKg: "3",
-        minPrice: "15.00",
+        zone: "REGIONAL_CITY",
+        weightBrackets: B([[6, 7], [11, 10], [16, 13], [21, 16], [31, 19], [41, 30], [51, 40]]),
         codFee: "2.00",
-        driverPayoutPercent: 75,
+        driverFlatFee: "5.00",
+        deliveryDays: 1,
       },
-    ],
-  });
+      {
+        zone: "TOWN_VILLAGE",
+        weightBrackets: B([[6, 11], [11, 14], [16, 17], [21, 20], [31, 23], [41, 35], [51, 45]]),
+        codFee: "2.00",
+        driverFlatFee: "7.00",
+        deliveryDays: 2,
+      },
+    ] as const;
+  const missing = seedRules.filter((r) => !existingZones.has(r.zone));
+  if (missing.length) await prisma.pricingRule.createMany({ data: missing as never });
 
   // ─── PRODUCTION: მხოლოდ დისპეჩერი env-იდან, დემო მონაცემების გარეშე ───
   if (process.env.NODE_ENV === "production") {
@@ -189,11 +176,12 @@ async function main() {
   for (const o of demo) {
     if (await prisma.order.findUnique({ where: { trackingNumber: o.tn } })) continue;
     const dist = haversine([o.pickup[1], o.pickup[2]], [o.delivery[1], o.delivery[2]]);
-    const base = 4;
-    const distancePrice = round2(dist * 0.8);
-    const weightPrice = round2(Math.max(0, o.weightKg - 5) * 0.5);
+    // თბილისის ტარიფი: წონა-კალათა
+    const tbBrackets: [number, number][] = [[6, 5], [11, 5], [16, 7], [21, 10], [31, 13], [41, 16], [51, 20]];
+    const deliveryPrice = tbBrackets.find(([m]) => o.weightKg <= m)?.[1] ?? 20;
     const codFee = o.payment === "CASH" ? 1 : 0;
-    const total = round2(Math.max(4, base + distancePrice + weightPrice + codFee));
+    const total = round2(deliveryPrice + codFee);
+    const driverFee = 2;
     const createdAt = new Date(Date.now() - o.minutesAgo * 60000);
     const assigned = o.status !== "PENDING";
     const delivered = o.status === "DELIVERED";
@@ -214,13 +202,15 @@ async function main() {
         driverId: assigned ? driver.id : null,
         status: o.status,
         kind: "INTRA_CITY",
+        zone: "TBILISI",
+        estimatedDeliveryAt: new Date(createdAt.getTime() + 3 * 3600 * 1000),
         senderName: "მარიამ გიორგაძე",
         senderPhone: "+995555000002",
         pickupAddress: o.pickup[0], pickupLat: o.pickup[1], pickupLng: o.pickup[2], pickupCityId: tbilisi.id,
         recipientName: o.recipient[0], recipientPhone: o.recipient[1],
         deliveryAddress: o.delivery[0], deliveryLat: o.delivery[1], deliveryLng: o.delivery[2], deliveryCityId: tbilisi.id,
         weightKg: o.weightKg, description: o.description,
-        distanceKm: dist, basePrice: base, distancePrice, weightPrice, codFee, totalPrice: total,
+        distanceKm: dist, deliveryPrice, codFee, totalPrice: total, driverFee,
         paymentMethod: o.payment,
         paymentStatus: delivered && o.payment === "CASH" ? "PAID" : "UNPAID",
         codAmount: o.payment === "CASH" ? total : 0,
@@ -237,7 +227,7 @@ async function main() {
     });
 
     if (delivered) {
-      const driverAmount = round2(total * 0.8);
+      const driverAmount = driverFee;
       await prisma.driverEarning.create({
         data: {
           driverId: driver.id, orderId: order.id, grossPrice: total,
