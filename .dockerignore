@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+_legacy
+*.md
+!README.md
+.claude
+.vscode
+.idea
+npm-debug.log*
+coverage
+scratchpad
+Dockerfile
+docker-compose*.yml

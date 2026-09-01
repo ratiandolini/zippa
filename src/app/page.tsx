@@ -1,0 +1,119 @@
+import Link from "next/link";
+import { Logo } from "@/components/logo";
+import { buttonVariants } from "@/components/ui/button";
+import { TrackSearch } from "@/components/track-search";
+import Image from "next/image";
+import { MapPin, Clock, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
+
+function Photo({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  return (
+    <div className={"relative overflow-hidden rounded-xl bg-muted " + (className ?? "")}>
+      <Image src={src} alt={alt} fill sizes="(max-width: 768px) 100vw, 600px" className="object-cover" />
+    </div>
+  );
+}
+
+const features = [
+  { icon: Clock, title: "სწრაფი მიტანა", text: "ქალაქში საშუალოდ 45 წუთი. ქალაქებს შორის — იმავე დღეს." },
+  { icon: MapPin, title: "ცოცხალი რუკა", text: "ნახე რუკაზე სად არის ამანათი და კურიერი — რეალურ დროში." },
+  { icon: Wallet, title: "ნებისმიერი გადახდა", text: "ონლაინ ბარათით ან ნაღდით კურიერთან — შენ ირჩევ." },
+  { icon: ShieldCheck, title: "საიმედოობა", text: "დადასტურებული კურიერები, მიტანის ფოტო-დადასტურება." },
+];
+
+const steps: [string, string, string][] = [
+  ["1", "შექმენი შეკვეთა", "მიუთითე საიდან სად, წონა და მიმღები"],
+  ["2", "კურიერი მიიღებს", "სისტემა უახლოეს თავისუფალ კურიერს მიანიჭებს"],
+  ["3", "ნახე რუკაზე", "აკონტროლე მიტანა რეალურ დროში"],
+  ["4", "მიღება", "მიმღები ადასტურებს — შეკვეთა დასრულდა"],
+];
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+        <Logo />
+        <div className="flex items-center gap-2">
+          <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            შესვლა
+          </Link>
+          <Link href="/register" className={buttonVariants({ size: "sm" })}>
+            რეგისტრაცია
+          </Link>
+        </div>
+      </header>
+
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-10 sm:pt-16 lg:grid-cols-2">
+        <div className="max-w-xl">
+          <span className="inline-flex items-center rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+            მთელი საქართველოს მასშტაბით
+          </span>
+          <h1 className="mt-5 text-4xl font-bold leading-[1.25] sm:text-5xl">
+            საკურიერო სერვისი,
+            <br className="hidden sm:block" /> რომელსაც ენდობი
+          </h1>
+          <p className="mt-4 text-lg text-muted-foreground">
+            გააგზავნე ამანათი ქალაქში ან ქალაქებს შორის. გამჭვირვალე ფასი,
+            ცოცხალი რუკა და დადასტურებული კურიერები.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/register?role=CUSTOMER" className={buttonVariants({ size: "lg" })}>
+              შეკვეთის გაფორმება <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link href="/register?role=DRIVER" className={buttonVariants({ size: "lg", variant: "outline" })}>
+              გახდი კურიერი
+            </Link>
+          </div>
+          <div className="mt-6">
+            <p className="mb-2 text-sm font-medium text-muted-foreground">ამანათის მოძებნა ნომრით</p>
+            <TrackSearch />
+          </div>
+        </div>
+        <Photo src="/photos/hero-courier.jpg" alt="კურიერი ამანათით" className="aspect-[4/3] w-full" />
+      </section>
+
+      <section className="mx-auto max-w-6xl px-5 pb-16">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Photo src="/photos/parcels.jpg" alt="ამანათები" className="aspect-square" />
+          <Photo src="/photos/courier-transport.jpg" alt="კურიერი ტრანსპორტით" className="aspect-square" />
+          <Photo src="/photos/customer.jpg" alt="კმაყოფილი მომხმარებელი" className="aspect-square" />
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-muted/40">
+        <div className="mx-auto grid max-w-6xl gap-6 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map((f) => (
+            <div key={f.title}>
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-background shadow-card">
+                <f.icon className="h-5 w-5 text-accent" />
+              </div>
+              <h3 className="mt-4 font-semibold">{f.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{f.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-5 py-16">
+        <h2 className="text-2xl font-semibold">როგორ მუშაობს</h2>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map(([n, title, text]) => (
+            <div key={n} className="rounded-xl border border-border bg-card p-5 shadow-card">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+                {n}
+              </span>
+              <h3 className="mt-4 font-semibold">{title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-8 text-sm text-muted-foreground sm:flex-row">
+          <Logo className="text-foreground" />
+          <span>© 2026 საკურიერო პრო · ფოტოები: Pexels</span>
+        </div>
+      </footer>
+    </div>
+  );
+}

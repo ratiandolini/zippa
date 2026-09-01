@@ -1,0 +1,22 @@
+# ლოკალური განვითარებისთვის — მხოლოდ ბაზა.
+# აპლიკაცია გაუშვი ცალკე: npm run dev
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sakuriero-db
+    environment:
+      POSTGRES_DB: sakuriero
+      POSTGRES_USER: sakuriero
+      POSTGRES_PASSWORD: sakuriero
+    ports:
+      - "5432:5432"
+    volumes:
+      - sakuriero_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sakuriero"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sakuriero_pgdata:

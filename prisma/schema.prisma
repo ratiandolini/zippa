@@ -1,0 +1,413 @@
+// საკურიერო პრო — მონაცემთა მოდელი
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// მომხმარებლები და როლები
+// ─────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  DISPATCHER // ადმინი / დისპეჩერი
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  driverProfile   DriverProfile?
+  ordersAsCustomer Order[]        @relation("CustomerOrders")
+  notifications   Notification[]
+  reviewsWritten  Review[]        @relation("ReviewAuthor")
+  passwordResets  PasswordReset[]
+
+  @@index([role])
+}
+
+// პაროლის აღდგენა — ტელეფონზე გამოგზავნილი კოდი
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// კურიერის პროფილი
+// ─────────────────────────────────────────────
+
+enum DriverStatus {
+  OFFLINE
+  AVAILABLE
+  BUSY
+}
+
+enum VehicleType {
+  BIKE
+  MOTORCYCLE
+  CAR
+  VAN
+}
+
+model DriverProfile {
+  id            String       @id @default(cuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType   VehicleType  @default(MOTORCYCLE)
+  vehicleNumber String?
+  status        DriverStatus @default(OFFLINE)
+  isApproved    Boolean      @default(false) // დისპეჩერი ამტკიცებს ახალ კურიერს
+
+  // მიმდინარე ლოკაცია
+  currentLat        Float?
+  currentLng        Float?
+  locationUpdatedAt DateTime?
+
+  // საბაზისო ქალაქი (სად მუშაობს ძირითადად)
+  cityId String?
+  city   City?   @relation(fields: [cityId], references: [id])
+
+  ratingAvg      Float @default(5)
+  ratingCount    Int   @default(0)
+  totalDeliveries Int  @default(0)
+
+  // ფინანსური ბალანსი
+  cashOnHand   Decimal @default(0) @db.Decimal(10, 2) // ხელზე აღებული ნაღდი, კომპანიას ჩასაბარებელი
+  unpaidEarnings Decimal @default(0) @db.Decimal(10, 2) // დარიცხული, გადაუხდელი ანაზღაურება
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders       Order[]
+  earnings     DriverEarning[]
+  settlements  CashSettlement[]
+  payouts      Payout[]
+
+  @@index([status])
+  @@index([cityId])
+}
+
+// ─────────────────────────────────────────────
+// გეოგრაფია და ტარიფები
+// ─────────────────────────────────────────────
+
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique // თბილისი, ქუთაისი, ბათუმი ...
+  isActive  Boolean  @default(true)
+  centerLat Float
+  centerLng Float
+  createdAt DateTime @default(now())
+
+  zones          Zone[]
+  drivers        DriverProfile[]
+  pricingRules   PricingRule[]
+}
+
+// ზონა ქალაქის შიგნით (მიახლოებით, GeoJSON polygon წერტილების მასივი)
+model Zone {
+  id       String @id @default(cuid())
+  cityId   String
+  city     City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  name     String
+  polygon  Json   // [[lat,lng], ...]
+  createdAt DateTime @default(now())
+}
+
+enum DeliveryKind {
+  INTRA_CITY   // ქალაქის შიგნით
+  INTER_CITY   // ქალაქებს შორის
+}
+
+// ტარიფის წესი. თუ cityId=null — ეს ინტერსიტი/გლობალური წესია.
+model PricingRule {
+  id             String       @id @default(cuid())
+  name           String
+  kind           DeliveryKind @default(INTRA_CITY)
+  cityId         String?
+  city           City?        @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  isActive       Boolean      @default(true)
+  priority       Int          @default(0) // მაღალი priority ჯერ მოწმდება
+
+  basePrice      Decimal @db.Decimal(10, 2) @default(5)
+  pricePerKm     Decimal @db.Decimal(10, 2) @default(1.5)
+  pricePerKg     Decimal @db.Decimal(10, 2) @default(0.5)
+  freeWeightKg   Decimal @db.Decimal(10, 2) @default(5)   // ამ წონამდე წონის დანამატი არ ერიცხება
+  minPrice       Decimal @db.Decimal(10, 2) @default(4)
+  codFee         Decimal @db.Decimal(10, 2) @default(0)   // ნაღდით გადახდის საკომისიო
+
+  // კურიერის ანაზღაურება ამ შეკვეთაზე
+  driverPayoutPercent Int @default(80) // შემოსავლის %
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, cityId, isActive])
+}
+
+// ─────────────────────────────────────────────
+// შეკვეთა
+// ─────────────────────────────────────────────
+
+enum OrderStatus {
+  DRAFT
+  PENDING        // შექმნილია, კურიერი არ ჰყავს
+  ASSIGNED       // კურიერი მინიჭებულია
+  ACCEPTED       // კურიერმა მიიღო
+  PICKED_UP      // ამანათი აღებულია
+  IN_TRANSIT     // გზაშია
+  DELIVERED      // ჩაბარებულია
+  CANCELLED
+  FAILED         // მიტანა ჩაიშალა
+}
+
+enum PaymentMethod {
+  CASH   // ხელზე / ნაღდით (COD)
+  CARD   // ონლაინ ბარათით
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING       // ონლაინ გადახდა დაწყებულია
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum PayerSide {
+  SENDER
+  RECIPIENT
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  trackingNumber String      @unique
+
+  customerId String
+  customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])
+
+  driverId String?
+  driver   DriverProfile? @relation(fields: [driverId], references: [id])
+
+  status OrderStatus @default(PENDING)
+  kind   DeliveryKind @default(INTRA_CITY)
+
+  // ამგზავნი
+  senderName    String
+  senderPhone   String
+  pickupAddress String
+  pickupLat     Float
+  pickupLng     Float
+  pickupCityId  String?
+  pickupNote    String?
+
+  // მიმღები
+  recipientName    String
+  recipientPhone   String
+  deliveryAddress  String
+  deliveryLat      Float
+  deliveryLng      Float
+  deliveryCityId   String?
+  deliveryNote     String?
+
+  // ამანათი
+  weightKg    Decimal @db.Decimal(10, 2) @default(1)
+  description String?
+  parcelValue Decimal? @db.Decimal(10, 2) // გამოცხადებული ღირებულება (COD-სთვის)
+
+  // ფასი (გამოთვლილი შექმნისას, PricingRule-ის სნეპშოტი)
+  distanceKm   Decimal @db.Decimal(10, 2) @default(0)
+  basePrice    Decimal @db.Decimal(10, 2) @default(0)
+  distancePrice Decimal @db.Decimal(10, 2) @default(0)
+  weightPrice  Decimal @db.Decimal(10, 2) @default(0)
+  codFee       Decimal @db.Decimal(10, 2) @default(0)
+  totalPrice   Decimal @db.Decimal(10, 2) @default(0)
+  pricingRuleId String?
+
+  // გადახდა
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(UNPAID)
+  payerSide     PayerSide     @default(SENDER)
+  codAmount     Decimal       @db.Decimal(10, 2) @default(0) // ნაღდად ასაღები თანხა (მიტანის საფასური ან/და parcelValue)
+
+  // მიტანის დადასტურება
+  proofPhotoUrl String?
+  signatureUrl  String?
+  deliveredAt   DateTime?
+  cancelReason  String?
+
+  estimatedDeliveryAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events   OrderEvent[]
+  payment  Payment?
+  review   Review?
+  earning  DriverEarning?
+
+  @@index([status])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model OrderEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  lat       Float?
+  lng       Float?
+  actorId   String?     // ვინ შეცვალა
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────
+// გადახდები (ონლაინ) — პროვაიდერ-აგნოსტიკური
+// ─────────────────────────────────────────────
+
+enum PaymentProvider {
+  BOG    // საქართველოს ბანკი
+  TBC    // თი-ბი-სი
+  MANUAL // ხელით მონიშნული / ნაღდი
+}
+
+model Payment {
+  id          String          @id @default(cuid())
+  orderId     String          @unique
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider    PaymentProvider @default(MANUAL)
+  providerRef String?         // პროვაიდერის ტრანზაქციის ID
+  amount      Decimal         @db.Decimal(10, 2)
+  currency    String          @default("GEL")
+  status      PaymentStatus   @default(PENDING)
+  redirectUrl String?         // ჰოსტინგ გვერდის URL
+  rawPayload  Json?
+  paidAt      DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// კურიერის ფინანსები
+// ─────────────────────────────────────────────
+
+// თითო მიტანილ შეკვეთაზე დარიცხული ანაზღაურება
+model DriverEarning {
+  id         String        @id @default(cuid())
+  driverId   String
+  driver     DriverProfile @relation(fields: [driverId], references: [id])
+  orderId    String        @unique
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  grossPrice Decimal       @db.Decimal(10, 2) // შეკვეთის სრული ფასი
+  driverAmount Decimal     @db.Decimal(10, 2) // კურიერს ერგება
+  companyAmount Decimal    @db.Decimal(10, 2) // კომპანიის საკომისიო
+  collectedInCash Boolean  @default(false)    // კურიერმა ნაღდი აიღო?
+  isSettled  Boolean       @default(false)    // ჩათვლილია payout-ში
+  createdAt  DateTime      @default(now())
+
+  @@index([driverId, isSettled])
+}
+
+// ნაღდი ფულის ჩაბარება კურიერისგან კომპანიაში
+model CashSettlement {
+  id        String        @id @default(cuid())
+  driverId  String
+  driver    DriverProfile @relation(fields: [driverId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  note      String?
+  confirmedById String?   // დისპეჩერი
+  createdAt DateTime      @default(now())
+
+  @@index([driverId])
+}
+
+// ანაზღაურების გადახდა კურიერზე
+model Payout {
+  id        String        @id @default(cuid())
+  driverId  String
+  driver    DriverProfile @relation(fields: [driverId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  periodFrom DateTime
+  periodTo   DateTime
+  note      String?
+  createdById String?
+  createdAt DateTime      @default(now())
+
+  @@index([driverId])
+}
+
+// ─────────────────────────────────────────────
+// შეფასება და შეტყობინებები
+// ─────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  driverId  String
+  rating    Int      // 1..5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([driverId])
+}
+
+enum NotificationType {
+  ORDER
+  PAYMENT
+  SYSTEM
+  PROMO
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(ORDER)
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+
+// ─────────────────────────────────────────────
+// კონფიგურაცია (key-value)
+// ─────────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
