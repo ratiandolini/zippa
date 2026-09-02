@@ -28,6 +28,12 @@ export async function putFile(
     return { url: res.url };
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "ფაილ-საცავი არ არის კონფიგურირებული (BLOB_READ_WRITE_TOKEN). Vercel-ში შექმენი Blob Store.",
+    );
+  }
+
   // ლოკალური dev — public/uploads/
   const dir = path.join(process.cwd(), "public", "uploads", path.dirname(key));
   await fs.mkdir(dir, { recursive: true });
