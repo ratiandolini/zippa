@@ -36,6 +36,17 @@ export const registerSchema = z
     path: ["taxId"],
   });
 
+export const createDispatcherSchema = z.object({
+  name: z.string().trim().min(2, "სახელი ძალიან მოკლეა").max(80),
+  email: z.string().trim().toLowerCase().email("ელფოსტა არასწორია"),
+  phone: phoneSchema,
+  password: z.string().min(8, "პაროლი მინიმუმ 8 სიმბოლო"),
+});
+
+export const updateDispatcherSchema = z.object({
+  isActive: z.boolean(),
+});
+
 export const loginSchema = z.object({
   emailOrPhone: z.string().trim().min(3, "შეავსე ველი"),
   password: z.string().min(1, "შეავსე პაროლი"),

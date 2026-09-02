@@ -106,6 +106,23 @@ export function usePricingRules() {
   return { rules: data?.rules ?? [], isLoading, mutate };
 }
 
+export interface DispatcherItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export function useDispatchers() {
+  const { data, isLoading, mutate } = useSWR<{ dispatchers: DispatcherItem[] }>(
+    "/api/dispatchers",
+    jsonFetcher,
+  );
+  return { dispatchers: data?.dispatchers ?? [], isLoading, mutate };
+}
+
 export interface NotificationItem {
   id: string;
   type: "ORDER" | "PAYMENT" | "SYSTEM" | "PROMO";
