@@ -21,7 +21,7 @@ export function TrackSearch() {
       <Input
         value={tn}
         onChange={(e) => setTn(e.target.value)}
-        placeholder="ტრეკინგ-ნომერი (SKR-XXXX-XXXX)"
+        placeholder="ტრეკინგ-ნომერი (ZP-XXXX-XXXX)"
         className="font-mono"
       />
       <Button type="submit" className="shrink-0">
