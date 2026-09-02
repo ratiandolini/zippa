@@ -15,7 +15,7 @@ function toLocalDigits(phone: string): string {
 
 async function sendViaSmsOffice(to: string, text: string): Promise<SmsResult> {
   const key = process.env.SMSOFFICE_KEY;
-  const sender = process.env.SMSOFFICE_SENDER || "Sakuriero";
+  const sender = process.env.SMSOFFICE_SENDER || "Zippa";
   if (!key) return { ok: false, provider: "SMSOFFICE", info: "SMSOFFICE_KEY არ არის" };
 
   const url = new URL("https://smsoffice.ge/api/v2/send/");
@@ -47,5 +47,5 @@ export const smsTemplates = {
   onTheWay: (tn: string) =>
     `კურიერი მოდის თქვენს ამანათთან. ტრეკინგი: ${APP_URL}/track/${tn}`,
   delivered: (tn: string) => `ამანათი ${tn} ჩაბარდა. მადლობა, რომ სარგებლობთ ჩვენი სერვისით.`,
-  resetCode: (code: string) => `საკურიერო: პაროლის აღდგენის კოდი — ${code}. მოქმედია 15 წუთი.`,
+  resetCode: (code: string) => `Zippa — პაროლის აღდგენის კოდი — ${code}. მოქმედია 15 წუთი.`,
 };

@@ -31,7 +31,7 @@ export async function geocode(query: string, signal?: AbortSignal): Promise<GeoR
     `&countrycodes=ge&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, {
     signal,
-    headers: { "User-Agent": "sakuriero-pro/0.1 (dev)" },
+    headers: { "User-Agent": "zippa/0.1" },
   });
   if (!res.ok) return [];
   const data = (await res.json()) as Array<{ display_name: string; lat: string; lon: string }>;

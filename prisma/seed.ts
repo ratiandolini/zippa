@@ -110,7 +110,7 @@ async function main() {
       driverProfile: {
         create: {
           vehicleType: "MOTORCYCLE",
-          vehicleNumber: "SKR-123",
+          vehicleNumber: "ZP-101",
           status: "AVAILABLE",
           isApproved: true,
           cityId: tbilisi.id,
@@ -133,7 +133,7 @@ async function main() {
       name: "დავით ხარაძე",
       role: "DRIVER",
       driverProfile: {
-        create: { vehicleType: "CAR", vehicleNumber: "SKR-456", isApproved: false, status: "OFFLINE" },
+        create: { vehicleType: "CAR", vehicleNumber: "ZP-102", isApproved: false, status: "OFFLINE" },
       },
     },
   });
@@ -166,11 +166,11 @@ async function main() {
   };
 
   const demo: DemoInput[] = [
-    { tn: "SKR-DEMO-0001", pickup: ["თბილისი, რუსთაველის გამზ. 10", 41.6977, 44.7995], delivery: ["თბილისი, ჭავჭავაძის გამზ. 25", 41.709, 44.7741], recipient: ["ლევან კაპანაძე", "+995555111222"], weightKg: 2.5, description: "დოკუმენტები", payment: "CASH", status: "IN_TRANSIT", minutesAgo: 55 },
-    { tn: "SKR-DEMO-0002", pickup: ["თბილისი, ვაჟა-ფშაველას გამზ. 45", 41.7255, 44.7502], delivery: ["თბილისი, აღმაშენებლის გამზ. 100", 41.7145, 44.7965], recipient: ["ანა ბოლქვაძე", "+995555333444"], weightKg: 5, description: "კვების პროდუქტები", payment: "CARD", status: "ASSIGNED", minutesAgo: 30 },
-    { tn: "SKR-DEMO-0003", pickup: ["თბილისი, პეკინის ქ. 5", 41.72, 44.76], delivery: ["თბილისი, ვარკეთილის III მ/რ", 41.744, 44.86], recipient: ["ნინო წიკლაური", "+995555555666"], weightKg: 1, description: "საჩუქარი", payment: "CASH", status: "PENDING", minutesAgo: 12 },
-    { tn: "SKR-DEMO-0004", pickup: ["თბილისი, აღმაშენებლის გამზ. 140", 41.72, 44.79], delivery: ["თბილისი, გლდანის IV მ/რ", 41.78, 44.81], recipient: ["დათო ქავთარაძე", "+995555888999"], weightKg: 3, description: "ტექნიკა", payment: "CARD", status: "PENDING", minutesAgo: 6 },
-    { tn: "SKR-DEMO-0005", pickup: ["თბილისი, ლესელიძის ქ. 8", 41.6905, 44.8065], delivery: ["თბილისი, საბურთალო, ყიფშიძის 4", 41.727, 44.746], recipient: ["გიორგი მაისურაძე", "+995555777888"], weightKg: 1.5, description: "წიგნები", payment: "CASH", status: "DELIVERED", minutesAgo: 240, rating: 5 },
+    { tn: "ZP-DEMO-0001", pickup: ["თბილისი, რუსთაველის გამზ. 10", 41.6977, 44.7995], delivery: ["თბილისი, ჭავჭავაძის გამზ. 25", 41.709, 44.7741], recipient: ["ლევან კაპანაძე", "+995555111222"], weightKg: 2.5, description: "დოკუმენტები", payment: "CASH", status: "IN_TRANSIT", minutesAgo: 55 },
+    { tn: "ZP-DEMO-0002", pickup: ["თბილისი, ვაჟა-ფშაველას გამზ. 45", 41.7255, 44.7502], delivery: ["თბილისი, აღმაშენებლის გამზ. 100", 41.7145, 44.7965], recipient: ["ანა ბოლქვაძე", "+995555333444"], weightKg: 5, description: "კვების პროდუქტები", payment: "CARD", status: "ASSIGNED", minutesAgo: 30 },
+    { tn: "ZP-DEMO-0003", pickup: ["თბილისი, პეკინის ქ. 5", 41.72, 44.76], delivery: ["თბილისი, ვარკეთილის III მ/რ", 41.744, 44.86], recipient: ["ნინო წიკლაური", "+995555555666"], weightKg: 1, description: "საჩუქარი", payment: "CASH", status: "PENDING", minutesAgo: 12 },
+    { tn: "ZP-DEMO-0004", pickup: ["თბილისი, აღმაშენებლის გამზ. 140", 41.72, 44.79], delivery: ["თბილისი, გლდანის IV მ/რ", 41.78, 44.81], recipient: ["დათო ქავთარაძე", "+995555888999"], weightKg: 3, description: "ტექნიკა", payment: "CARD", status: "PENDING", minutesAgo: 6 },
+    { tn: "ZP-DEMO-0005", pickup: ["თბილისი, ლესელიძის ქ. 8", 41.6905, 44.8065], delivery: ["თბილისი, საბურთალო, ყიფშიძის 4", 41.727, 44.746], recipient: ["გიორგი მაისურაძე", "+995555777888"], weightKg: 1.5, description: "წიგნები", payment: "CASH", status: "DELIVERED", minutesAgo: 240, rating: 5 },
   ];
 
   for (const o of demo) {

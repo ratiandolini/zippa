@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "საკურიერო პრო",
-    short_name: "საკურიერო",
-    description: "საკურიერო სერვისი მთელი საქართველოს მასშტაბით",
+    name: "Zippa",
+    short_name: "Zippa",
+    description: "Zippa — საკურიერო სერვისი მთელი საქართველოს მასშტაბით",
     lang: "ka",
     start_url: "/",
     scope: "/",

@@ -33,7 +33,7 @@ export function formatPhone(phone: string): string {
 }
 
 export function generateTrackingNumber(): string {
-  const prefix = 'SKR';
+  const prefix = 'ZP';
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `${prefix}-${timestamp}-${random}`;

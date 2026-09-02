@@ -1,6 +1,6 @@
 # განთავსება (Deployment)
 
-საკურიერო პრო — ერთი Next.js აპლიკაცია + PostgreSQL. მთელი სტეკი Docker-შია.
+Zippa — ერთი Next.js აპლიკაცია + PostgreSQL. მთელი სტეკი Docker-შია.
 
 ## რა გჭირდება
 
@@ -24,8 +24,8 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 ## 2. კოდის ატანა
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/sakuriero-pro.git /opt/sakuriero
-cd /opt/sakuriero
+git clone https://github.com/YOUR_USERNAME/zippa.git /opt/zippa
+cd /opt/zippa
 ```
 
 ## 3. კონფიგურაცია
@@ -68,7 +68,7 @@ curl -I https://sakuriero.ge/api/health   # → 200
 ## 5. განახლება
 
 ```bash
-cd /opt/sakuriero
+cd /opt/zippa
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -83,7 +83,7 @@ docker compose -f docker-compose.prod.yml exec -T db \
   pg_dump -U sakuriero sakuriero | gzip > backup-$(date +%F).sql.gz
 
 # ყოველდღიური cron (root crontab -e)
-0 3 * * * cd /opt/sakuriero && docker compose -f docker-compose.prod.yml exec -T db pg_dump -U sakuriero sakuriero | gzip > /opt/backups/skr-$(date +\%F).sql.gz && find /opt/backups -mtime +14 -delete
+0 3 * * * cd /opt/zippa && docker compose -f docker-compose.prod.yml exec -T db pg_dump -U sakuriero sakuriero | gzip > /opt/backups/skr-$(date +\%F).sql.gz && find /opt/backups -mtime +14 -delete
 ```
 
 აღდგენა:

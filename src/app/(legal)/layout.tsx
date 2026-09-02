@@ -20,7 +20,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         <div className="mx-auto flex max-w-3xl flex-wrap gap-x-6 gap-y-2 px-5 py-6 text-sm text-muted-foreground">
           <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
           <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>
-          <span className="ml-auto">© 2026 საკურიერო პრო</span>
+          <span className="ml-auto">© 2026 Zippa</span>
         </div>
       </footer>
     </div>

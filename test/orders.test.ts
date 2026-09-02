@@ -28,7 +28,7 @@ describe("შეკვეთის შექმნა", () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
     expect(o.status).toBe("PENDING");
-    expect(o.trackingNumber).toMatch(/^SKR-/);
+    expect(o.trackingNumber).toMatch(/^ZP-/);
     expect(o.price.total).toBe(6); // 5 + 1 cod
     const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
     expect(db.estimatedDeliveryAt).toBeTruthy();

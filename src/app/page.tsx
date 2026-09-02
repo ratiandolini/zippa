@@ -114,7 +114,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
             <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>
-            <span>© 2026 საკურიერო პრო</span>
+            <span>© 2026 Zippa</span>
           </div>
         </div>
       </footer>

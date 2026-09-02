@@ -15,16 +15,16 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "საკურიერო პრო",
-    template: "%s · საკურიერო პრო",
+    default: "Zippa",
+    template: "%s · Zippa",
   },
-  description: "საკურიერო სერვისი მთელი საქართველოს მასშტაბით — სწრაფად და საიმედოდ.",
-  applicationName: "საკურიერო პრო",
+  description: "Zippa — საკურიერო სერვისი მთელი საქართველოს მასშტაბით — სწრაფად და საიმედოდ.",
+  applicationName: "Zippa",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "საკურიერო პრო",
+    title: "Zippa",
   },
   icons: {
     icon: [
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
   },
   openGraph: {
-    title: "საკურიერო პრო",
-    description: "საკურიერო სერვისი მთელი საქართველოს მასშტაბით",
+    title: "Zippa",
+    description: "Zippa — საკურიერო სერვისი მთელი საქართველოს მასშტაბით",
     type: "website",
     locale: "ka_GE",
   },
