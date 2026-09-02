@@ -188,6 +188,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo className="text-foreground" />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href="/pricing" className="hover:text-foreground">ფასები</Link>
             <Link href="/faq" className="hover:text-foreground">კითხვები</Link>
             <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
             <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>

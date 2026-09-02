@@ -4,7 +4,7 @@ import { appUrl } from "@/lib/app-url";
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = appUrl();
   const now = new Date();
-  const routes = ["", "/faq", "/terms", "/privacy", "/login", "/register"];
+  const routes = ["", "/pricing", "/faq", "/terms", "/privacy", "/login", "/register"];
   return routes.map((path) => ({
     url: `${base}${path}`,
     lastModified: now,

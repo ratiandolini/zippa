@@ -33,7 +33,7 @@ describe("შეკვეთის შექმნა", () => {
     const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
     expect(db.estimatedDeliveryAt).toBeTruthy();
     expect(db.zone).toBe("TBILISI");
-    expect(Number(db.driverFee)).toBe(2);
+    expect(Number(db.driverFee)).toBe(3);
   });
 
   it("ავტორიზაციის გარეშე → 401", async () => {
@@ -222,7 +222,7 @@ describe("სტატუსების მანქანა", () => {
 describe("ჩაბარებისას ფინანსური აღრიცხვა", () => {
   it("DELIVERED (ნაღდი) → earning, unpaidEarnings += driverFee, cashOnHand += codAmount, +1 მიტანა, AVAILABLE", async () => {
     const c = await makeUser("CUSTOMER");
-    const o = await newOrder(c.id); // CASH, total 6, codAmount 6, driverFee 2
+    const o = await newOrder(c.id); // CASH, total 6, codAmount 6, driverFee 3
     const drv = await makeDriver({ approved: true });
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
@@ -231,12 +231,12 @@ describe("ჩაბარებისას ფინანსური აღ�
       await call(setStatus, { params: { id: o.id }, body: { status: s } });
     }
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.unpaidEarnings)).toBe(2);
+    expect(Number(dp.unpaidEarnings)).toBe(3);
     expect(Number(dp.cashOnHand)).toBe(6);
     expect(dp.totalDeliveries).toBe(1);
     expect(dp.status).toBe("AVAILABLE");
     const e = await prisma.driverEarning.findUniqueOrThrow({ where: { orderId: o.id } });
-    expect(Number(e.driverAmount)).toBe(2);
+    expect(Number(e.driverAmount)).toBe(3);
     expect(e.collectedInCash).toBe(true);
   });
 

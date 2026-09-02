@@ -38,17 +38,17 @@ async function deliverN(n: number, payment: "CASH" | "CARD") {
 beforeEach(resetDb);
 
 describe("payout (დისპეჩერი)", () => {
-  it("2 ნაღდი მიტანა → unpaidEarnings 4, cashOnHand 12", async () => {
-    const { drv } = await deliverN(2, "CASH"); // total 6 თითო, driverFee 2 თითო
+  it("2 ნაღდი მიტანა → unpaidEarnings 6, cashOnHand 12", async () => {
+    const { drv } = await deliverN(2, "CASH"); // total 6 თითო, driverFee 3 თითო
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.unpaidEarnings)).toBe(4);
+    expect(Number(dp.unpaidEarnings)).toBe(6);
     expect(Number(dp.cashOnHand)).toBe(12);
   });
 
   it("გადახდა → unpaidEarnings მცირდება, Payout ჩანაწერი, earnings settled", async () => {
     const { drv, disp } = await deliverN(3, "CARD");
     actAs(session(disp));
-    const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 6 } });
+    const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 9 } });
     expect(r.status).toBe(200);
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.unpaidEarnings)).toBe(0);
@@ -57,7 +57,7 @@ describe("payout (დისპეჩერი)", () => {
   });
 
   it("გადასახდელზე მეტი → 400", async () => {
-    const { drv, disp } = await deliverN(1, "CARD"); // unpaid 2
+    const { drv, disp } = await deliverN(1, "CARD"); // unpaid 3
     actAs(session(disp));
     const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 100 } });
     expect(r.status).toBe(400);
@@ -74,7 +74,7 @@ describe("payout (დისპეჩერი)", () => {
     const { drv, disp } = await deliverN(2, "CARD");
     actAs(session(disp));
     const r = await call(driverDetail, { params: { id: drv.profile.id } });
-    expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(4);
+    expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(6);
     expect((r.body.driver as { unsettledEarningsCount: number }).unsettledEarningsCount).toBe(2);
   });
 });

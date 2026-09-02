@@ -44,17 +44,17 @@ export async function resetDb() {
     data: [
       {
         zone: "TBILISI",
-        weightBrackets: B([[6, 5], [11, 5], [16, 7], [21, 10], [31, 13], [41, 16], [51, 20]]),
-        codFee: "1.00", driverFlatFee: "2.00", sameDayCutoffHour: 16, deliveryDays: 0,
+        weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
+        codFee: "1.00", driverFlatFee: "3.00", sameDayCutoffHour: 16, deliveryDays: 0,
       },
       {
         zone: "REGIONAL_CITY",
-        weightBrackets: B([[6, 7], [11, 10], [16, 13], [21, 16], [31, 19], [41, 30], [51, 40]]),
+        weightBrackets: B([[6, 7], [10, 9], [15, 12], [20, 15], [30, 19], [40, 28], [50, 38]]),
         codFee: "2.00", driverFlatFee: "5.00", deliveryDays: 1,
       },
       {
         zone: "TOWN_VILLAGE",
-        weightBrackets: B([[6, 11], [11, 14], [16, 17], [21, 20], [31, 23], [41, 35], [51, 45]]),
+        weightBrackets: B([[6, 11], [10, 13], [15, 16], [20, 19], [30, 23], [40, 33], [50, 43]]),
         codFee: "2.00", driverFlatFee: "7.00", deliveryDays: 2,
       },
     ],

@@ -14,11 +14,6 @@ export function LegalDoc({
         <p className="mt-1 text-sm text-muted-foreground">ბოლო განახლება: {updated}</p>
       </div>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-        <strong>შენიშვნა:</strong> დოკუმენტი მომზადებულია შაბლონის საფუძველზე.
-        რეკომენდებულია იურისტთან გადამოწმება.
-      </div>
-
       <div className="space-y-5 text-[15px] leading-relaxed text-foreground/90">{children}</div>
     </article>
   );

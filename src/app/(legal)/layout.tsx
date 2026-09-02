@@ -18,6 +18,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       <main className="mx-auto max-w-3xl px-5 py-10">{children}</main>
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-3xl flex-wrap gap-x-6 gap-y-2 px-5 py-6 text-sm text-muted-foreground">
+          <Link href="/pricing" className="hover:text-foreground">ფასები</Link>
           <Link href="/faq" className="hover:text-foreground">კითხვები</Link>
           <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
           <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>

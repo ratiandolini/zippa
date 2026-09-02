@@ -35,7 +35,7 @@ describe("resolveZone / resolveCityId", () => {
 describe("calculatePrice — თბილისი", () => {
   const tbId = () => prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } }).then((c) => c.id);
 
-  it("3 კგ ნაღდი → 5 + 1 = 6, კურიერს 2", async () => {
+  it("3 კგ ნაღდი → 5 + 1 = 6, კურიერს 3", async () => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: await tbId(),
     });
@@ -43,7 +43,7 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.deliveryPrice).toBe(5);
     expect(p.codFee).toBe(1);
     expect(p.totalPrice).toBe(6);
-    expect(p.driverFee).toBe(2);
+    expect(p.driverFee).toBe(3);
     expect(p.overWeight).toBe(false);
   });
 
@@ -56,7 +56,7 @@ describe("calculatePrice — თბილისი", () => {
   });
 
   it.each([
-    [6, 5], [7, 5], [11, 5], [12, 7], [16, 7], [20, 10], [30, 13], [40, 16], [50, 20],
+    [6, 5], [7, 6], [10, 6], [11, 8], [15, 8], [16, 10], [20, 10], [25, 13], [30, 13], [40, 16], [50, 20],
   ])("წონა %d კგ → მიტანა %d ₾", async (kg, expected) => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: kg, paymentMethod: "CARD", deliveryCityId: await tbId(),
@@ -64,7 +64,7 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.deliveryPrice).toBe(expected);
   });
 
-  it("51 კგ-ზე მეტი → overWeight true, ბოლო კალათის ფასი", async () => {
+  it("50 კგ-ზე მეტი → overWeight true, ბოლო კალათის ფასი", async () => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 80, paymentMethod: "CARD", deliveryCityId: await tbId(),
     });
