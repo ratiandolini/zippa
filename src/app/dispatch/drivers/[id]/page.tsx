@@ -34,7 +34,23 @@ interface DriverDetail {
     unsettledEarningsCount: number;
     payouts: { id: string; amount: number; note: string | null; createdAt: string }[];
     settlements: { id: string; amount: number; note: string | null; createdAt: string }[];
+    reviews: {
+      id: string;
+      rating: number;
+      comment: string | null;
+      trackingNumber: string | null;
+      createdAt: string;
+    }[];
   };
+}
+
+function Stars({ n }: { n: number }) {
+  return (
+    <span className="tabular-nums text-amber-500">
+      {"★".repeat(n)}
+      <span className="text-muted-foreground">{"★".repeat(5 - n)}</span>
+    </span>
+  );
 }
 
 export default function DriverDetailPage({ params }: { params: { id: string } }) {
@@ -156,6 +172,30 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>შეფასებები ({d.ratingCount})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          {d.reviews.length === 0 ? (
+            <p className="text-muted-foreground">ჯერ არ არის შეფასება.</p>
+          ) : (
+            d.reviews.map((r) => (
+              <div key={r.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
+                <div className="flex items-center justify-between">
+                  <Stars n={r.rating} />
+                  <span className="text-xs text-muted-foreground">
+                    {r.trackingNumber ? `${r.trackingNumber} · ` : ""}
+                    {fmtDate(r.createdAt)}
+                  </span>
+                </div>
+                {r.comment && <p className="mt-1 text-muted-foreground">{r.comment}</p>}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
