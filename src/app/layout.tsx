@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Georgian } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
+import { appUrl } from "@/lib/app-url";
 
 const sans = Noto_Sans_Georgian({
   subsets: ["georgian", "latin"],
@@ -10,7 +11,7 @@ const sans = Noto_Sans_Georgian({
   display: "swap",
 });
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const APP_URL = appUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),

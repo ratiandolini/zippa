@@ -1,4 +1,5 @@
 // SMS — პროვაიდერ-აგნოსტიკური. ცარიელი/LOG => კონსოლში.
+import { appUrl } from "@/lib/app-url";
 
 const PROVIDER = (process.env.SMS_PROVIDER || "LOG").toUpperCase();
 
@@ -40,7 +41,7 @@ export async function sendSms(to: string, text: string): Promise<SmsResult> {
   return { ok: true, provider: "LOG" };
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const APP_URL = appUrl();
 
 /** მოკლე შაბლონები (ქართული = 70 სიმბოლო/სეგმენტი, ვინახავთ მოკლედ) */
 export const smsTemplates = {

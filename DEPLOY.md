@@ -43,7 +43,7 @@ nano .env
 | `AUTH_SECRET` | `openssl rand -base64 32` |
 | `DOMAIN` | `sakuriero.ge` (შენი დომენი, `https://` გარეშე) |
 | `TLS_EMAIL` | შენი ელფოსტა (Let's Encrypt-ისთვის) |
-| `NEXT_PUBLIC_APP_URL` | `https://sakuriero.ge` |
+| `APP_URL` | `https://sakuriero.ge` |
 | `ADMIN_EMAIL` / `ADMIN_PHONE` / `ADMIN_PASSWORD` | პირველი დისპეჩერის ანგარიში |
 
 ## 4. გაშვება
@@ -142,7 +142,7 @@ git push   # კოდი GitHub-ზე უნდა იყოს
 | `DATABASE_URL` | Neon-ის **pooled** connection string |
 | `DIRECT_URL` | Neon-ის **direct** connection string |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
-| `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` (Deploy-ის შემდეგ განაახლე რეალურით) |
+| `APP_URL` | *(არჩევითი — Vercel თავად პოულობს. სურვილისამებრ `https://zippa.ge`)* |
 | `SMS_PROVIDER` | `LOG` |
 | `ADMIN_EMAIL` / `ADMIN_PHONE` / `ADMIN_PASSWORD` | პირველი დისპეჩერი |
 | `ADMIN_NAME` | დისპეჩერი |
