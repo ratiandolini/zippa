@@ -29,6 +29,7 @@ export function GET(req: Request) {
       status: d.status,
       city: d.city?.name ?? null,
       rating: d.ratingAvg,
+      ratingCount: d.ratingCount,
       totalDeliveries: d.totalDeliveries,
       location:
         d.currentLat != null && d.currentLng != null

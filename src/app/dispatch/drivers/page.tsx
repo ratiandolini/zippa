@@ -94,7 +94,12 @@ export default function DriversPage() {
                     {VEHICLE_LABEL[d.vehicleType as VehicleType] ?? d.vehicleType}
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">{d.city ?? "—"}</td>
-                  <td className="px-5 py-3 tabular-nums">★ {d.rating.toFixed(1)}</td>
+                  <td className="px-5 py-3 tabular-nums">
+                    <span className="text-amber-500">★</span> {d.rating.toFixed(1)}
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      {d.ratingCount > 0 ? `(${d.ratingCount})` : "(ახალი)"}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 tabular-nums">{d.totalDeliveries}</td>
                   <td className="px-5 py-3 tabular-nums">{GEL(d.cashOnHand)}</td>
                   <td className="px-5 py-3">

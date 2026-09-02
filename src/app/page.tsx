@@ -4,6 +4,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { TrackSearch } from "@/components/track-search";
 import Image from "next/image";
 import { MapPin, Clock, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
+import { FAQ } from "@/lib/faq";
+import { FaqAccordion } from "@/components/faq-accordion";
 
 function Photo({ src, alt, className }: { src: string; alt: string; className?: string }) {
   return (
@@ -108,10 +110,23 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="border-t border-border bg-muted/40">
+        <div className="mx-auto max-w-3xl px-5 py-16">
+          <h2 className="text-2xl font-semibold">ხშირად დასმული კითხვები</h2>
+          <div className="mt-8">
+            <FaqAccordion items={FAQ.slice(0, 6)} />
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            <Link href="/faq" className="text-accent hover:underline">ყველა კითხვა →</Link>
+          </p>
+        </div>
+      </section>
+
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo className="text-foreground" />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href="/faq" className="hover:text-foreground">კითხვები</Link>
             <Link href="/terms" className="hover:text-foreground">წესები და პირობები</Link>
             <Link href="/privacy" className="hover:text-foreground">კონფიდენციალურობა</Link>
             <span>© 2026 Zippa</span>

@@ -17,16 +17,63 @@ const columns: { key: OrderDTO["status"][]; title: string }[] = [
   { key: ["DELIVERED", "FAILED", "CANCELLED"], title: "დასრულებული" },
 ];
 
+function matches(o: OrderDTO, q: string) {
+  const t = q.trim().toLowerCase();
+  if (!t) return true;
+  return [
+    o.trackingNumber,
+    o.pickup.address,
+    o.delivery.address,
+    o.driverName,
+    o.sender.name,
+    o.sender.phone,
+    o.recipient.name,
+    o.recipient.phone,
+    o.customerName,
+  ]
+    .filter(Boolean)
+    .some((v) => String(v).toLowerCase().includes(t));
+}
+
 export default function OrdersBoard() {
   const { orders, isLoading, mutate } = useOrders("", 10000);
+  const [q, setQ] = useState("");
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+
+  const filtered = orders.filter(
+    (o) => matches(o, q) && (!unassignedOnly || !o.driverId),
+  );
 
   return (
     <>
       <PageHeader title="შეკვეთები" description="სტატუსების დაფა · კურიერის მინიჭება" />
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="ძებნა — ნომერი, მისამართი, კურიერი, ტელეფონი…"
+          className="h-9 w-full max-w-sm rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent"
+        />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={unassignedOnly}
+            onChange={(e) => setUnassignedOnly(e.target.checked)}
+          />
+          მხოლოდ უკურიერო
+        </label>
+        {(q || unassignedOnly) && (
+          <span className="text-xs text-muted-foreground">
+            ნაპოვნია {filtered.length} / {orders.length}
+          </span>
+        )}
+      </div>
+
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {columns.map((col) => {
-          const items = orders.filter((o) => col.key.includes(o.status));
+          const items = filtered.filter((o) => col.key.includes(o.status));
           return (
             <div key={col.title} className="rounded-xl bg-muted/50 p-3">
               <div className="mb-3 flex items-center justify-between px-1">
@@ -161,7 +208,9 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
         >
           <span className="font-medium">{d.name}</span>
           <span className="text-muted-foreground">
-            {d.distanceKm != null ? `${d.distanceKm} კმ` : `★ ${d.rating.toFixed(1)}`}
+            <span className="text-amber-500">★</span> {d.rating.toFixed(1)}
+            {d.ratingCount > 0 ? ` (${d.ratingCount})` : ""}
+            {d.distanceKm != null ? ` · ${d.distanceKm} კმ` : ""}
           </span>
         </button>
       ))}

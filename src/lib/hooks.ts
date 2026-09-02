@@ -14,6 +14,7 @@ export interface DriverListItem {
   status: "AVAILABLE" | "BUSY" | "OFFLINE";
   city: string | null;
   rating: number;
+  ratingCount: number;
   totalDeliveries: number;
   location: { lat: number; lng: number } | null;
   cashOnHand: number;
