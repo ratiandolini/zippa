@@ -9,6 +9,7 @@ import { jsonFetcher, api } from "@/lib/fetcher";
 import { GEL, streetOf } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 const columns: { key: OrderDTO["status"][]; title: string }[] = [
   { key: ["PENDING"], title: "მოლოდინში" },
@@ -101,6 +102,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const canCancel = !TERMINAL.includes(order.status);
+  const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status);
 
   async function cancel() {
     setCancelling(true);
@@ -152,15 +154,25 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         </div>
       )}
 
-      {canCancel && (
-        <button
-          onClick={cancel}
-          disabled={cancelling}
-          className="mt-1.5 text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
-        >
-          {cancelling ? "…" : "შეკვეთის გაუქმება"}
-        </button>
-      )}
+      <div className="mt-1.5 flex items-center gap-3">
+        {canEdit && (
+          <Link
+            href={`/dispatch/orders/${order.id}/edit`}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            რედაქტირება
+          </Link>
+        )}
+        {canCancel && (
+          <button
+            onClick={cancel}
+            disabled={cancelling}
+            className="text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+          >
+            {cancelling ? "…" : "გაუქმება"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

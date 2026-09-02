@@ -83,6 +83,30 @@ export const createOrderSchema = z.object({
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
+// შეკვეთის რედაქტირება — ყველა ველი არასავალდებულო
+export const editOrderSchema = z
+  .object({
+    sender: z.object({
+      name: z.string().trim().min(2, "ამგზავნის სახელი"),
+      phone: phoneSchema,
+    }),
+    recipient: z.object({
+      name: z.string().trim().min(2, "მიმღების სახელი"),
+      phone: phoneSchema,
+    }),
+    pickup: point.extend({ note: z.string().trim().max(200).optional() }),
+    delivery: point.extend({ note: z.string().trim().max(200).optional() }),
+    weightKg: z.number().positive("წონა 0-ზე მეტი").max(500),
+    description: z.string().trim().max(400).nullable(),
+    parcelValue: z.number().nonnegative().max(100000).nullable(),
+    paymentMethod: z.enum(["CASH", "CARD"]),
+    payerSide: z.enum(["SENDER", "RECIPIENT"]),
+  })
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: "არაფერი შესაცვლელი" });
+
+export type EditOrderInput = z.infer<typeof editOrderSchema>;
+
 export const assignDriverSchema = z.object({ driverId: z.string().cuid() });
 
 // ─── ტარიფის წესი ───

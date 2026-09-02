@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetDb, prisma, call, makeUser, makeDriver, actAs, session } from "./helpers";
 import { POST as createOrder, GET as listOrders } from "@/app/api/orders/route";
-import { GET as getOrder } from "@/app/api/orders/[id]/route";
+import { GET as getOrder, PATCH as editOrder } from "@/app/api/orders/[id]/route";
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 
@@ -72,6 +72,68 @@ describe("წვდომა (scoping)", () => {
     actAs(session(d));
     const r = await call(listOrders, {});
     expect((r.body.orders as unknown[]).length).toBe(2);
+  });
+});
+
+describe("შეკვეთის რედაქტირება", () => {
+  it("დისპეჩერი ცვლის მიმღების მისამართს — ფასი/ზონა თავიდან იანგარიშება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id); // თბილისი, total 6
+    const d = await makeUser("DISPATCHER");
+    actAs(session(d));
+    const r = await call(editOrder, {
+      method: "PATCH",
+      params: { id: o.id },
+      body: { delivery: { address: "ბათუმი, ჭავჭავაძის 5", lat: 41.6168, lng: 41.6367 }, weightKg: 3 },
+    });
+    expect(r.status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.zone).toBe("REGIONAL_CITY");
+    expect(db.deliveryAddress).toContain("ბათუმი");
+    expect(Number(db.totalPrice)).toBe(9); // 7 + 2 cod
+  });
+
+  it("მომხმარებელი რედაქტირებს თავის PENDING შეკვეთას", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    actAs(session(c));
+    const r = await call(editOrder, {
+      method: "PATCH",
+      params: { id: o.id },
+      body: { recipient: { name: "ახალი მიმღები", phone: "+995599333444" } },
+    });
+    expect(r.status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.recipientName).toBe("ახალი მიმღები");
+  });
+
+  it("სხვისი შეკვეთის რედაქტირება → 403", async () => {
+    const a = await makeUser("CUSTOMER");
+    const b = await makeUser("CUSTOMER");
+    const o = await newOrder(a.id);
+    actAs(session(b));
+    const r = await call(editOrder, {
+      method: "PATCH",
+      params: { id: o.id },
+      body: { description: "hack" },
+    });
+    expect(r.status).toBe(403);
+  });
+
+  it("მიტანილი შეკვეთის რედაქტირება → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const { profile } = await makeDriver({ approved: true });
+    const d = await makeUser("DISPATCHER");
+    actAs(session(d));
+    await call(assign, { params: { id: o.id }, body: { driverId: profile.id } });
+    await prisma.order.update({ where: { id: o.id }, data: { status: "DELIVERED" } });
+    const r = await call(editOrder, {
+      method: "PATCH",
+      params: { id: o.id },
+      body: { description: "late" },
+    });
+    expect(r.status).toBe(409);
   });
 });
 
