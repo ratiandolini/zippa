@@ -63,6 +63,8 @@ export function serializeOrder(o: OrderWith) {
     payerSide: o.payerSide,
     codAmount: num(o.codAmount),
 
+    proofPhotoUrl: o.proofPhotoUrl,
+
     review: o.review ? { rating: o.review.rating, comment: o.review.comment } : null,
 
     events: o.events.map((e) => ({

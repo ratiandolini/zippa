@@ -10,6 +10,7 @@ import { GEL, streetOf } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { ProofPhoto } from "@/components/proof-photo";
 
 const columns: { key: OrderDTO["status"][]; title: string }[] = [
   { key: ["PENDING"], title: "მოლოდინში" },
@@ -132,6 +133,12 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         <span>{order.driverName ?? "კურიერი არ ჰყავს"}</span>
         <span>{GEL(order.price.total)}</span>
       </div>
+
+      {order.proofPhotoUrl && (
+        <div className="mt-2">
+          <ProofPhoto order={order} />
+        </div>
+      )}
 
       {canAssign && (
         <div className="mt-2">

@@ -38,5 +38,8 @@ _legacy/
 # ts build cache
 *.tsbuildinfo
 
+# ატვირთული ფაილები (ლოკალური dev-საცავი; პროდში Vercel Blob)
+/public/uploads/
+
 # vitest
 /test-results/

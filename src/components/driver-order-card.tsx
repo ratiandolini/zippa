@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { DRIVER_NEXT_STATUS, ORDER_STATUS_LABEL, GEL } from "@/lib/domain";
 import { api } from "@/lib/fetcher";
+import { ProofPhoto } from "@/components/proof-photo";
 import type { OrderDTO } from "@/lib/serialize";
 import type { OrderStatus } from "@prisma/client";
 import { ArrowRight, Phone } from "lucide-react";
@@ -75,6 +76,12 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
             : "გადახდილია"}
         </span>
       </div>
+
+      {["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (
+        <div className="mt-3">
+          <ProofPhoto order={order} canUpload onChange={onChange} />
+        </div>
+      )}
 
       {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
 

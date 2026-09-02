@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { OrderTimeline } from "@/components/order-timeline";
 import { CancelOrderButton, RatingWidget } from "@/components/order-actions";
+import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
 import { GEL, streetOf } from "@/lib/domain";
@@ -154,6 +155,17 @@ function Detail({ id }: { id: string }) {
               )}
             </CardContent>
           </Card>
+
+          {order.proofPhotoUrl && (
+            <Card>
+              <CardHeader>
+                <CardTitle>მიტანის ფოტო</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProofPhoto order={order} />
+              </CardContent>
+            </Card>
+          )}
 
           {order.status === "DELIVERED" && (
             <Card>
