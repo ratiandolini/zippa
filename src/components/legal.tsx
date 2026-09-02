@@ -15,8 +15,8 @@ export function LegalDoc({
       </div>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-        <strong>შენიშვნა:</strong> ეს არის სამუშაო ვერსია. საბოლოო გამოქვეყნებამდე
-        გადაამოწმებინეთ იურისტს და შეავსეთ კვადრატულ ფრჩხილებში [ ] მითითებული რეკვიზიტები.
+        <strong>შენიშვნა:</strong> დოკუმენტი მომზადებულია შაბლონის საფუძველზე.
+        რეკომენდებულია იურისტთან გადამოწმება.
       </div>
 
       <div className="space-y-5 text-[15px] leading-relaxed text-foreground/90">{children}</div>
