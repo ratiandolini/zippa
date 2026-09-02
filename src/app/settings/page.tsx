@@ -15,7 +15,16 @@ import { VEHICLE_LABEL } from "@/lib/domain";
 import type { Role, VehicleType } from "@prisma/client";
 
 interface Me {
-  user: { id: string; name: string; email: string; phone: string; role: Role };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    role: Role;
+    accountType: "INDIVIDUAL" | "COMPANY";
+    companyName: string | null;
+    taxId: string | null;
+  };
 }
 
 export default function SettingsPage() {
@@ -77,14 +86,34 @@ function Section({
 function ProfileForm({ user, onSaved }: { user: Me["user"]; onSaved: () => void }) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone);
+  const [accountType, setAccountType] = useState(user.accountType);
+  const [companyName, setCompanyName] = useState(user.companyName ?? "");
+  const [taxId, setTaxId] = useState(user.taxId ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const canChooseType = user.role === "CUSTOMER";
+  const isCompany = canChooseType && accountType === "COMPANY";
+
   async function save() {
+    if (isCompany && (!companyName.trim() || !/^\d{9,11}$/.test(taxId.trim()))) {
+      setMsg({ ok: false, text: "შეავსეთ კომპანიის დასახელება და ს/კ (9–11 ციფრი)" });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
-      await api("/api/auth/me", "PATCH", { name, phone });
+      await api("/api/auth/me", "PATCH", {
+        name,
+        phone,
+        ...(canChooseType
+          ? {
+              accountType,
+              companyName: isCompany ? companyName : null,
+              taxId: isCompany ? taxId : null,
+            }
+          : {}),
+      });
       setMsg({ ok: true, text: "შენახულია" });
       onSaved();
     } catch (e) {
@@ -96,8 +125,32 @@ function ProfileForm({ user, onSaved }: { user: Me["user"]; onSaved: () => void 
 
   return (
     <Section title="პროფილი" onSubmit={save} busy={busy} msg={msg}>
+      {canChooseType && (
+        <div className="space-y-1.5">
+          <Label>ანგარიშის ტიპი</Label>
+          <Select
+            value={accountType}
+            onChange={(e) => setAccountType(e.target.value as "INDIVIDUAL" | "COMPANY")}
+          >
+            <option value="INDIVIDUAL">ფიზიკური პირი</option>
+            <option value="COMPANY">იურიდიული პირი</option>
+          </Select>
+        </div>
+      )}
+      {isCompany && (
+        <>
+          <div className="space-y-1.5">
+            <Label>კომპანიის დასახელება</Label>
+            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>საიდენტიფიკაციო კოდი</Label>
+            <Input value={taxId} inputMode="numeric" onChange={(e) => setTaxId(e.target.value)} />
+          </div>
+        </>
+      )}
       <div className="space-y-1.5">
-        <Label>სახელი და გვარი</Label>
+        <Label>{isCompany ? "საკონტაქტო პირი" : "სახელი და გვარი"}</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="space-y-1.5">

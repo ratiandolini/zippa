@@ -12,25 +12,57 @@ beforeEach(resetDb);
 describe("register", () => {
   it("ქმნის მომხმარებელს", async () => {
     const r = await call(register, {
-      body: { name: "ანა ტესტი", email: "ana@test.ge", phone: "+995599112233", password: "secret12345", role: "CUSTOMER" },
+      body: { name: "ანა ტესტი", email: "ana@test.ge", phone: "+995599112233", password: "secret12345", role: "CUSTOMER", agreed: true },
     });
     expect(r.status).toBe(201);
     const u = await prisma.user.findUnique({ where: { email: "ana@test.ge" } });
     expect(u?.role).toBe("CUSTOMER");
+    expect(u?.agreedAt).toBeInstanceOf(Date);
   });
 
   it("DRIVER-ს უჩნდება დაუმტკიცებელი პროფილი", async () => {
     await call(register, {
-      body: { name: "დრ", email: "dr@test.ge", phone: "+995599112244", password: "secret12345", role: "DRIVER" },
+      body: { name: "დრ", email: "dr@test.ge", phone: "+995599112244", password: "secret12345", role: "DRIVER", agreed: true },
     });
     const u = await prisma.user.findUnique({ where: { email: "dr@test.ge" }, include: { driverProfile: true } });
     expect(u?.driverProfile?.isApproved).toBe(false);
   });
 
+  it("კომპანიის ანგარიში ინახავს დასახელებას და ს/კ-ს", async () => {
+    const r = await call(register, {
+      body: {
+        name: "საკონტაქტო პირი", email: "co@test.ge", phone: "+995599112255", password: "secret12345",
+        role: "CUSTOMER", accountType: "COMPANY", companyName: "შპს ტესტი", taxId: "404123456", agreed: true,
+      },
+    });
+    expect(r.status).toBe(201);
+    const u = await prisma.user.findUnique({ where: { email: "co@test.ge" } });
+    expect(u?.accountType).toBe("COMPANY");
+    expect(u?.companyName).toBe("შპს ტესტი");
+    expect(u?.taxId).toBe("404123456");
+  });
+
+  it("კომპანია ს/კ-ს გარეშე → 422", async () => {
+    const r = await call(register, {
+      body: {
+        name: "პირი", email: "co2@test.ge", phone: "+995599112266", password: "secret12345",
+        role: "CUSTOMER", accountType: "COMPANY", companyName: "შპს X", agreed: true,
+      },
+    });
+    expect(r.status).toBe(422);
+  });
+
+  it("წესებზე თანხმობის გარეშე → 422", async () => {
+    const r = await call(register, {
+      body: { name: "უთანხმო", email: "na@test.ge", phone: "+995599112277", password: "secret12345", role: "CUSTOMER" },
+    });
+    expect(r.status).toBe(422);
+  });
+
   it("დუბლიკატი ელფოსტა → 409", async () => {
     await makeUser("CUSTOMER", { email: "dup@test.ge" });
     const r = await call(register, {
-      body: { name: "დუბლი კაცი", email: "dup@test.ge", phone: "+995599000001", password: "secret12345", role: "CUSTOMER" },
+      body: { name: "დუბლი კაცი", email: "dup@test.ge", phone: "+995599000001", password: "secret12345", role: "CUSTOMER", agreed: true },
     });
     expect(r.status).toBe(409);
   });

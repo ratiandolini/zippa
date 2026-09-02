@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { registerSchema } from "@/lib/validation";
+import { TERMS_VERSION } from "@/lib/terms";
 import { handle, ok, ApiError, throttle } from "@/lib/api";
 
 export function POST(req: Request) {
@@ -23,6 +24,8 @@ export function POST(req: Request) {
       );
     }
 
+    const isCompany = data.role === "CUSTOMER" && data.accountType === "COMPANY";
+
     const user = await prisma.user.create({
       data: {
         name: data.name,
@@ -30,6 +33,11 @@ export function POST(req: Request) {
         phone: data.phone,
         passwordHash: await hashPassword(data.password),
         role: data.role,
+        accountType: isCompany ? "COMPANY" : "INDIVIDUAL",
+        companyName: isCompany ? data.companyName?.trim() : null,
+        taxId: isCompany ? data.taxId?.trim() : null,
+        agreedAt: new Date(),
+        termsVersion: TERMS_VERSION,
         ...(data.role === "DRIVER"
           ? { driverProfile: { create: { isApproved: false, status: "OFFLINE" } } }
           : {}),

@@ -27,6 +27,7 @@ function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [role, setRole] = useState(params.get("role") === "DRIVER" ? "DRIVER" : "CUSTOMER");
+  const [accountType, setAccountType] = useState<"INDIVIDUAL" | "COMPANY">("INDIVIDUAL");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ function RegisterForm() {
     setError(null);
     setLoading(true);
     const form = new FormData(e.currentTarget);
+    const isCompany = role === "CUSTOMER" && accountType === "COMPANY";
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -50,6 +52,10 @@ function RegisterForm() {
           email: form.get("email"),
           password: form.get("password"),
           role,
+          accountType: role === "CUSTOMER" ? accountType : "INDIVIDUAL",
+          companyName: isCompany ? form.get("companyName") : undefined,
+          taxId: isCompany ? form.get("taxId") : undefined,
+          agreed,
         }),
       });
       const data = await res.json();
@@ -89,9 +95,49 @@ function RegisterForm() {
             </button>
           ))}
         </div>
+
+        {role === "CUSTOMER" && (
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            {[
+              { key: "INDIVIDUAL", label: "ფიზიკური პირი" },
+              { key: "COMPANY", label: "იურიდიული პირი" },
+            ].map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setAccountType(a.key as "INDIVIDUAL" | "COMPANY")}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-center text-sm transition-colors",
+                  accountType === a.key
+                    ? "border-accent bg-accent/10 font-medium"
+                    : "border-border hover:bg-muted",
+                )}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <form className="space-y-4" onSubmit={onSubmit}>
+          {role === "CUSTOMER" && accountType === "COMPANY" && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="companyName">კომპანიის დასახელება</Label>
+                <Input id="companyName" name="companyName" placeholder="შპს „მაგალითი“" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="taxId">საიდენტიფიკაციო კოდი</Label>
+                <Input id="taxId" name="taxId" inputMode="numeric" placeholder="404XXXXXX" required />
+              </div>
+            </>
+          )}
           <div className="space-y-1.5">
-            <Label htmlFor="name">სახელი და გვარი</Label>
+            <Label htmlFor="name">
+              {role === "CUSTOMER" && accountType === "COMPANY"
+                ? "საკონტაქტო პირი"
+                : "სახელი და გვარი"}
+            </Label>
             <Input id="name" name="name" placeholder="გიორგი მაისურაძე" required />
           </div>
           <div className="space-y-1.5">
@@ -114,9 +160,11 @@ function RegisterForm() {
               className="mt-0.5"
             />
             <span>
-              ვეთანხმები{" "}
+              {role === "CUSTOMER" && accountType === "COMPANY"
+                ? "კომპანიის სახელით ვადასტურებ და ვეთანხმები "
+                : "ვეთანხმები "}
               <Link href="/terms" target="_blank" className="text-accent hover:underline">წესებსა და პირობებს</Link>{" "}
-              და{" "}
+              (საჯარო ოფერტი) და{" "}
               <Link href="/privacy" target="_blank" className="text-accent hover:underline">კონფიდენციალურობის პოლიტიკას</Link>
             </span>
           </label>

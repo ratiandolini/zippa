@@ -21,6 +21,11 @@ enum Role {
   DISPATCHER // ადმინი / დისპეჩერი
 }
 
+enum AccountType {
+  INDIVIDUAL // ფიზიკური პირი
+  COMPANY // იურიდიული პირი
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -31,6 +36,15 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // ანგარიშის ტიპი — ფიზიკური / იურიდიული (ინვოისისთვის)
+  accountType AccountType @default(INDIVIDUAL)
+  companyName String? // იურიდიული დასახელება
+  taxId       String? // საიდენტიფიკაციო კოდი / ს/კ
+
+  // საჯარო ოფერტზე თანხმობა
+  agreedAt     DateTime?
+  termsVersion String?
 
   driverProfile    DriverProfile?
   ordersAsCustomer Order[]         @relation("CustomerOrders")

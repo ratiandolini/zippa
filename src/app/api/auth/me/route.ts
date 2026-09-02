@@ -18,8 +18,27 @@ export function PATCH(req: Request) {
 
     const user = await prisma.user.update({
       where: { id: session.sub },
-      data: { ...(data.name ? { name: data.name } : {}), ...(data.phone ? { phone: data.phone } : {}) },
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.phone ? { phone: data.phone } : {}),
+        ...(data.accountType ? { accountType: data.accountType } : {}),
+        ...(data.accountType === "INDIVIDUAL"
+          ? { companyName: null, taxId: null }
+          : {
+              ...(data.companyName !== undefined ? { companyName: data.companyName || null } : {}),
+              ...(data.taxId !== undefined ? { taxId: data.taxId || null } : {}),
+            }),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        accountType: true,
+        companyName: true,
+        taxId: true,
+      },
     });
 
     // სესიის განახლება (სახელი JWT-შია)
@@ -35,7 +54,16 @@ export function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.sub },
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        accountType: true,
+        companyName: true,
+        taxId: true,
+      },
     });
     if (!user) return fail(401, "მომხმარებელი ვერ მოიძებნა");
     return ok({ user });

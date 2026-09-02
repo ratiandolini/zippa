@@ -13,13 +13,28 @@ export const phoneSchema = z
     return `+995${local}`;
   });
 
-export const registerSchema = z.object({
-  name: z.string().trim().min(2, "სახელი ძალიან მოკლეა").max(80),
-  email: z.string().trim().toLowerCase().email("ელფოსტა არასწორია"),
-  phone: phoneSchema,
-  password: z.string().min(8, "პაროლი მინიმუმ 8 სიმბოლო"),
-  role: z.enum(["CUSTOMER", "DRIVER"]).default("CUSTOMER"),
-});
+export const registerSchema = z
+  .object({
+    name: z.string().trim().min(2, "სახელი ძალიან მოკლეა").max(80),
+    email: z.string().trim().toLowerCase().email("ელფოსტა არასწორია"),
+    phone: phoneSchema,
+    password: z.string().min(8, "პაროლი მინიმუმ 8 სიმბოლო"),
+    role: z.enum(["CUSTOMER", "DRIVER"]).default("CUSTOMER"),
+    accountType: z.enum(["INDIVIDUAL", "COMPANY"]).default("INDIVIDUAL"),
+    companyName: z.string().trim().max(160).optional(),
+    taxId: z.string().trim().max(20).optional(),
+    agreed: z.literal(true, {
+      errorMap: () => ({ message: "დაეთანხმეთ წესებსა და კონფიდენციალურობის პოლიტიკას" }),
+    }),
+  })
+  .refine((d) => d.role !== "CUSTOMER" || d.accountType !== "COMPANY" || !!d.companyName?.trim(), {
+    message: "მიუთითეთ კომპანიის დასახელება",
+    path: ["companyName"],
+  })
+  .refine((d) => d.role !== "CUSTOMER" || d.accountType !== "COMPANY" || /^\d{9,11}$/.test(d.taxId ?? ""), {
+    message: "საიდენტიფიკაციო კოდი 9–11 ციფრია",
+    path: ["taxId"],
+  });
 
 export const loginSchema = z.object({
   emailOrPhone: z.string().trim().min(3, "შეავსე ველი"),
@@ -83,6 +98,9 @@ export type PricingRuleInput = z.infer<typeof pricingRuleSchema>;
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   phone: phoneSchema.optional(),
+  accountType: z.enum(["INDIVIDUAL", "COMPANY"]).optional(),
+  companyName: z.string().trim().max(160).nullable().optional(),
+  taxId: z.string().trim().max(20).nullable().optional(),
 });
 
 export const changePasswordSchema = z.object({
