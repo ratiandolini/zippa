@@ -22,6 +22,12 @@ export const metadata: Metadata = {
   description: "Zippa — საკურიერო სერვისი მთელი საქართველოს მასშტაბით — სწრაფად და საიმედოდ.",
   applicationName: "Zippa",
   manifest: "/manifest.webmanifest",
+  formatDetection: { telephone: false },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -29,6 +35,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
     ],

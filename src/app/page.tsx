@@ -1,5 +1,40 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { appUrl } from "@/lib/app-url";
+
+export const metadata: Metadata = {
+  title: "Zippa — საკურიერო სერვისი მთელი საქართველოში",
+  description:
+    "გააგზავნე ამანათი ქალაქში ან ქალაქებს შორის. გამჭვირვალე ფასი წონისა და ზონის მიხედვით, ცოცხალი რუკა, დადასტურებული კურიერები. ონლაინ ან ნაღდი გადახდა.",
+  keywords: [
+    "საკურიერო",
+    "კურიერი",
+    "ამანათის მიტანა",
+    "მიწოდება",
+    "თბილისი",
+    "საქართველო",
+    "courier",
+    "delivery",
+    "Georgia",
+    "Zippa",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Zippa — საკურიერო სერვისი მთელი საქართველოში",
+    description:
+      "ამანათის მიტანა ქალაქში და ქალაქებს შორის. გამჭვირვალე ფასი, ცოცხალი რუკა, დადასტურებული კურიერები.",
+    url: "/",
+    siteName: "Zippa",
+    locale: "ka_GE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Zippa — საკურიერო სერვისი",
+    description: "ამანათის მიტანა მთელი საქართველოს მასშტაბით.",
+  },
+};
 import { buttonVariants } from "@/components/ui/button";
 import { TrackSearch } from "@/components/track-search";
 import Image from "next/image";
@@ -29,9 +64,36 @@ const steps: [string, string, string][] = [
   ["4", "მიღება", "მიმღები ადასტურებს — შეკვეთა დასრულდა"],
 ];
 
+function JsonLd() {
+  const base = appUrl();
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "MovingCompany",
+    name: "Zippa",
+    description: "საკურიერო სერვისი მთელი საქართველოს მასშტაბით",
+    url: base,
+    areaServed: { "@type": "Country", name: "Georgia" },
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "მინდელის ქუჩა 3",
+      addressLocality: "თბილისი",
+      addressCountry: "GE",
+    },
+    email: "ratiandolini@gmail.com",
+    telephone: "+995598423234",
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
+      <JsonLd />
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <Logo />
         <div className="flex items-center gap-2">
