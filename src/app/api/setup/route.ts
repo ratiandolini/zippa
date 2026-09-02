@@ -39,10 +39,57 @@ export function POST(req: Request) {
   return handle(async () => {
     const token = process.env.SETUP_TOKEN;
     if (!token) return fail(503, "SETUP_TOKEN არ არის კონფიგურირებული");
-    const given = req.headers.get("x-setup-token") || new URL(req.url).searchParams.get("token");
+    const url = new URL(req.url);
+    const given = req.headers.get("x-setup-token") || url.searchParams.get("token");
     if (given !== token) return fail(401, "არასწორი token");
 
     const result: Record<string, unknown> = {};
+
+    // სატესტო მონაცემების გასუფთავება: POST /api/setup?cleanup=test
+    // შლის ყველა ანგარიშს, რომლის ელფოსტა მთავრდება @zippa.test-ით და მათ შეკვეთებს.
+    if (url.searchParams.get("cleanup") === "test") {
+      const testUsers = await prisma.user.findMany({
+        where: { email: { endsWith: "@zippa.test" } },
+        select: { id: true, email: true },
+      });
+      const ids = testUsers.map((u) => u.id);
+      const dp = await prisma.driverProfile.findMany({
+        where: { userId: { in: ids } },
+        select: { id: true },
+      });
+      const dpIds = dp.map((d) => d.id);
+      const delOrders = await prisma.order.deleteMany({
+        where: { OR: [{ customerId: { in: ids } }, { driverId: { in: dpIds } }] },
+      });
+      const delUsers = await prisma.user.deleteMany({
+        where: { email: { endsWith: "@zippa.test" } },
+      });
+
+      // ობოლი შეტყობინებები — რომელთა orderId აღარ არსებობს (მაგ. წაშლილი სატესტო შეკვეთები)
+      const notifs = await prisma.notification.findMany({
+        where: { type: "ORDER" },
+        select: { id: true, data: true },
+      });
+      const orderIds = new Set(
+        (await prisma.order.findMany({ select: { id: true } })).map((o) => o.id),
+      );
+      const orphanIds = notifs
+        .filter((n) => {
+          const oid = (n.data as { orderId?: string } | null)?.orderId;
+          return oid && !orderIds.has(oid);
+        })
+        .map((n) => n.id);
+      const delNotifs = await prisma.notification.deleteMany({
+        where: { id: { in: orphanIds } },
+      });
+      return ok({
+        cleanup: "test",
+        usersDeleted: delUsers.count,
+        ordersDeleted: delOrders.count,
+        notificationsDeleted: delNotifs.count,
+        emails: testUsers.map((u) => u.email),
+      });
+    }
 
     for (const c of CITIES) {
       await prisma.city.upsert({ where: { name: c.name }, update: {}, create: c });
