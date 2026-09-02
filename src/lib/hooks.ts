@@ -15,6 +15,7 @@ export interface DriverListItem {
   city: string | null;
   rating: number;
   ratingCount: number;
+  activeOrders: number;
   totalDeliveries: number;
   location: { lat: number; lng: number } | null;
   cashOnHand: number;

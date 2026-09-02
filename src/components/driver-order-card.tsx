@@ -23,6 +23,20 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
   const [err, setErr] = useState<string | null>(null);
   const next = DRIVER_NEXT_STATUS[order.status] ?? [];
 
+  async function reject() {
+    if (!confirm("დარწმუნებული ხარ, რომ უარს ამბობ ამ შეკვეთაზე?")) return;
+    setBusy("REJECT");
+    setErr(null);
+    try {
+      await api(`/api/orders/${order.id}/reject`, "POST", {});
+      onChange();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function move(status: OrderStatus) {
     setBusy(status);
     setErr(null);
@@ -98,6 +112,11 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
               {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
             </Button>
           ))}
+          {order.status === "ASSIGNED" && (
+            <Button size="sm" variant="ghost" disabled={busy != null} onClick={reject}>
+              {busy === "REJECT" ? "…" : "უარი"}
+            </Button>
+          )}
         </div>
       )}
     </div>

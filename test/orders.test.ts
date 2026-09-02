@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetDb, prisma, call, makeUser, makeDriver, actAs, session } from "./helpers";
 import { POST as createOrder, GET as listOrders } from "@/app/api/orders/route";
-import { GET as getOrder, PATCH as editOrder } from "@/app/api/orders/[id]/route";
+import { GET as getOrder, PATCH as editOrder, DELETE as deleteOrder } from "@/app/api/orders/[id]/route";
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
+import { POST as rejectOrder } from "@/app/api/orders/[id]/reject/route";
 
 const orderBody = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მარიამ გ", phone: "+995599111111" },
@@ -134,6 +135,78 @@ describe("შეკვეთის რედაქტირება", () => {
       body: { description: "late" },
     });
     expect(r.status).toBe(409);
+  });
+});
+
+describe("კურიერის უარი (reject)", () => {
+  it("კურიერი უარს ამბობს ASSIGNED-ზე → PENDING, driverId იშლება, კურიერი AVAILABLE", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+
+    actAs(session(drv.user));
+    const r = await call(rejectOrder, { method: "POST", params: { id: o.id }, body: {} });
+    expect(r.status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.status).toBe("PENDING");
+    expect(db.driverId).toBeNull();
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.status).toBe("AVAILABLE");
+  });
+
+  it("სხვისი კურიერი ვერ იტყვის უარს → 403", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    const other = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(other.user));
+    const r = await call(rejectOrder, { method: "POST", params: { id: o.id }, body: {} });
+    expect(r.status).toBe(403);
+  });
+
+  it("ACCEPTED-ის შემდეგ უარი → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
+    const r = await call(rejectOrder, { method: "POST", params: { id: o.id }, body: {} });
+    expect(r.status).toBe(409);
+  });
+});
+
+describe("გაუქმებული შეკვეთის წაშლა", () => {
+  it("დისპეჩერი შლის CANCELLED შეკვეთას", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    await prisma.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
+    actAs(session(await makeUser("DISPATCHER")));
+    const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
+    expect(r.status).toBe(200);
+    expect(await prisma.order.findUnique({ where: { id: o.id } })).toBeNull();
+  });
+
+  it("აქტიური შეკვეთის წაშლა → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    actAs(session(await makeUser("DISPATCHER")));
+    const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
+    expect(r.status).toBe(409);
+  });
+
+  it("მომხმარებელი ვერ შლის → 403", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    await prisma.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
+    actAs(session(c));
+    const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
+    expect(r.status).toBe(403);
   });
 });
 

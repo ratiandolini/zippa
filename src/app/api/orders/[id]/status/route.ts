@@ -8,7 +8,7 @@ import { sendSms, smsTemplates } from "@/lib/sms";
 import type { OrderStatus } from "@prisma/client";
 
 const CUSTOMER_MSG: Partial<Record<OrderStatus, string>> = {
-  ACCEPTED: "კურიერმა მიიღო შეკვეთა",
+  ACCEPTED: "კურიერი დაინიშნა",
   PICKED_UP: "კურიერმა აიღო ამანათი",
   IN_TRANSIT: "ამანათი გზაშია",
   DELIVERED: "ამანათი ჩაბარდა 🎉",
@@ -108,9 +108,13 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
 
     const msg = CUSTOMER_MSG[body.status as OrderStatus];
     if (msg) {
+      const driverName =
+        body.status === "ACCEPTED" ? updated.driver?.user.name ?? null : null;
       await notify(order.customerId, {
         title: msg,
-        body: `შეკვეთა ${order.trackingNumber}`,
+        body: driverName
+          ? `${driverName} · შეკვეთა ${order.trackingNumber}`
+          : `შეკვეთა ${order.trackingNumber}`,
         data: { orderId: order.id },
       });
     }

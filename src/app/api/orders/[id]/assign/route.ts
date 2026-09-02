@@ -43,13 +43,13 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
 
     await Promise.all([
       notify(order.customerId, {
-        title: "კურიერი მოგენიჭათ",
-        body: `${driver.user.name} მალე აიღებს ამანათს (${order.trackingNumber})`,
+        title: "კურიერს ვეძებთ",
+        body: `${order.trackingNumber} — კურიერს ვთხოვეთ დადასტურება`,
         data: { orderId: order.id },
       }),
       notifyDriver(driverId, {
-        title: "ახალი შეკვეთა",
-        body: `${order.trackingNumber} — ${streetOf(order.pickupAddress)}`,
+        title: "ახალი შემოთავაზება",
+        body: `${order.trackingNumber} — ${streetOf(order.pickupAddress)} · დაადასტურე ან უარყავი`,
         data: { orderId: order.id },
       }),
     ]);

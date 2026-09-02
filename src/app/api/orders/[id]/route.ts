@@ -10,6 +10,22 @@ import type { Prisma } from "@prisma/client";
 const EDITABLE_DISPATCHER = ["PENDING", "ASSIGNED", "ACCEPTED"];
 const EDITABLE_CUSTOMER = ["PENDING"];
 
+// დისპეჩერს შეუძლია წაშალოს მხოლოდ გაუქმებული/მონახაზი შეკვეთა (შეცდომით შექმნილი ან სატესტო)
+export function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  return handle(async () => {
+    await requireUser().then((s) => {
+      if (s.role !== "DISPATCHER") throw new ApiError(403, "წვდომა აკრძალულია");
+    });
+    const order = await prisma.order.findUnique({ where: { id: params.id } });
+    if (!order) return fail(404, "შეკვეთა ვერ მოიძებნა");
+    if (!["CANCELLED", "DRAFT"].includes(order.status)) {
+      throw new ApiError(409, "მხოლოდ გაუქმებული შეკვეთის წაშლა შეიძლება");
+    }
+    await prisma.order.delete({ where: { id: order.id } });
+    return ok({ deleted: true });
+  });
+}
+
 export function GET(_req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     const session = await requireUser();

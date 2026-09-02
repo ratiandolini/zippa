@@ -100,10 +100,12 @@ const TERMINAL = ["DELIVERED", "CANCELLED"];
 function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void }) {
   const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const canCancel = !TERMINAL.includes(order.status);
   const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status);
+  const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
 
   async function cancel() {
     setCancelling(true);
@@ -115,6 +117,17 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
       onChange();
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function remove() {
+    if (!confirm("წავშალო ეს გაუქმებული შეკვეთა სამუდამოდ?")) return;
+    setDeleting(true);
+    try {
+      await api(`/api/orders/${order.id}`, "DELETE");
+      onChange();
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -179,6 +192,15 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
             {cancelling ? "…" : "გაუქმება"}
           </button>
         )}
+        {canDelete && (
+          <button
+            onClick={remove}
+            disabled={deleting}
+            className="text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+          >
+            {deleting ? "…" : "წაშლა"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -191,9 +213,17 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
 
   useEffect(() => {
     jsonFetcher<{ drivers: DriverListItem[] }>(
-      `/api/drivers?available=1&lat=${order.pickup.lat}&lng=${order.pickup.lng}`,
+      `/api/drivers?working=1&lat=${order.pickup.lat}&lng=${order.pickup.lng}`,
     )
-      .then((d) => setDrivers(d.drivers))
+      .then((d) =>
+        setDrivers(
+          [...d.drivers].sort(
+            (a, b) =>
+              a.activeOrders - b.activeOrders ||
+              (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9),
+          ),
+        ),
+      )
       .catch(() => setDrivers([]));
   }, [order.id, order.pickup.lat, order.pickup.lng]);
 
@@ -213,7 +243,9 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
   }
 
   if (drivers.length === 0)
-    return <p className="mt-2 text-[11px] text-muted-foreground">თავისუფალი კურიერი არ არის.</p>;
+    return (
+      <p className="mt-2 text-[11px] text-muted-foreground">ხაზზე მყოფი კურიერი არ არის.</p>
+    );
 
   return (
     <div className="mt-2 space-y-1">
@@ -223,12 +255,22 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
           key={d.id}
           disabled={busy != null}
           onClick={() => assign(d.id)}
-          className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-left text-[11px] hover:bg-muted disabled:opacity-50"
+          className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-left text-[11px] hover:bg-muted disabled:opacity-50"
         >
-          <span className="font-medium">{d.name}</span>
-          <span className="text-muted-foreground">
+          <span className="font-medium">
+            {d.name}
+            <span
+              className={
+                d.activeOrders >= 3
+                  ? "ml-1.5 font-normal text-destructive"
+                  : "ml-1.5 font-normal text-muted-foreground"
+              }
+            >
+              {d.activeOrders} აქტიური
+            </span>
+          </span>
+          <span className="shrink-0 text-muted-foreground">
             <span className="text-amber-500">★</span> {d.rating.toFixed(1)}
-            {d.ratingCount > 0 ? ` (${d.ratingCount})` : ""}
             {d.distanceKm != null ? ` · ${d.distanceKm} კმ` : ""}
           </span>
         </button>
