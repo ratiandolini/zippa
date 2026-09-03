@@ -28,7 +28,10 @@ export function POST(req: Request) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
-        data: { passwordHash: await hashPassword(newPassword) },
+        data: {
+          passwordHash: await hashPassword(newPassword),
+          tokenVersion: { increment: 1 }, // ძველი სესიები იკვდება
+        },
       }),
       prisma.passwordReset.updateMany({
         where: { userId: user.id, usedAt: null },

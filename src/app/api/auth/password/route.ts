@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUser, handle, ok, ApiError } from "@/lib/api";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
+import { createSession } from "@/lib/auth/session";
 import { changePasswordSchema } from "@/lib/validation";
 
 export function POST(req: Request) {
@@ -12,9 +13,21 @@ export function POST(req: Request) {
     if (!(await verifyPassword(currentPassword, user.passwordHash)))
       throw new ApiError(401, "მიმდინარე პაროლი არასწორია");
 
-    await prisma.user.update({
+    // პაროლის ცვლილება → tokenVersion++ → ყველა სხვა სესია (მოწყობილობა) გაითიშება
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: {
+        passwordHash: await hashPassword(newPassword),
+        tokenVersion: { increment: 1 },
+      },
+    });
+    // მიმდინარე სესიას ვინარჩუნებთ — ვასწორებთ cookie-ს ახალი ვერსიით
+    await createSession({
+      sub: updated.id,
+      role: updated.role,
+      name: updated.name,
+      email: updated.email,
+      tv: updated.tokenVersion,
     });
     return ok({ ok: true });
   });

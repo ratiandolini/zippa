@@ -38,12 +38,20 @@ export function PATCH(req: Request) {
         accountType: true,
         companyName: true,
         taxId: true,
+        tokenVersion: true,
       },
     });
 
     // სესიის განახლება (სახელი JWT-შია)
-    await createSession({ sub: user.id, role: user.role, name: user.name, email: user.email });
-    return ok({ user });
+    await createSession({
+      sub: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      tv: user.tokenVersion,
+    });
+    const { tokenVersion: _tv, ...safeUser } = user;
+    return ok({ user: safeUser });
   });
 }
 

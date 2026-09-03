@@ -8,12 +8,16 @@ import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { generateTrackingNumber } from "@/lib/utils";
 import { notifyDispatchers } from "@/lib/notify";
 import { streetOf } from "@/lib/domain";
+import { expireStaleAssignments } from "@/lib/assignments";
 
 export function GET(req: Request) {
   return handle(async () => {
     const session = await requireUser();
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
+
+    // უპასუხო მიბმების დაბრუნება „მოლოდინში" (იაფი, თუ არაფერია ვადაგასული)
+    await expireStaleAssignments().catch(() => {});
 
     const where: Prisma.OrderWhereInput = {};
     if (session.role === "CUSTOMER") where.customerId = session.sub;

@@ -37,9 +37,16 @@ export async function getSession(): Promise<SessionPayload | null> {
   // როლის ცვლილება დაუყოვნებლივ აისახება.
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { isActive: true, role: true, name: true, email: true },
+    select: { isActive: true, role: true, name: true, email: true, tokenVersion: true },
   });
   if (!user || !user.isActive) return null;
+  if ((payload.tv ?? 0) !== user.tokenVersion) return null; // პაროლი შეიცვალა → ძველი სესია აღარ მუშაობს
 
-  return { sub: payload.sub, role: user.role, name: user.name, email: user.email };
+  return {
+    sub: payload.sub,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    tv: user.tokenVersion,
+  };
 }

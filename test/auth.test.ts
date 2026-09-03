@@ -114,6 +114,15 @@ describe("password change", () => {
     expect((await call(login, { body: { emailOrPhone: u.email, password: "password123" } })).status).toBe(401);
     expect((await call(login, { body: { emailOrPhone: u.email, password: "brandnew123" } })).status).toBe(200);
   });
+
+  it("პაროლის ცვლილება ზრდის tokenVersion-ს (ძველი სესიები კვდება)", async () => {
+    const u = await makeUser("CUSTOMER", { password: "password123" });
+    expect(u.tokenVersion).toBe(0);
+    actAs(session(u));
+    await call(changePassword, { body: { currentPassword: "password123", newPassword: "brandnew123" } });
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(after.tokenVersion).toBe(1);
+  });
 });
 
 describe("password reset", () => {
@@ -135,6 +144,9 @@ describe("password reset", () => {
     const reuse = await call(reset, { body: { emailOrPhone: u.email, code: "123456", newPassword: "again12345" } });
     expect(reuse.status).toBe(400);
     void pr;
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(after.tokenVersion).toBe(1);
   });
 
   it("არასებული მომხმარებელი → მაინც 200 (გაჟონვის გარეშე)", async () => {

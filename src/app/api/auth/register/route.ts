@@ -42,10 +42,16 @@ export function POST(req: Request) {
           ? { driverProfile: { create: { isApproved: false, status: "OFFLINE" } } }
           : {}),
       },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, tokenVersion: true },
     });
 
-    await createSession({ sub: user.id, role: user.role, name: user.name, email: user.email });
+    await createSession({
+      sub: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      tv: user.tokenVersion,
+    });
     return ok({ user }, 201);
   });
 }

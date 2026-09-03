@@ -5,6 +5,7 @@ import { GET as getOrder, PATCH as editOrder, DELETE as deleteOrder } from "@/ap
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { POST as rejectOrder } from "@/app/api/orders/[id]/reject/route";
+import { expireStaleAssignments } from "@/lib/assignments";
 
 const orderBody = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მარიამ გ", phone: "+995599111111" },
@@ -178,6 +179,53 @@ describe("კურიერის უარი (reject)", () => {
     await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
     const r = await call(rejectOrder, { method: "POST", params: { id: o.id }, body: {} });
     expect(r.status).toBe(409);
+  });
+});
+
+describe("უპასუხო მიბმის ტაიმაუტი", () => {
+  it("90 წამზე ძველი ASSIGNED → PENDING, კურიერი გათავისუფლდა", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+
+    // ხელოვნურად ვაძველებთ მიბმას
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { assignedAt: new Date(Date.now() - 120_000) },
+    });
+
+    const n = await expireStaleAssignments();
+    expect(n).toBe(1);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.status).toBe("PENDING");
+    expect(db.driverId).toBeNull();
+    expect(db.assignedAt).toBeNull();
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.status).toBe("AVAILABLE");
+  });
+
+  it("ახალი მიბმა არ ითიშება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    const n = await expireStaleAssignments();
+    expect(n).toBe(0);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe("ASSIGNED");
+  });
+
+  it("დადასტურების შემდეგ assignedAt ნულდება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).assignedAt).toBeNull();
   });
 });
 

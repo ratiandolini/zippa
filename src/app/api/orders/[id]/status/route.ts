@@ -52,6 +52,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         where: { id: order.id },
         data: {
           status: body.status,
+          ...(body.status === "ACCEPTED" ? { assignedAt: null } : {}),
           ...(body.status === "DELIVERED" ? { deliveredAt: new Date() } : {}),
           ...(body.status === "DELIVERED" && order.paymentMethod === "CASH"
             ? { paymentStatus: "PAID" }

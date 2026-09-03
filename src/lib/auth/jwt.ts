@@ -17,6 +17,7 @@ export interface SessionPayload {
   role: Role;
   name: string;
   email: string;
+  tv?: number; // tokenVersion — ძველი ტოკენებში არ არის, ითვლება 0-ად
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {

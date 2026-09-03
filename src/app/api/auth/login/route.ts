@@ -14,7 +14,13 @@ export function POST(req: Request) {
       throw new ApiError(401, "ელფოსტა/ტელეფონი ან პაროლი არასწორია");
     }
 
-    await createSession({ sub: user.id, role: user.role, name: user.name, email: user.email });
+    await createSession({
+      sub: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      tv: user.tokenVersion,
+    });
     return ok({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });

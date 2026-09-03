@@ -26,6 +26,7 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
         data: {
           driverId: null,
           status: "PENDING",
+          assignedAt: null,
           events: {
             create: {
               status: "PENDING",

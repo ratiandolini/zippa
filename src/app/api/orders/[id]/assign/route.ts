@@ -27,6 +27,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         data: {
           driverId,
           status: "ASSIGNED",
+          assignedAt: new Date(),
           events: {
             create: {
               status: "ASSIGNED",
