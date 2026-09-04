@@ -270,7 +270,7 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
           )}
         >
           <span className="min-w-0">
-            <span className="font-medium">{d.name}</span>
+            <span className="font-medium">{d.name} </span>
             <span
               className={cn(
                 "ml-1.5 font-normal",

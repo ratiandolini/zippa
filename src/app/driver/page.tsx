@@ -14,7 +14,7 @@ import { Wallet, Package, Banknote } from "lucide-react";
 const ACTIVE = ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
 
 export default function DriverHome() {
-  const { driver, mutate: mutateDriver } = useDriverMe(15000);
+  const { driver, mutate: mutateDriver, isLoading } = useDriverMe(15000);
   const { orders, mutate: mutateOrders } = useOrders("", 10000);
   const [toggling, setToggling] = useState(false);
 
@@ -44,6 +44,15 @@ export default function DriverHome() {
     } finally {
       setToggling(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader title="დღეს" />
+        <p className="text-sm text-muted-foreground">იტვირთება…</p>
+      </>
+    );
   }
 
   if (driver && !driver.isApproved) {

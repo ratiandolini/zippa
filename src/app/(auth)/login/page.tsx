@@ -61,8 +61,12 @@ function LoginForm() {
             <Input id="emailOrPhone" name="emailOrPhone" type="text" placeholder="you@example.com" required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password">პაროლი</Label>
-            {/* პაროლის აღდგენა კოდით SMS-ს საჭიროებს — ჩაირთვება SMS-პროვაიდერის კონფიგურაციისას */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">პაროლი</Label>
+              <Link href="/forgot" className="text-xs text-accent hover:underline">
+                დაგავიწყდა?
+              </Link>
+            </div>
             <Input id="password" name="password" type="password" placeholder="••••••••" required />
           </div>
           {error && (

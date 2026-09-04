@@ -10,7 +10,7 @@ import { api } from "@/lib/fetcher";
 import { GEL, fmtDate } from "@/lib/domain";
 
 export default function EarningsPage() {
-  const { driver, mutate } = useDriverMe(15000);
+  const { driver, mutate, isLoading } = useDriverMe(15000);
   const { orders } = useOrders("", 20000);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -38,11 +38,15 @@ export default function EarningsPage() {
     <>
       <PageHeader title="ფინანსები" description="შემოსავალი, ნაღდი ფული და ანგარიშსწორება" />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="გადასახდელი ანაზღაურება" value={GEL(driver?.unpaidEarnings ?? 0)} />
-        <Stat label="ნაღდი ხელზე" value={GEL(driver?.cashOnHand ?? 0)} sub="კომპანიას ჩასაბარებელი" />
-        <Stat label="სულ მიტანები" value={String(driver?.totalDeliveries ?? 0)} />
-      </div>
+      {isLoading ? (
+        <p className="mb-6 text-sm text-muted-foreground">იტვირთება…</p>
+      ) : (
+        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          <Stat label="გადასახდელი ანაზღაურება" value={GEL(driver?.unpaidEarnings ?? 0)} />
+          <Stat label="ნაღდი ხელზე" value={GEL(driver?.cashOnHand ?? 0)} sub="კომპანიას ჩასაბარებელი" />
+          <Stat label="სულ მიტანები" value={String(driver?.totalDeliveries ?? 0)} />
+        </div>
+      )}
 
       {driver && driver.cashOnHand > 0 && (
         <Card className="mb-6 border-amber-200 bg-amber-50/50">

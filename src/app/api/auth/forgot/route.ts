@@ -4,6 +4,7 @@ import { forgotSchema } from "@/lib/validation";
 import { findUserByEmailOrPhone } from "@/lib/auth/lookup";
 import { hashPassword } from "@/lib/auth/password";
 import { sendSms, smsTemplates } from "@/lib/sms";
+import { sendEmail, emailTemplates } from "@/lib/email";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
@@ -27,7 +28,11 @@ export function POST(req: Request) {
             expiresAt: new Date(Date.now() + WINDOW_MS),
           },
         });
-        await sendSms(user.phone, smsTemplates.resetCode(code));
+        const tpl = emailTemplates.resetCode(code);
+        await Promise.all([
+          sendSms(user.phone, smsTemplates.resetCode(code)),
+          sendEmail(user.email, tpl.subject, tpl.text),
+        ]);
       }
     }
 

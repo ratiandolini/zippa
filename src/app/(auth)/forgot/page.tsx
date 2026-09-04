@@ -54,7 +54,7 @@ export default function ForgotPage() {
         <CardTitle className="text-lg">პაროლის აღდგენა</CardTitle>
         <p className="text-sm text-muted-foreground">
           {step === 1
-            ? "მიუთითე ტელეფონი ან ელფოსტა — გამოგიგზავნით კოდს SMS-ით"
+            ? "მიუთითე ტელეფონი ან ელფოსტა — გამოგიგზავნით კოდს"
             : "შეიყვანე მიღებული 6-ნიშნა კოდი და ახალი პაროლი"}
         </p>
       </CardHeader>
