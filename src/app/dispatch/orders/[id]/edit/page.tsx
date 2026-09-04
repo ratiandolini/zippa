@@ -120,7 +120,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
           <div className="sm:col-span-2">
             <AddressField label="მისამართი" value={pickup} onChange={setPickup} />
           </div>
-          <Field label="ამგზავნი" value={senderName} onChange={setSenderName} />
+          <Field label="გამგზავნი" value={senderName} onChange={setSenderName} />
           <Field label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} />
         </CardContent>
       </Card>
@@ -143,7 +143,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
           <CardTitle>ამანათი და გადახდა</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <Field label="წონა (კგ)" value={weight} onChange={setWeight} type="number" />
+          <Field label="წონა, კგ (მაგ. 0.5)" value={weight} onChange={setWeight} type="number" />
           <Field label="გამოცხადებული ღირებულება (₾)" value={parcelValue} onChange={setParcelValue} type="number" />
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />

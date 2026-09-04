@@ -26,7 +26,7 @@ async function main() {
       {
         zone: "TBILISI",
         weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
-        codFee: "1.00",
+        codFee: "0",
         driverFlatFee: "3.00",
         sameDayCutoffHour: 16,
         deliveryDays: 0,
@@ -34,14 +34,14 @@ async function main() {
       {
         zone: "REGIONAL_CITY",
         weightBrackets: B([[6, 7], [10, 9], [15, 12], [20, 15], [30, 19], [40, 28], [50, 38]]),
-        codFee: "2.00",
+        codFee: "0",
         driverFlatFee: "5.00",
         deliveryDays: 1,
       },
       {
         zone: "TOWN_VILLAGE",
         weightBrackets: B([[6, 11], [10, 13], [15, 16], [20, 19], [30, 23], [40, 33], [50, 43]]),
-        codFee: "2.00",
+        codFee: "0",
         driverFlatFee: "7.00",
         deliveryDays: 2,
       },
@@ -179,7 +179,7 @@ async function main() {
     // თბილისის ტარიფი: წონა-კალათა
     const tbBrackets: [number, number][] = [[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]];
     const deliveryPrice = tbBrackets.find(([m]) => o.weightKg <= m)?.[1] ?? 20;
-    const codFee = o.payment === "CASH" ? 1 : 0;
+    const codFee = 0;
     const total = round2(deliveryPrice + codFee);
     const driverFee = 3;
     const createdAt = new Date(Date.now() - o.minutesAgo * 60000);

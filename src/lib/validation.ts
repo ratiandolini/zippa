@@ -65,7 +65,7 @@ const point = z.object({
 
 export const createOrderSchema = z.object({
   sender: z.object({
-    name: z.string().trim().min(2, "ამგზავნის სახელი"),
+    name: z.string().trim().min(2, "გამგზავნის სახელი"),
     phone: phoneSchema,
   }),
   recipient: z.object({
@@ -87,7 +87,7 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export const editOrderSchema = z
   .object({
     sender: z.object({
-      name: z.string().trim().min(2, "ამგზავნის სახელი"),
+      name: z.string().trim().min(2, "გამგზავნის სახელი"),
       phone: phoneSchema,
     }),
     recipient: z.object({

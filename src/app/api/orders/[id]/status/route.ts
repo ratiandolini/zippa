@@ -35,7 +35,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       session.role === "CUSTOMER" &&
       order.customerId === session.sub &&
       body.status === "CANCELLED" &&
-      order.status === "PENDING";
+      ["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status); // ვიდრე კურიერი ამანათს აიღებს
 
     if (!isDispatcher && !isOwnerDriver && !isCustomerCancel)
       return fail(403, "წვდომა აკრძალულია");
@@ -103,6 +103,9 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: { status: "AVAILABLE" },
         });
       }
+      if (body.status === "CANCELLED" && order.assignedAt) {
+        await tx.order.update({ where: { id: order.id }, data: { assignedAt: null } });
+      }
 
       return o;
     });
@@ -127,7 +130,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       });
     }
 
-    // SMS მიმღებს/ამგზავნს (ანგარიში არ სჭირდებათ)
+    // SMS მიმღებს/გამგზავნს (ანგარიში არ სჭირდებათ)
     if (body.status === "IN_TRANSIT") {
       void sendSms(order.recipientPhone, smsTemplates.onTheWay(order.trackingNumber));
     }

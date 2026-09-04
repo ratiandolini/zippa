@@ -148,9 +148,12 @@ function Detail({ id }: { id: string }) {
                 <span className="text-muted-foreground">წონა</span>
                 <span>{order.weightKg} კგ</span>
               </div>
-              {order.status === "PENDING" && (
+              {["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status) && (
                 <div className="pt-2">
                   <CancelOrderButton orderId={order.id} onDone={() => mutate()} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    გაუქმება უფასოა, სანამ კურიერი ამანათს აიღებს.
+                  </p>
                 </div>
               )}
             </CardContent>

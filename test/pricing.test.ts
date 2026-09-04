@@ -35,14 +35,14 @@ describe("resolveZone / resolveCityId", () => {
 describe("calculatePrice — თბილისი", () => {
   const tbId = () => prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } }).then((c) => c.id);
 
-  it("3 კგ ნაღდი → 5 + 1 = 6, კურიერს 3", async () => {
+  it("3 კგ ნაღდი → 5, კურიერს 3", async () => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: await tbId(),
     });
     expect(p.zone).toBe("TBILISI");
     expect(p.deliveryPrice).toBe(5);
-    expect(p.codFee).toBe(1);
-    expect(p.totalPrice).toBe(6);
+    expect(p.codFee).toBe(0);
+    expect(p.totalPrice).toBe(5);
     expect(p.driverFee).toBe(3);
     expect(p.overWeight).toBe(false);
   });
@@ -74,13 +74,13 @@ describe("calculatePrice — თბილისი", () => {
 });
 
 describe("calculatePrice — რეგიონი / სოფელი", () => {
-  it("ბათუმი 3 კგ ნაღდი → 7 + 2, კურიერს 5", async () => {
+  it("ბათუმი 3 კგ → 7 ₾, კურიერს 5", async () => {
     const ba = await prisma.city.findUniqueOrThrow({ where: { name: "ბათუმი" } });
     const p = await calculatePrice({
       pickup: TB, delivery: BATUMI, weightKg: 3, paymentMethod: "CASH", deliveryCityId: ba.id,
     });
     expect(p.zone).toBe("REGIONAL_CITY");
-    expect(p.totalPrice).toBe(9);
+    expect(p.totalPrice).toBe(7);
     expect(p.driverFee).toBe(5);
   });
 

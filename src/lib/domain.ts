@@ -104,13 +104,22 @@ export function fmtDateTime(iso: string | Date): string {
 
 const CITY_WORDS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "საქართველო", "georgia"];
 
-/** მისამართიდან ქუჩის მოკლე ვერსია (ქალაქის/ქვეყნის პრეფიქსის გარეშე) */
+/** მისამართიდან ქუჩის მოკლე ვერსია (ქალაქის/ქვეყნის/ინდექსის გარეშე) */
 export function streetOf(address: string): string {
   const parts = address
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean)
-    .filter((p) => !CITY_WORDS.some((c) => p.toLowerCase().includes(c)));
-  const s = (parts[0] || address.split(",")[0] || address).trim();
-  return s.length > 28 ? s.slice(0, 27) + "…" : s;
+    .filter((p) => !CITY_WORDS.some((c) => p.toLowerCase().includes(c)))
+    .filter((p) => !/^\d{4,}$/.test(p)); // საფოსტო ინდექსი
+
+  let s: string;
+  // Nominatim აბრუნებს "3, ვანის ქუჩა, ..." — სახლის ნომერი ცალკე; ვაერთებთ ქუჩას
+  if (parts.length >= 2 && /^\d+[a-zა-ჰ]?$/i.test(parts[0])) {
+    s = `${parts[1]} ${parts[0]}`;
+  } else {
+    s = parts[0] || address.split(",")[0] || address;
+  }
+  s = s.trim();
+  return s.length > 30 ? s.slice(0, 29) + "…" : s;
 }

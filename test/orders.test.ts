@@ -31,7 +31,7 @@ describe("შეკვეთის შექმნა", () => {
     const o = await newOrder(c.id);
     expect(o.status).toBe("PENDING");
     expect(o.trackingNumber).toMatch(/^ZP-/);
-    expect(o.price.total).toBe(6); // 5 + 1 cod
+    expect(o.price.total).toBe(5);
     const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
     expect(db.estimatedDeliveryAt).toBeTruthy();
     expect(db.zone).toBe("TBILISI");
@@ -80,7 +80,7 @@ describe("წვდომა (scoping)", () => {
 describe("შეკვეთის რედაქტირება", () => {
   it("დისპეჩერი ცვლის მიმღების მისამართს — ფასი/ზონა თავიდან იანგარიშება", async () => {
     const c = await makeUser("CUSTOMER");
-    const o = await newOrder(c.id); // თბილისი, total 6
+    const o = await newOrder(c.id); // თბილისი, total 5
     const d = await makeUser("DISPATCHER");
     actAs(session(d));
     const r = await call(editOrder, {
@@ -92,7 +92,7 @@ describe("შეკვეთის რედაქტირება", () => {
     const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
     expect(db.zone).toBe("REGIONAL_CITY");
     expect(db.deliveryAddress).toContain("ბათუმი");
-    expect(Number(db.totalPrice)).toBe(9); // 7 + 2 cod
+    expect(Number(db.totalPrice)).toBe(7);
   });
 
   it("მომხმარებელი რედაქტირებს თავის PENDING შეკვეთას", async () => {
@@ -327,23 +327,33 @@ describe("სტატუსების მანქანა", () => {
     expect(r.status).toBe(403);
   });
 
-  it("მომხმარებელი აუქმებს PENDING-ს; ASSIGNED-ს ვეღარ → 403", async () => {
+  it("მომხმარებელი აუქმებს PENDING-სა და ASSIGNED-ს; PICKED_UP-ს ვეღარ", async () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
     actAs(session(c));
     expect((await call(setStatus, { params: { id: o.id }, body: { status: "CANCELLED" } })).status).toBe(200);
 
+    // ASSIGNED — ჯერ კიდევ შეიძლება
     const { c: c2, o: o2, drv } = await assigned();
-    void drv;
     actAs(session(c2));
-    expect((await call(setStatus, { params: { id: o2.id }, body: { status: "CANCELLED" } })).status).toBe(403);
+    expect((await call(setStatus, { params: { id: o2.id }, body: { status: "CANCELLED" } })).status).toBe(200);
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.status).toBe("AVAILABLE"); // კურიერი გათავისუფლდა
+
+    // PICKED_UP — უკვე გვიანია
+    const a3 = await assigned();
+    actAs(session(a3.drv.user));
+    await call(setStatus, { params: { id: a3.o.id }, body: { status: "ACCEPTED" } });
+    await call(setStatus, { params: { id: a3.o.id }, body: { status: "PICKED_UP" } });
+    actAs(session(a3.c));
+    expect((await call(setStatus, { params: { id: a3.o.id }, body: { status: "CANCELLED" } })).status).toBe(403);
   });
 });
 
 describe("ჩაბარებისას ფინანსური აღრიცხვა", () => {
   it("DELIVERED (ნაღდი) → earning, unpaidEarnings += driverFee, cashOnHand += codAmount, +1 მიტანა, AVAILABLE", async () => {
     const c = await makeUser("CUSTOMER");
-    const o = await newOrder(c.id); // CASH, total 6, codAmount 6, driverFee 3
+    const o = await newOrder(c.id); // CASH, total 5, codAmount 5, driverFee 3
     const drv = await makeDriver({ approved: true });
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
@@ -353,7 +363,7 @@ describe("ჩაბარებისას ფინანსური აღ�
     }
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.unpaidEarnings)).toBe(3);
-    expect(Number(dp.cashOnHand)).toBe(6);
+    expect(Number(dp.cashOnHand)).toBe(5);
     expect(dp.totalDeliveries).toBe(1);
     expect(dp.status).toBe("AVAILABLE");
     const e = await prisma.driverEarning.findUniqueOrThrow({ where: { orderId: o.id } });

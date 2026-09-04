@@ -11,6 +11,7 @@ import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ProofPhoto } from "@/components/proof-photo";
+import { cn } from "@/lib/utils";
 
 const columns: { key: OrderDTO["status"][]; title: string }[] = [
   { key: ["PENDING"], title: "მოლოდინში" },
@@ -212,18 +213,21 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    // ყველა დამტკიცებული კურიერი (ოფლაინიც) — დისპეჩერი თვითონ წყვეტს
     jsonFetcher<{ drivers: DriverListItem[] }>(
-      `/api/drivers?working=1&lat=${order.pickup.lat}&lng=${order.pickup.lng}`,
+      `/api/drivers?lat=${order.pickup.lat}&lng=${order.pickup.lng}`,
     )
-      .then((d) =>
+      .then((d) => {
+        const rank = (s: string) => (s === "AVAILABLE" ? 0 : s === "BUSY" ? 1 : 2);
         setDrivers(
           [...d.drivers].sort(
             (a, b) =>
+              rank(a.status) - rank(b.status) ||
               a.activeOrders - b.activeOrders ||
               (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9),
           ),
-        ),
-      )
+        );
+      })
       .catch(() => setDrivers([]));
   }, [order.id, order.pickup.lat, order.pickup.lng]);
 
@@ -244,29 +248,36 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
 
   if (drivers.length === 0)
     return (
-      <p className="mt-2 text-[11px] text-muted-foreground">ხაზზე მყოფი კურიერი არ არის.</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        დამტკიცებული კურიერი არ არის. ჯერ დაამტკიცე „კურიერები" გვერდზე.
+      </p>
     );
+
+  const statusLabel = (s: string) =>
+    s === "AVAILABLE" ? "თავისუფალი" : s === "BUSY" ? "დაკავებული" : "ოფლაინ";
 
   return (
     <div className="mt-2 space-y-1">
       {err && <p className="text-[11px] text-destructive">{err}</p>}
-      {drivers.slice(0, 5).map((d) => (
+      {drivers.slice(0, 6).map((d) => (
         <button
           key={d.id}
           disabled={busy != null}
           onClick={() => assign(d.id)}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-left text-[11px] hover:bg-muted disabled:opacity-50"
+          className={cn(
+            "flex w-full items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-left text-[11px] hover:bg-muted disabled:opacity-50",
+            d.status === "OFFLINE" && "opacity-60",
+          )}
         >
-          <span className="font-medium">
-            {d.name}
+          <span className="min-w-0">
+            <span className="font-medium">{d.name}</span>
             <span
-              className={
-                d.activeOrders >= 3
-                  ? "ml-1.5 font-normal text-destructive"
-                  : "ml-1.5 font-normal text-muted-foreground"
-              }
+              className={cn(
+                "ml-1.5 font-normal",
+                d.activeOrders >= 3 ? "text-destructive" : "text-muted-foreground",
+              )}
             >
-              {d.activeOrders} აქტიური
+              {statusLabel(d.status)} · {d.activeOrders} აქტ.
             </span>
           </span>
           <span className="shrink-0 text-muted-foreground">

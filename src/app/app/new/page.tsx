@@ -125,7 +125,7 @@ export default function NewOrderPage() {
                   placeholder="ქალაქი, ქუჩა, ნომერი"
                 />
               </div>
-              <Text label="ამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" />
+              <Text label="გამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" />
               <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="+995 5XX XX XX XX" />
             </CardContent>
           </Card>
@@ -153,8 +153,16 @@ export default function NewOrderPage() {
               <CardTitle>ამანათი</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Text label="წონა (კგ)" value={weight} onChange={setWeight} placeholder="2" type="number" />
-              <Text label="აღწერა" value={description} onChange={setDescription} placeholder="დოკუმენტები" />
+              <Text
+                label="წონა, კგ"
+                value={weight}
+                onChange={setWeight}
+                placeholder="მაგ. 0.5 ან 2"
+                type="number"
+                step="0.1"
+                hint="კილოგრამში. 500 გრამი = 0.5"
+              />
+              <Text label="აღწერა" value={description} onChange={setDescription} placeholder="მაგ. დოკუმენტები, ტანსაცმელი" />
             </CardContent>
           </Card>
 
@@ -166,7 +174,7 @@ export default function NewOrderPage() {
               <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
                 <div className="font-medium">{PAYMENT_METHOD_LABEL.CASH}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  მიტანის საფასურს გადაიხდის ამგზავნი ან მიმღები კურიერთან.
+                  მიტანის საფასური ნაღდით ბარდება კურიერს — გამგზავნისგან ან მიმღებისგან.
                 </div>
               </div>
             </CardContent>
@@ -232,22 +240,28 @@ function Text({
   onChange,
   placeholder,
   type,
+  hint,
+  step,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  hint?: string;
+  step?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
         type={type}
+        step={step}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

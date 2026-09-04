@@ -14,8 +14,10 @@ import type { VehicleType } from "@prisma/client";
 const tone = { AVAILABLE: "green", BUSY: "accent", OFFLINE: "neutral" } as const;
 
 export default function DriversPage() {
-  const { drivers, isLoading } = useDrivers("", 15000);
-  const { drivers: pending, mutate: mutatePending } = useDrivers("?pending=1", 15000);
+  const { drivers, isLoading: loadingAll } = useDrivers("", 15000);
+  const { drivers: pending, mutate: mutatePending, isLoading: loadingPending } =
+    useDrivers("?pending=1", 15000);
+  const isLoading = loadingAll || loadingPending;
   const [busy, setBusy] = useState<string | null>(null);
 
   async function approve(id: string) {
