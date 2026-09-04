@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { AddressField, type AddressValue } from "@/components/address-field";
 import { useOrder } from "@/lib/hooks";
 import { api } from "@/lib/fetcher";
-import { cn } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 
@@ -64,7 +63,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
   const [parcelValue, setParcelValue] = useState(
     order.parcelValue == null ? "" : String(order.parcelValue),
   );
-  const [payment, setPayment] = useState<"CASH" | "CARD">(order.paymentMethod);
+  const payment = order.paymentMethod;
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,20 +148,8 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />
           </div>
-          <div className="sm:col-span-2 grid grid-cols-2 gap-3">
-            {(["CASH", "CARD"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPayment(p)}
-                className={cn(
-                  "rounded-lg border px-4 py-2.5 text-left text-sm transition-colors",
-                  payment === p ? "border-accent bg-accent/10" : "border-border hover:bg-muted",
-                )}
-              >
-                {PAYMENT_METHOD_LABEL[p]}
-              </button>
-            ))}
+          <div className="sm:col-span-2 text-sm text-muted-foreground">
+            გადახდა: {PAYMENT_METHOD_LABEL[payment]}
           </div>
         </CardContent>
       </Card>

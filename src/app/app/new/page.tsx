@@ -36,7 +36,7 @@ export default function NewOrderPage() {
   const [delivery, setDelivery] = useState<AddressValue>(empty);
   const [weight, setWeight] = useState("");
   const [description, setDescription] = useState("");
-  const [payment, setPayment] = useState<"CARD" | "CASH">("CASH");
+  const payment = "CASH" as const;
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -162,23 +162,13 @@ export default function NewOrderPage() {
             <CardHeader>
               <CardTitle>გადახდა</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              {(["CASH", "CARD"] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPayment(p)}
-                  className={cn(
-                    "rounded-lg border px-4 py-3 text-left text-sm transition-colors",
-                    payment === p ? "border-accent bg-accent/10" : "border-border hover:bg-muted",
-                  )}
-                >
-                  <div className="font-medium">{PAYMENT_METHOD_LABEL[p]}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p === "CARD" ? "გადახდა ონლაინ (მალე)" : "გადაიხდის ამგზავნი/მიმღები"}
-                  </div>
-                </button>
-              ))}
+            <CardContent className="text-sm">
+              <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
+                <div className="font-medium">{PAYMENT_METHOD_LABEL.CASH}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  მიტანის საფასურს გადაიხდის ამგზავნი ან მიმღები კურიერთან.
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

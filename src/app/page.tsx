@@ -53,7 +53,7 @@ function Photo({ src, alt, className }: { src: string; alt: string; className?: 
 const features = [
   { icon: Clock, title: "სწრაფი მიტანა", text: "ქალაქში საშუალოდ 45 წუთი. ქალაქებს შორის — იმავე დღეს." },
   { icon: MapPin, title: "ცოცხალი რუკა", text: "ნახე რუკაზე სად არის ამანათი და კურიერი — რეალურ დროში." },
-  { icon: Wallet, title: "ნებისმიერი გადახდა", text: "ონლაინ ბარათით ან ნაღდით კურიერთან — შენ ირჩევ." },
+  { icon: Wallet, title: "მოქნილი გადახდა", text: "ნაღდით კურიერთან — გადაიხდის ამგზავნი ან მიმღები, შენ ირჩევ." },
   { icon: ShieldCheck, title: "საიმედოობა", text: "დადასტურებული კურიერები, მიტანის ფოტო-დადასტურება." },
 ];
 
