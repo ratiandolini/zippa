@@ -24,10 +24,12 @@ export async function api<T = unknown>(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = data as { error?: string; issues?: { formErrors?: string[]; fieldErrors?: Record<string, string[]> } };
+    // ვალიდაციის კონკრეტული შეტყობინება (რომელი ველია არასწორი) წინ უსწრებს
+    // ზოგად "ვალიდაციის შეცდომა"-ს, რომელსაც სერვერი ყოველთვის აბრუნებს ZodError-ზე
     const fieldMsg = d.issues?.fieldErrors
       ? Object.values(d.issues.fieldErrors).flat()[0]
       : undefined;
-    throw new HttpError(res.status, d.error || d.issues?.formErrors?.[0] || fieldMsg || "შეცდომა");
+    throw new HttpError(res.status, fieldMsg || d.issues?.formErrors?.[0] || d.error || "შეცდომა");
   }
   return data as T;
 }
