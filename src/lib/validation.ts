@@ -6,7 +6,7 @@ const phoneRegex = /^(\+995)?\s?5\d{2}\s?\d{2}\s?\d{2}\s?\d{2}$/;
 export const phoneSchema = z
   .string()
   .trim()
-  .regex(phoneRegex, "ტელეფონის ფორმატი არასწორია (მაგ. +995 555 12 34 56)")
+  .regex(phoneRegex, "ტელეფონის ფორმატი არასწორია (მაგ. 555 12 34 56)")
   .transform((v) => {
     const digits = v.replace(/\D/g, "");
     const local = digits.slice(-9); // ბოლო 9 ციფრი

@@ -126,7 +126,7 @@ export default function NewOrderPage() {
                 />
               </div>
               <Text label="გამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" />
-              <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="+995 5XX XX XX XX" />
+              <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="5XX XX XX XX" />
             </CardContent>
           </Card>
 
@@ -144,7 +144,7 @@ export default function NewOrderPage() {
                 />
               </div>
               <Text label="მიმღები" value={recipientName} onChange={setRecipientName} placeholder="სახელი გვარი" />
-              <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="+995 5XX XX XX XX" />
+              <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="5XX XX XX XX" />
             </CardContent>
           </Card>
 

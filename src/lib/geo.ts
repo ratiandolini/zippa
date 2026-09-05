@@ -41,3 +41,16 @@ export async function geocode(query: string, signal?: AbortSignal): Promise<GeoR
     lng: parseFloat(d.lon),
   }));
 }
+
+/** კოორდინატიდან მისამართის ტექსტი (რუკაზე მონიშვნისას, თუ მომხმარებელს ტექსტი არ აქვს დაწერილი) */
+export async function reverseGeocode(lat: number, lng: number, signal?: AbortSignal): Promise<string | null> {
+  const url = `${NOMINATIM}/reverse?format=jsonv2&accept-language=ka&lat=${lat}&lon=${lng}`;
+  try {
+    const res = await fetch(url, { signal, headers: { "User-Agent": "zippa/0.1" } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { display_name?: string };
+    return data.display_name ?? null;
+  } catch {
+    return null;
+  }
+}

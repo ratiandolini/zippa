@@ -143,7 +143,7 @@ function RegisterForm() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">ტელეფონი</Label>
-            <Input id="phone" name="phone" type="tel" placeholder="+995 5XX XX XX XX" required />
+            <Input id="phone" name="phone" type="tel" placeholder="5XX XX XX XX" required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">ელფოსტა</Label>

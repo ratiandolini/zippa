@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { geocode, type GeoResult } from "@/lib/geo";
+import { geocode, reverseGeocode, type GeoResult } from "@/lib/geo";
 import { MapPin, Loader2 } from "lucide-react";
+import { MapPickerLazy } from "@/components/map-picker-lazy";
 
 export interface AddressValue {
   address: string;
@@ -26,6 +27,8 @@ export function AddressField({
   const [results, setResults] = useState<GeoResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [locating, setLocating] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,6 +65,17 @@ export function AddressField({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  async function pickOnMap(pt: { lat: number; lng: number }) {
+    let address = value.address.trim();
+    if (!address) {
+      setLocating(true);
+      const rg = await reverseGeocode(pt.lat, pt.lng).catch(() => null);
+      setLocating(false);
+      address = rg || "მისამართი მონიშნულია რუკაზე";
+    }
+    onChange({ address, lat: pt.lat, lng: pt.lng });
+  }
+
   return (
     <div className="space-y-1.5" ref={boxRef}>
       <Label>{label}</Label>
@@ -73,10 +87,10 @@ export function AddressField({
           onChange={(e) => onChange({ address: e.target.value, lat: null, lng: null })}
           onFocus={() => results.length && setOpen(true)}
         />
-        {loading && (
+        {(loading || locating) && (
           <Loader2 className="absolute right-3 top-2.5 h-5 w-5 animate-spin text-muted-foreground" />
         )}
-        {value.lat != null && !loading && (
+        {value.lat != null && !loading && !locating && (
           <MapPin className="absolute right-3 top-2.5 h-5 w-5 text-accent" />
         )}
 
@@ -100,8 +114,27 @@ export function AddressField({
           </ul>
         )}
       </div>
-      {value.address.trim().length >= 3 && value.lat == null && !loading && !open && (
-        <p className="text-xs text-muted-foreground">აირჩიე სიიდან ზუსტი მისამართი</p>
+
+      <div className="flex items-center gap-3">
+        {value.address.trim().length >= 3 && value.lat == null && !loading && !open && (
+          <p className="text-xs text-muted-foreground">სიაში ვერ ჰპოულობ? აირჩიე ან რუკაზე მონიშნე.</p>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowMap((v) => !v)}
+          className="text-xs font-medium text-accent hover:underline"
+        >
+          {showMap ? "რუკის დახურვა" : value.lat != null ? "მდებარეობის შეცვლა რუკაზე" : "მონიშვნა რუკაზე"}
+        </button>
+      </div>
+
+      {showMap && (
+        <div className="pt-1">
+          <MapPickerLazy lat={value.lat} lng={value.lng} onChange={pickOnMap} />
+          <p className="mt-1 text-xs text-muted-foreground">
+            დააჭირე რუკას სასურველ წერტილზე ან გადაათრიე ნიშანი — მისამართის ტექსტს თვითონ დაწერ/შეინარჩუნებ.
+          </p>
+        </div>
       )}
     </div>
   );
