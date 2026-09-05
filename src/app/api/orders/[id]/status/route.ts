@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUser, handle, ok, fail, ApiError } from "@/lib/api";
 import { updateStatusSchema } from "@/lib/validation";
-import { DRIVER_NEXT_STATUS } from "@/lib/domain";
+import { DRIVER_NEXT_STATUS, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL } from "@/lib/domain";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { notify, notifyDispatchers } from "@/lib/notify";
 import { sendSms, smsTemplates } from "@/lib/sms";
@@ -9,6 +9,7 @@ import type { OrderStatus } from "@prisma/client";
 
 const CUSTOMER_MSG: Partial<Record<OrderStatus, string>> = {
   ACCEPTED: "კურიერი დაინიშნა",
+  EN_ROUTE_PICKUP: "კურიერი მოდის ასაღებად",
   PICKED_UP: "კურიერმა აიღო ამანათი",
   IN_TRANSIT: "ამანათი გზაშია",
   DELIVERED: "ამანათი ჩაბარდა 🎉",
@@ -35,10 +36,15 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       session.role === "CUSTOMER" &&
       order.customerId === session.sub &&
       body.status === "CANCELLED" &&
-      ["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status); // ვიდრე კურიერი ამანათს აიღებს
+      [...FREE_CANCEL_STATUSES, ...PAID_CANCEL_STATUSES].includes(order.status);
+    // ამანათის აღების შემდეგ (PICKED_UP+) მომხმარებელი ვეღარ აუქმებს — მხოლოდ დაბრუნების მოთხოვნა (support)
 
     if (!isDispatcher && !isOwnerDriver && !isCustomerCancel)
       return fail(403, "წვდომა აკრძალულია");
+
+    // მომხმარებლის გაუქმების საფასური — მხოლოდ თუ კურიერი უკვე გზაშია ასაღებად
+    const cancelFee =
+      isCustomerCancel && PAID_CANCEL_STATUSES.includes(order.status) ? CANCEL_FEE_GEL : 0;
 
     // კურიერისთვის — გადასვლების შემოწმება
     if (isOwnerDriver && !isDispatcher) {
@@ -53,6 +59,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         data: {
           status: body.status,
           ...(body.status === "ACCEPTED" ? { assignedAt: null } : {}),
+          ...(body.status === "CANCELLED" && cancelFee > 0 ? { cancelFee } : {}),
           ...(body.status === "DELIVERED" ? { deliveredAt: new Date() } : {}),
           ...(body.status === "DELIVERED" && order.paymentMethod === "CASH"
             ? { paymentStatus: "PAID" }
@@ -118,7 +125,9 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         title: msg,
         body: driverName
           ? `${driverName} · შეკვეთა ${order.trackingNumber}`
-          : `შეკვეთა ${order.trackingNumber}`,
+          : cancelFee > 0
+            ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
+            : `შეკვეთა ${order.trackingNumber}`,
         data: { orderId: order.id },
       });
     }
@@ -126,6 +135,13 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       await notifyDispatchers({
         title: "მიტანა ჩაიშალა",
         body: `${order.trackingNumber}${body.note ? ` — ${body.note}` : ""}`,
+        data: { orderId: order.id },
+      });
+    }
+    if (cancelFee > 0) {
+      await notifyDispatchers({
+        title: "გაუქმება საფასურით",
+        body: `${order.trackingNumber} — მომხმარებელმა გააუქმა კურიერის გზაში-ყოფნისას, ${cancelFee} ₾ ასაკრები`,
         data: { orderId: order.id },
       });
     }

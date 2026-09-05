@@ -12,6 +12,7 @@ import { ArrowRight, Phone } from "lucide-react";
 
 const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   ACCEPTED: "შეკვეთის მიღება",
+  EN_ROUTE_PICKUP: "მივდივარ ასაღებად",
   PICKED_UP: "ამანათი ავიღე",
   IN_TRANSIT: "გზაში ვარ",
   DELIVERED: "ჩავაბარე",

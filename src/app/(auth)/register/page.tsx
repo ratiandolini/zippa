@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -150,7 +151,7 @@ function RegisterForm() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="password">პაროლი</Label>
-            <Input id="password" name="password" type="password" placeholder="მინიმუმ 8 სიმბოლო" required />
+            <PasswordInput id="password" name="password" placeholder="მინიმუმ 8 სიმბოლო" required />
           </div>
           <label className="flex items-start gap-2 text-xs text-muted-foreground">
             <input

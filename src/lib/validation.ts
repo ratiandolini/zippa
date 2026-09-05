@@ -166,6 +166,7 @@ export const payoutSchema = z.object({
 export const updateStatusSchema = z.object({
   status: z.enum([
     "ACCEPTED",
+    "EN_ROUTE_PICKUP",
     "PICKED_UP",
     "IN_TRANSIT",
     "DELIVERED",

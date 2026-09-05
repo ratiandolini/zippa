@@ -11,7 +11,7 @@ import { CancelOrderButton, RatingWidget } from "@/components/order-actions";
 import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
-import { GEL, streetOf } from "@/lib/domain";
+import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL } from "@/lib/domain";
 import { ArrowRight } from "lucide-react";
 
 const ACTIVE = ["PENDING", "ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
@@ -148,13 +148,29 @@ function Detail({ id }: { id: string }) {
                 <span className="text-muted-foreground">წონა</span>
                 <span>{order.weightKg} კგ</span>
               </div>
-              {["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status) && (
+              {[...FREE_CANCEL_STATUSES, ...PAID_CANCEL_STATUSES].includes(order.status) && (
                 <div className="pt-2">
-                  <CancelOrderButton orderId={order.id} onDone={() => mutate()} />
+                  <CancelOrderButton
+                    orderId={order.id}
+                    onDone={() => mutate()}
+                    feeGel={PAID_CANCEL_STATUSES.includes(order.status) ? CANCEL_FEE_GEL : 0}
+                  />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    გაუქმება უფასოა, სანამ კურიერი ამანათს აიღებს.
+                    {PAID_CANCEL_STATUSES.includes(order.status)
+                      ? `კურიერი უკვე გზაშია ასაღებად — გაუქმებას ${CANCEL_FEE_GEL} ₾ ერიცხება.`
+                      : "გაუქმება უფასოა, სანამ კურიერი გზას დაადგება ასაღებად."}
                   </p>
                 </div>
+              )}
+              {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && (
+                <p className="pt-2 text-xs text-muted-foreground">
+                  ამანათი უკვე კურიერთანაა — გაუქმება აღარ შეიძლება. დაბრუნების მოთხოვნისთვის
+                  მოგვწერეთ{" "}
+                  <a href="mailto:ratiandolini@gmail.com" className="text-accent hover:underline">
+                    support-ს
+                  </a>
+                  .
+                </p>
               )}
             </CardContent>
           </Card>

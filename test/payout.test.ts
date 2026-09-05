@@ -28,7 +28,7 @@ async function deliverN(n: number, payment: "CASH" | "CARD") {
     actAs(session(disp));
     await call(assign, { params: { id: oid }, body: { driverId: drv.profile.id } });
     actAs(session(drv.user));
-    for (const s of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
       await call(setStatus, { params: { id: oid }, body: { status: s } });
     }
   }

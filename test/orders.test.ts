@@ -306,10 +306,18 @@ describe("სტატუსების მანქანა", () => {
   it("სწორი თანმიმდევრობა ASSIGNED→ACCEPTED→PICKED_UP→IN_TRANSIT→DELIVERED", async () => {
     const { drv, o } = await assigned();
     actAs(session(drv.user));
-    for (const s of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
       const r = await call(setStatus, { params: { id: o.id }, body: { status: s } });
       expect(r.status, s).toBe(200);
     }
+  });
+
+  it("გამოტოვებული გადასვლა ACCEPTED→PICKED_UP → 409 (EN_ROUTE_PICKUP გამოტოვებული)", async () => {
+    const { drv, o } = await assigned();
+    actAs(session(drv.user));
+    await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
+    const r = await call(setStatus, { params: { id: o.id }, body: { status: "PICKED_UP" } });
+    expect(r.status).toBe(409);
   });
 
   it("გამოტოვებული გადასვლა ASSIGNED→DELIVERED → 409", async () => {
@@ -344,9 +352,44 @@ describe("სტატუსების მანქანა", () => {
     const a3 = await assigned();
     actAs(session(a3.drv.user));
     await call(setStatus, { params: { id: a3.o.id }, body: { status: "ACCEPTED" } });
+    await call(setStatus, { params: { id: a3.o.id }, body: { status: "EN_ROUTE_PICKUP" } });
     await call(setStatus, { params: { id: a3.o.id }, body: { status: "PICKED_UP" } });
     actAs(session(a3.c));
     expect((await call(setStatus, { params: { id: a3.o.id }, body: { status: "CANCELLED" } })).status).toBe(403);
+  });
+
+  it("EN_ROUTE_PICKUP-ზე მომხმარებლის გაუქმებას 2 ₾ ერიცხება", async () => {
+    const { c, o, drv } = await assigned();
+    actAs(session(drv.user));
+    await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
+    await call(setStatus, { params: { id: o.id }, body: { status: "EN_ROUTE_PICKUP" } });
+    actAs(session(c));
+    const r = await call(setStatus, { params: { id: o.id }, body: { status: "CANCELLED" } });
+    expect(r.status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.status).toBe("CANCELLED");
+    expect(Number(db.cancelFee)).toBe(2);
+  });
+
+  it("PENDING-ზე გაუქმებას საფასური არ ერიცხება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    actAs(session(c));
+    await call(setStatus, { params: { id: o.id }, body: { status: "CANCELLED" } });
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(Number(db.cancelFee)).toBe(0);
+  });
+
+  it("დისპეჩერის გაუქმებას საფასური არასდროს ერიცხება", async () => {
+    const { o, drv } = await assigned();
+    actAs(session(drv.user));
+    await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
+    await call(setStatus, { params: { id: o.id }, body: { status: "EN_ROUTE_PICKUP" } });
+    actAs(session(await makeUser("DISPATCHER")));
+    const r = await call(setStatus, { params: { id: o.id }, body: { status: "CANCELLED" } });
+    expect(r.status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(Number(db.cancelFee)).toBe(0);
   });
 });
 
@@ -358,7 +401,7 @@ describe("ჩაბარებისას ფინანსური აღ�
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
     actAs(session(drv.user));
-    for (const s of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
       await call(setStatus, { params: { id: o.id }, body: { status: s } });
     }
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
@@ -378,7 +421,7 @@ describe("ჩაბარებისას ფინანსური აღ�
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
     actAs(session(drv.user));
-    for (const s of ["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "FAILED"]) {
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "FAILED"]) {
       await call(setStatus, { params: { id: o.id }, body: { status: s } });
     }
     const drv2 = await makeDriver({ approved: true });

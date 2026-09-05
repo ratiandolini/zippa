@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { PageHeader } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -190,11 +191,11 @@ function PasswordForm() {
     <Section title="პაროლის შეცვლა" onSubmit={save} busy={busy} msg={msg}>
       <div className="space-y-1.5">
         <Label>მიმდინარე პაროლი</Label>
-        <Input type="password" value={cur} onChange={(e) => setCur(e.target.value)} />
+        <PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} />
       </div>
       <div className="space-y-1.5">
         <Label>ახალი პაროლი</Label>
-        <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+        <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} />
       </div>
     </Section>
   );

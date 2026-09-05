@@ -196,6 +196,7 @@ enum OrderStatus {
   PENDING // შექმნილია, კურიერი არ ჰყავს
   ASSIGNED // კურიერი მინიჭებულია
   ACCEPTED // კურიერმა მიიღო
+  EN_ROUTE_PICKUP // კურიერი გზაშია ასაღებად (მომსახურების ფაქტობრივი დაწყება)
   PICKED_UP // ამანათი აღებულია
   IN_TRANSIT // გზაშია
   DELIVERED // ჩაბარებულია
@@ -276,6 +277,7 @@ model Order {
   signatureUrl  String?
   deliveredAt   DateTime?
   cancelReason  String?
+  cancelFee     Decimal   @default(0) @db.Decimal(10, 2) // მომხმარებლის გაუქმების საფასური (კურიერის გზაში-ყოფნისას)
 
   estimatedDeliveryAt DateTime?
   assignedAt          DateTime? // კურიერზე მიბმის დრო (ტაიმაუტისთვის)

@@ -7,6 +7,7 @@ const tone: Record<OrderStatus, "neutral" | "amber" | "blue" | "violet" | "accen
   PENDING: "amber",
   ASSIGNED: "blue",
   ACCEPTED: "blue",
+  EN_ROUTE_PICKUP: "violet",
   PICKED_UP: "violet",
   IN_TRANSIT: "accent",
   DELIVERED: "green",

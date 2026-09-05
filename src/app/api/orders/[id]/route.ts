@@ -7,7 +7,7 @@ import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
 import type { Prisma } from "@prisma/client";
 
 // რომელ სტატუსებზეა შეკვეთის რედაქტირება დაშვებული
-const EDITABLE_DISPATCHER = ["PENDING", "ASSIGNED", "ACCEPTED"];
+const EDITABLE_DISPATCHER = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"];
 const EDITABLE_CUSTOMER = ["PENDING"];
 
 // დისპეჩერს შეუძლია წაშალოს მხოლოდ გაუქმებული/მონახაზი შეკვეთა (შეცდომით შექმნილი ან სატესტო)

@@ -11,10 +11,13 @@ export function CancelOrderButton({
   orderId,
   onDone,
   size = "sm",
+  feeGel = 0,
 }: {
   orderId: string;
   onDone: () => void;
   size?: "sm" | "default";
+  /** მომხმარებლის გაუქმების საფასური (₾) — >0 როცა კურიერი უკვე გზაშია ასაღებად */
+  feeGel?: number;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -38,12 +41,17 @@ export function CancelOrderButton({
   if (!confirming)
     return (
       <Button size={size} variant="outline" onClick={() => setConfirming(true)}>
-        გაუქმება
+        {feeGel > 0 ? `გაუქმება — ${feeGel} ₾` : "უფასო გაუქმება"}
       </Button>
     );
 
   return (
     <div className="flex flex-col gap-1">
+      {feeGel > 0 && (
+        <p className="text-xs text-muted-foreground">
+          კურიერი უკვე გზაშია ასაღებად — გაუქმებას {feeGel} ₾ ერიცხება.
+        </p>
+      )}
       <div className="flex gap-2">
         <Button size={size} variant="destructive" disabled={busy} onClick={cancel}>
           {busy ? "…" : "დიახ, გავაუქმოთ"}

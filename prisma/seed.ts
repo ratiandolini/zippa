@@ -186,12 +186,17 @@ async function main() {
     const assigned = o.status !== "PENDING";
     const delivered = o.status === "DELIVERED";
 
-    const steps: { status: DemoInput["status"] | "ACCEPTED" | "PICKED_UP"; note: string; t: number }[] = [
+    const steps: { status: DemoInput["status"] | "ACCEPTED" | "EN_ROUTE_PICKUP" | "PICKED_UP"; note: string; t: number }[] = [
       { status: "PENDING", note: "შეკვეთა შექმნილია", t: 0 },
     ];
     if (assigned) steps.push({ status: "ASSIGNED", note: "კურიერი: ნიკა ბერიძე", t: 5 });
     if (o.status === "IN_TRANSIT" || delivered) {
-      steps.push({ status: "ACCEPTED", note: "", t: 8 }, { status: "PICKED_UP", note: "", t: 20 }, { status: "IN_TRANSIT", note: "", t: 25 });
+      steps.push(
+        { status: "ACCEPTED", note: "", t: 8 },
+        { status: "EN_ROUTE_PICKUP", note: "", t: 12 },
+        { status: "PICKED_UP", note: "", t: 20 },
+        { status: "IN_TRANSIT", note: "", t: 25 },
+      );
     }
     if (delivered) steps.push({ status: "DELIVERED", note: "ჩაბარებულია", t: 40 });
 

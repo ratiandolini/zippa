@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ROLE_HOME } from "@/lib/domain";
@@ -67,7 +68,7 @@ function LoginForm() {
                 დაგავიწყდა?
               </Link>
             </div>
-            <Input id="password" name="password" type="password" placeholder="••••••••" required />
+            <PasswordInput id="password" name="password" placeholder="••••••••" required />
           </div>
           {error && (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>

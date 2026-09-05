@@ -26,6 +26,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: "მოლოდინში",
   ASSIGNED: "მინიჭებული",
   ACCEPTED: "მიღებული",
+  EN_ROUTE_PICKUP: "გზაშია ასაღებად",
   PICKED_UP: "აღებული",
   IN_TRANSIT: "გზაშია",
   DELIVERED: "ჩაბარებული",
@@ -36,10 +37,16 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 /** კურიერის მიერ ნებადართული შემდეგი სტატუსები */
 export const DRIVER_NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   ASSIGNED: ["ACCEPTED"],
-  ACCEPTED: ["PICKED_UP"],
+  ACCEPTED: ["EN_ROUTE_PICKUP"],
+  EN_ROUTE_PICKUP: ["PICKED_UP"],
   PICKED_UP: ["IN_TRANSIT"],
   IN_TRANSIT: ["DELIVERED", "FAILED"],
 };
+
+// მომხმარებელს შეუძლია უფასოდ გაუქმება ამ სტატუსებში; EN_ROUTE_PICKUP-ზე — ფასიანი (იხ. CANCEL_FEE)
+export const FREE_CANCEL_STATUSES: OrderStatus[] = ["PENDING", "ASSIGNED", "ACCEPTED"];
+export const PAID_CANCEL_STATUSES: OrderStatus[] = ["EN_ROUTE_PICKUP"];
+export const CANCEL_FEE_GEL = 2;
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   CASH: "ნაღდი (ხელზე)",

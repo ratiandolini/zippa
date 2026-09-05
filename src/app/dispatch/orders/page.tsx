@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 const columns: { key: OrderDTO["status"][]; title: string }[] = [
   { key: ["PENDING"], title: "მოლოდინში" },
-  { key: ["ASSIGNED", "ACCEPTED"], title: "მინიჭებული" },
+  { key: ["ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"], title: "მინიჭებული" },
   { key: ["PICKED_UP", "IN_TRANSIT"], title: "გზაშია" },
   { key: ["DELIVERED", "FAILED", "CANCELLED"], title: "დასრულებული" },
 ];
@@ -105,7 +105,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const canCancel = !TERMINAL.includes(order.status);
-  const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED"].includes(order.status);
+  const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
   const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
 
   async function cancel() {
