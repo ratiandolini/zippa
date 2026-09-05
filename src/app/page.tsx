@@ -79,7 +79,7 @@ function JsonLd() {
       addressLocality: "თბილისი",
       addressCountry: "GE",
     },
-    email: "ratiandolini@gmail.com",
+    email: "support@zippa.ge",
     telephone: "+995598423234",
   };
   return (

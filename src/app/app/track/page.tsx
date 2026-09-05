@@ -166,7 +166,7 @@ function Detail({ id }: { id: string }) {
                 <p className="pt-2 text-xs text-muted-foreground">
                   ამანათი უკვე კურიერთანაა — გაუქმება აღარ შეიძლება. დაბრუნების მოთხოვნისთვის
                   მოგვწერეთ{" "}
-                  <a href="mailto:ratiandolini@gmail.com" className="text-accent hover:underline">
+                  <a href="mailto:support@zippa.ge" className="text-accent hover:underline">
                     support-ს
                   </a>
                   .

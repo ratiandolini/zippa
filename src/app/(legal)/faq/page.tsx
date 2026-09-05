@@ -12,7 +12,7 @@ export default function FaqPage() {
         <h1 className="text-2xl font-bold">ხშირად დასმული კითხვები</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           ვერ იპოვე პასუხი?{" "}
-          <a href="mailto:ratiandolini@gmail.com" className="text-accent hover:underline">
+          <a href="mailto:support@zippa.ge" className="text-accent hover:underline">
             მოგვწერე
           </a>
         </p>
