@@ -1,5 +1,9 @@
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+    public fields?: Record<string, string[]>,
+  ) {
     super(message);
   }
 }
@@ -29,7 +33,11 @@ export async function api<T = unknown>(
     const fieldMsg = d.issues?.fieldErrors
       ? Object.values(d.issues.fieldErrors).flat()[0]
       : undefined;
-    throw new HttpError(res.status, fieldMsg || d.issues?.formErrors?.[0] || d.error || "შეცდომა");
+    throw new HttpError(
+      res.status,
+      fieldMsg || d.issues?.formErrors?.[0] || d.error || "შეცდომა",
+      d.issues?.fieldErrors,
+    );
   }
   return data as T;
 }

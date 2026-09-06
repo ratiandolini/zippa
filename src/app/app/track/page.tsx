@@ -11,10 +11,10 @@ import { CancelOrderButton, RatingWidget } from "@/components/order-actions";
 import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
-import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL } from "@/lib/domain";
+import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL, ACTIVE_ORDER_STATUSES } from "@/lib/domain";
 import { ArrowRight } from "lucide-react";
 
-const ACTIVE = ["PENDING", "ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
+const ACTIVE = ["PENDING", ...ACTIVE_ORDER_STATUSES];
 
 export default function TrackPage() {
   return (

@@ -4,10 +4,8 @@ import { PageHeader } from "@/components/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { LazyMap } from "@/components/map-lazy";
 import { useDrivers, useOrders } from "@/lib/hooks";
-import { ORDER_STATUS_LABEL, streetOf } from "@/lib/domain";
+import { ORDER_STATUS_LABEL, streetOf, ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
 import type { MapPoint } from "@/components/map";
-
-const ACTIVE = ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
 
 export default function DispatchMapPage() {
   const { drivers } = useDrivers("", 10000);

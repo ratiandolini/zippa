@@ -7,10 +7,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { OrderRow } from "@/components/order-row";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { useOrders } from "@/lib/hooks";
-import { GEL, streetOf } from "@/lib/domain";
+import { GEL, streetOf, ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
 import { Plus, MapPin } from "lucide-react";
-
-const ACTIVE = ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
 
 export default function CustomerHome() {
   const { orders, isLoading } = useOrders("", 15000);

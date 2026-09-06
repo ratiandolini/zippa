@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok } from "@/lib/api";
 import { haversineKm } from "@/lib/geo";
+import { ACTIVE_ORDER_STATUSES } from "@/lib/domain";
 
 export function GET(req: Request) {
   return handle(async () => {
@@ -32,7 +33,7 @@ export function GET(req: Request) {
         by: ["driverId"],
         where: {
           driverId: { in: drivers.map((d) => d.id) },
-          status: { in: ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"] },
+          status: { in: ACTIVE_ORDER_STATUSES },
         },
         _count: true,
       });

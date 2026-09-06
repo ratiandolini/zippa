@@ -7,11 +7,9 @@ import { Stat } from "@/components/stat";
 import { DriverOrderCard } from "@/components/driver-order-card";
 import { useDriverMe, useOrders } from "@/lib/hooks";
 import { api } from "@/lib/fetcher";
-import { GEL } from "@/lib/domain";
+import { GEL, ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { Wallet, Package, Banknote } from "lucide-react";
-
-const ACTIVE = ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
 
 export default function DriverHome() {
   const { driver, mutate: mutateDriver, isLoading } = useDriverMe(15000);

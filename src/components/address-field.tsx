@@ -18,11 +18,13 @@ export function AddressField({
   value,
   onChange,
   placeholder,
+  error,
 }: {
   label: string;
   value: AddressValue;
   onChange: (v: AddressValue) => void;
   placeholder?: string;
+  error?: string;
 }) {
   const [results, setResults] = useState<GeoResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -82,7 +84,7 @@ export function AddressField({
   return (
     <div className="space-y-1.5" ref={boxRef}>
       <Label>{label}</Label>
-      <div className="relative z-20">
+      <div className="relative z-30">
         <Input
           value={value.address}
           placeholder={placeholder}
@@ -98,7 +100,7 @@ export function AddressField({
         )}
 
         {open && results.length > 0 && (
-          <ul className="absolute z-[1000] mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-background shadow-card">
+          <ul className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-background shadow-card">
             {results.map((r, i) => (
               <li key={i}>
                 <button
@@ -114,6 +116,8 @@ export function AddressField({
           </ul>
         )}
       </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex items-center gap-3">
         {value.address.trim().length >= 3 && value.lat == null && !loading && !open && (

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/stat";
 import { OrderRow } from "@/components/order-row";
 import { useOrders, useDrivers } from "@/lib/hooks";
-import { GEL, DRIVER_STATUS_LABEL } from "@/lib/domain";
+import { GEL, DRIVER_STATUS_LABEL, ACTIVE_ORDER_STATUSES } from "@/lib/domain";
 import { Package, Clock, Wallet, Users } from "lucide-react";
 
 function isToday(iso: string) {
@@ -20,9 +20,7 @@ export default function DispatchHome() {
   const { drivers } = useDrivers("", 15000);
 
   const pending = orders.filter((o) => o.status === "PENDING");
-  const activeCount = orders.filter((o) =>
-    ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"].includes(o.status),
-  ).length;
+  const activeCount = orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status)).length;
   const doneToday = orders.filter((o) => o.status === "DELIVERED" && o.deliveredAt && isToday(o.deliveredAt));
   const revenueToday = doneToday.reduce((s, o) => s + o.price.total, 0);
   const online = drivers.filter((d) => d.status !== "OFFLINE");

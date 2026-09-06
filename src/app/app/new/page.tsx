@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AddressField, type AddressValue } from "@/components/address-field";
 import { GEL, PAYMENT_METHOD_LABEL, DELIVERY_ZONE_LABEL, fmtDate } from "@/lib/domain";
-import { api } from "@/lib/fetcher";
+import { api, HttpError } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
 import type { OrderDTO } from "@/lib/serialize";
 
@@ -41,7 +41,9 @@ export default function NewOrderPage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
+  const fe = (k: string) => fieldErr[k]?.[0];
 
   const weightNum = parseFloat(weight);
   const ready =
@@ -74,6 +76,7 @@ export default function NewOrderPage() {
 
   async function submit() {
     setError(null);
+    setFieldErr({});
     setSubmitting(true);
     try {
       const { order } = await api<{ order: OrderDTO }>("/api/orders", "POST", {
@@ -92,7 +95,12 @@ export default function NewOrderPage() {
       });
       router.push(`/app/track?id=${order.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "შეცდომა");
+      if (e instanceof HttpError && e.fields && Object.keys(e.fields).length) {
+        setFieldErr(e.fields);
+        setError("შეასწორე მონიშნული ველები");
+      } else {
+        setError(e instanceof Error ? e.message : "შეცდომა");
+      }
       setSubmitting(false);
     }
   }
@@ -123,10 +131,11 @@ export default function NewOrderPage() {
                   value={pickup}
                   onChange={setPickup}
                   placeholder="ქალაქი, ქუჩა, ნომერი"
+                  error={fe("pickup.address")}
                 />
               </div>
-              <Text label="გამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" />
-              <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="5XX XX XX XX" />
+              <Text label="გამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" error={fe("sender.name")} />
+              <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="5XX XX XX XX" error={fe("sender.phone")} />
             </CardContent>
           </Card>
 
@@ -141,10 +150,11 @@ export default function NewOrderPage() {
                   value={delivery}
                   onChange={setDelivery}
                   placeholder="ქალაქი, ქუჩა, ნომერი"
+                  error={fe("delivery.address")}
                 />
               </div>
-              <Text label="მიმღები" value={recipientName} onChange={setRecipientName} placeholder="სახელი გვარი" />
-              <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="5XX XX XX XX" />
+              <Text label="მიმღები" value={recipientName} onChange={setRecipientName} placeholder="სახელი გვარი" error={fe("recipient.name")} />
+              <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="5XX XX XX XX" error={fe("recipient.phone")} />
             </CardContent>
           </Card>
 
@@ -161,6 +171,7 @@ export default function NewOrderPage() {
                 type="number"
                 step="0.1"
                 hint="კილოგრამში. 500 გრამი = 0.5"
+                error={fe("weightKg")}
               />
               <Text label="აღწერა" value={description} onChange={setDescription} placeholder="მაგ. დოკუმენტები, ტანსაცმელი" />
             </CardContent>
@@ -242,6 +253,7 @@ function Text({
   type,
   hint,
   step,
+  error,
 }: {
   label: string;
   value: string;
@@ -250,6 +262,7 @@ function Text({
   type?: string;
   hint?: string;
   step?: string;
+  error?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -260,8 +273,13 @@ function Text({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        className={cn(error && "border-destructive focus-visible:ring-destructive")}
       />
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : (
+        hint && <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
     </div>
   );
 }

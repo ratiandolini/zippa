@@ -26,8 +26,16 @@ export function handle(fn: () => Promise<Response>) {
       throw err;
     if (err instanceof ApiError) return fail(err.status, err.message);
     if (err instanceof ZodError) {
+      // dotted-path fieldErrors (მაგ. "sender.phone") — რომ კლიენტმა კონკრეტულ ველთან აჩვენოს
+      const fieldErrors: Record<string, string[]> = {};
+      const formErrors: string[] = [];
+      for (const i of err.issues) {
+        const key = i.path.join(".");
+        if (key) (fieldErrors[key] ??= []).push(i.message);
+        else formErrors.push(i.message);
+      }
       return NextResponse.json(
-        { error: "ვალიდაციის შეცდომა", issues: err.flatten() },
+        { error: "ვალიდაციის შეცდომა", issues: { formErrors, fieldErrors } },
         { status: 422 },
       );
     }

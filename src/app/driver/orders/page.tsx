@@ -5,8 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DriverOrderCard } from "@/components/driver-order-card";
 import { OrderRow } from "@/components/order-row";
 import { useOrders } from "@/lib/hooks";
-
-const ACTIVE = ["ASSIGNED", "ACCEPTED", "PICKED_UP", "IN_TRANSIT"];
+import { ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
 
 export default function DriverOrdersPage() {
   const { orders, isLoading, mutate } = useOrders("", 12000);

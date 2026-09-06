@@ -43,6 +43,15 @@ export const DRIVER_NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   IN_TRANSIT: ["DELIVERED", "FAILED"],
 };
 
+/** შეკვეთა „მიმდინარეა" — მინიჭებულია და ჯერ არ დასრულებულა */
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
+  "ASSIGNED",
+  "ACCEPTED",
+  "EN_ROUTE_PICKUP",
+  "PICKED_UP",
+  "IN_TRANSIT",
+];
+
 // მომხმარებელს შეუძლია უფასოდ გაუქმება ამ სტატუსებში; EN_ROUTE_PICKUP-ზე — ფასიანი (იხ. CANCEL_FEE)
 export const FREE_CANCEL_STATUSES: OrderStatus[] = ["PENDING", "ASSIGNED", "ACCEPTED"];
 export const PAID_CANCEL_STATUSES: OrderStatus[] = ["EN_ROUTE_PICKUP"];

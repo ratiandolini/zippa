@@ -52,7 +52,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background shadow-card">
+        <div className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background shadow-card">
           <div className="border-b border-border px-4 py-2.5 text-sm font-medium">შეტყობინებები</div>
           <div className="max-h-96 overflow-auto">
             {notifications.length === 0 && (

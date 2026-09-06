@@ -77,7 +77,7 @@ export function AppShell({
 
       {/* Main */}
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/80 px-5 backdrop-blur">
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-background/80 px-5 backdrop-blur">
           <div className="lg:hidden">
             <Logo />
           </div>
