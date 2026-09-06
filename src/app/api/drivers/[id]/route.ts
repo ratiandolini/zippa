@@ -68,6 +68,7 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
           id: s.id,
           amount: Number(s.amount),
           note: s.note,
+          status: s.status,
           createdAt: s.createdAt.toISOString(),
         })),
         reviews: reviews.map((r) => ({

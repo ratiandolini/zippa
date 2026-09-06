@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Stat } from "@/components/stat";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate } from "@/lib/domain";
+import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate, SETTLEMENT_STATUS_LABEL } from "@/lib/domain";
+import type { SettlementStatus } from "@prisma/client";
 import type { VehicleType } from "@prisma/client";
 import { ArrowLeft } from "lucide-react";
 
@@ -33,7 +34,7 @@ interface DriverDetail {
     unsettledEarningsSum: number;
     unsettledEarningsCount: number;
     payouts: { id: string; amount: number; note: string | null; createdAt: string }[];
-    settlements: { id: string; amount: number; note: string | null; createdAt: string }[];
+    settlements: { id: string; amount: number; note: string | null; status: SettlementStatus; createdAt: string }[];
     reviews: {
       id: string;
       rating: number;
@@ -163,7 +164,12 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
               ) : (
                 d.settlements.map((s) => (
                   <div key={s.id} className="flex justify-between border-b border-border py-1.5 last:border-0">
-                    <span>{fmtDate(s.createdAt)}</span>
+                    <span>
+                      {fmtDate(s.createdAt)}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {SETTLEMENT_STATUS_LABEL[s.status]}
+                      </span>
+                    </span>
                     <span className="font-medium tabular-nums">{GEL(s.amount)}</span>
                   </div>
                 ))

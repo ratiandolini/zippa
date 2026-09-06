@@ -120,6 +120,9 @@ export const pricingRuleSchema = z.object({
     .array(z.object({ maxKg: z.number().positive().max(1000), price: money }))
     .min(1, "მინიმუმ ერთი წონა-კალათა"),
   codFee: money,
+  driverBaseFee: money.default(0),
+  driverPerKm: money.default(0),
+  driverFreeKm: money.default(0),
   driverFlatFee: money,
   driverPayoutPercent: z.number().int().min(0).max(100).nullable().optional(),
   sameDayCutoffHour: z.number().int().min(0).max(23).nullable().optional(),
@@ -174,6 +177,21 @@ export const updateStatusSchema = z.object({
     "CANCELLED",
   ]),
   note: z.string().trim().max(300).optional(),
+  failureReason: z
+    .enum(["RECIPIENT_UNAVAILABLE", "RECIPIENT_REFUSED", "ADDRESS_INVALID", "DAMAGED", "OTHER"])
+    .optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+});
+
+// ნაღდის ჩაბარება — კურიერი აცხადებს
+export const cashSettlementSchema = z.object({
+  amount: z.number().positive().max(1000000),
+  note: z.string().trim().max(200).optional(),
+});
+
+// დისპეჩერი ადასტურებს / უარყოფს
+export const settlementReviewSchema = z.object({
+  action: z.enum(["CONFIRM", "REJECT"]),
+  note: z.string().trim().max(200).optional(),
 });

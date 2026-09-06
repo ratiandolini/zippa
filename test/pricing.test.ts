@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { resetDb, prisma } from "./helpers";
-import { calculatePrice, resolveZone, resolveCityId, estimateDelivery } from "@/lib/pricing";
+import { calculatePrice, resolveZone, resolveCityId, estimateDelivery, driverFeeFor } from "@/lib/pricing";
 
 const TB = { lat: 41.72, lng: 44.79 };
 const TB2 = { lat: 41.71, lng: 44.77 };
@@ -91,6 +91,30 @@ describe("calculatePrice — რეგიონი / სოფელი", () => 
     expect(p.zone).toBe("TOWN_VILLAGE");
     expect(p.deliveryPrice).toBe(11);
     expect(p.driverFee).toBe(7);
+  });
+});
+
+describe("driverFeeFor — ბაზისი + კმ", () => {
+  it("ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ", () => {
+    const rule = { driverBaseFee: 2.5, driverPerKm: 0.5, driverFreeKm: 5, driverFlatFee: 3 };
+    expect(driverFeeFor(rule, 3, 5)).toBe(2.5); // უფასო ზონაში
+    expect(driverFeeFor(rule, 5, 5)).toBe(2.5); // ზუსტად ზღვარზე
+    expect(driverFeeFor(rule, 9, 5)).toBe(4.5); // 2.5 + 4×0.5
+    expect(driverFeeFor(rule, 15, 5)).toBe(7.5); // 2.5 + 10×0.5
+  });
+  it("driverBaseFee = 0 → fallback ფიქსირებულ driverFlatFee-ზე", () => {
+    expect(driverFeeFor({ driverBaseFee: 0, driverFlatFee: 3 }, 20, 5)).toBe(3);
+  });
+  it("calculatePrice იყენებს ბაზისი+კმ-ს როცა rule ასეა კონფიგურირებული", async () => {
+    await prisma.pricingRule.update({
+      where: { zone: "TBILISI" },
+      data: { driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5" },
+    });
+    const tb = await prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } });
+    const near = await calculatePrice({
+      pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: tb.id,
+    });
+    expect(near.driverFee).toBe(2.5); // TB↔TB2 ახლოსაა (< 5 კმ)
   });
 });
 

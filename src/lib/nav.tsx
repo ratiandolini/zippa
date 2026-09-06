@@ -11,6 +11,7 @@ import {
   Tag,
   BarChart3,
   UserCog,
+  Banknote,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import type { NavItem } from "@/components/app-shell";
@@ -35,6 +36,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/dispatch", label: "მიმოხილვა", icon: <LayoutGrid className={c} /> },
     { href: "/dispatch/orders", label: "შეკვეთები", icon: <Package className={c} /> },
     { href: "/dispatch/drivers", label: "კურიერები", icon: <Users className={c} /> },
+    { href: "/dispatch/cash", label: "ნაღდი", icon: <Banknote className={c} /> },
     { href: "/dispatch/map", label: "რუკა", icon: <Map className={c} /> },
     { href: "/dispatch/pricing", label: "ტარიფები", icon: <Tag className={c} /> },
     { href: "/dispatch/analytics", label: "ანალიტიკა", icon: <BarChart3 className={c} /> },

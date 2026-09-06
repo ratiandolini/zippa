@@ -64,6 +64,8 @@ export function serializeOrder(o: OrderWith) {
     payerSide: o.payerSide,
     codAmount: num(o.codAmount),
     cancelFee: num(o.cancelFee),
+    returnFee: num(o.returnFee),
+    failureReason: o.failureReason,
 
     proofPhotoUrl: o.proofPhotoUrl,
 

@@ -176,7 +176,12 @@ model PricingRule {
 
   codFee Decimal @default(0) @db.Decimal(10, 2) // ნაღდით გადახდის საკომისიო
 
-  // კურიერის ანაზღაურება ამ ზონის მიტანაზე (ჰიბრიდი: ბაზა ცალკეა, ეს არის ბონუსი მიტანაზე)
+  // კურიერის ანაზღაურება ამ ზონის მიტანაზე — ბაზისი + კმ-თარიფი მანძილის ზღვრის მერე
+  driverBaseFee Decimal @default(0) @db.Decimal(10, 2) // საბაზისო საფასური თითო მიტანაზე
+  driverPerKm   Decimal @default(0) @db.Decimal(10, 2) // კმ-თარიფი driverFreeKm-ის მერე
+  driverFreeKm  Decimal @default(0) @db.Decimal(10, 2) // ამ მანძილამდე კმ-თარიფი არ ერიცხება
+
+  // ძველი მოდელი — fallback თუ driverBaseFee = 0
   driverFlatFee       Decimal @default(0) @db.Decimal(10, 2)
   driverPayoutPercent Int? // ალტერნატივა — შემოსავლის %, თუ driverFlatFee = 0
 
@@ -220,6 +225,15 @@ enum PaymentStatus {
 enum PayerSide {
   SENDER
   RECIPIENT
+}
+
+// მიტანის ჩაშლის მიზეზი (RTO)
+enum OrderFailureReason {
+  RECIPIENT_UNAVAILABLE // მიმღები ვერ მოიძებნა
+  RECIPIENT_REFUSED // მიმღებმა უარი თქვა
+  ADDRESS_INVALID // მისამართი არასწორია
+  DAMAGED // ამანათი დაზიანდა
+  OTHER
 }
 
 model Order {
@@ -278,6 +292,10 @@ model Order {
   deliveredAt   DateTime?
   cancelReason  String?
   cancelFee     Decimal   @default(0) @db.Decimal(10, 2) // მომხმარებლის გაუქმების საფასური (კურიერის გზაში-ყოფნისას)
+
+  // მიტანის ჩაშლა (RTO)
+  failureReason OrderFailureReason?
+  returnFee     Decimal            @default(0) @db.Decimal(10, 2) // გამგზავნს დაბრუნებისთვის დარიცხული
 
   estimatedDeliveryAt DateTime?
   assignedAt          DateTime? // კურიერზე მიბმის დრო (ტაიმაუტისთვის)
@@ -357,17 +375,26 @@ model DriverEarning {
   @@index([driverId, isSettled])
 }
 
+enum SettlementStatus {
+  PENDING // კურიერმა გამოაცხადა, დისპეჩერს არ დაუდასტურებია
+  CONFIRMED // დისპეჩერმა მიიღო ნაღდი
+  REJECTED // დისპეჩერმა უარყო (თანხა არ ემთხვევა)
+}
+
 // ნაღდი ფულის ჩაბარება კურიერისგან კომპანიაში
 model CashSettlement {
-  id            String        @id @default(cuid())
+  id            String           @id @default(cuid())
   driverId      String
-  driver        DriverProfile @relation(fields: [driverId], references: [id])
-  amount        Decimal       @db.Decimal(10, 2)
+  driver        DriverProfile    @relation(fields: [driverId], references: [id])
+  amount        Decimal          @db.Decimal(10, 2)
   note          String?
+  status        SettlementStatus @default(PENDING)
   confirmedById String? // დისპეჩერი
-  createdAt     DateTime      @default(now())
+  confirmedAt   DateTime?
+  createdAt     DateTime         @default(now())
 
   @@index([driverId])
+  @@index([status])
 }
 
 // ანაზღაურების გადახდა კურიერზე

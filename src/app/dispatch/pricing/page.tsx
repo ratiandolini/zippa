@@ -37,7 +37,9 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
   const [editing, setEditing] = useState(false);
   const [brackets, setBrackets] = useState<WeightBracket[]>(rule.weightBrackets);
   const [codFee, setCodFee] = useState(String(rule.codFee));
-  const [driverFee, setDriverFee] = useState(String(rule.driverFlatFee));
+  const [dBase, setDBase] = useState(String(rule.driverBaseFee));
+  const [dPerKm, setDPerKm] = useState(String(rule.driverPerKm));
+  const [dFreeKm, setDFreeKm] = useState(String(rule.driverFreeKm));
   const [cutoff, setCutoff] = useState(rule.sameDayCutoffHour == null ? "" : String(rule.sameDayCutoffHour));
   const [days, setDays] = useState(String(rule.deliveryDays));
   const [busy, setBusy] = useState(false);
@@ -46,7 +48,9 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
   function reset() {
     setBrackets(rule.weightBrackets);
     setCodFee(String(rule.codFee));
-    setDriverFee(String(rule.driverFlatFee));
+    setDBase(String(rule.driverBaseFee));
+    setDPerKm(String(rule.driverPerKm));
+    setDFreeKm(String(rule.driverFreeKm));
     setCutoff(rule.sameDayCutoffHour == null ? "" : String(rule.sameDayCutoffHour));
     setDays(String(rule.deliveryDays));
     setEditing(false);
@@ -60,7 +64,9 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
       await api(`/api/pricing/rules/${rule.id}`, "PATCH", {
         weightBrackets: brackets.map((b) => ({ maxKg: Number(b.maxKg), price: Number(b.price) })),
         codFee: Number(codFee),
-        driverFlatFee: Number(driverFee),
+        driverBaseFee: Number(dBase),
+        driverPerKm: Number(dPerKm),
+        driverFreeKm: Number(dFreeKm),
         sameDayCutoffHour: cutoff === "" ? null : Number(cutoff),
         deliveryDays: Number(days),
       });
@@ -146,12 +152,17 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="ნაღდის საკომისიო ₾" value={codFee} onChange={setCodFee} edit={editing} display={GEL(rule.codFee)} />
-          <Field label="კურიერს ერგება ₾ (მიტანაზე)" value={driverFee} onChange={setDriverFee} edit={editing} display={GEL(rule.driverFlatFee)} />
+          <Field label="კურიერი — ბაზისი ₾" value={dBase} onChange={setDBase} edit={editing} display={GEL(rule.driverBaseFee)} />
+          <Field label="კურიერი — ₾/კმ" value={dPerKm} onChange={setDPerKm} edit={editing} display={GEL(rule.driverPerKm)} />
+          <Field label="უფასო კმ (ბაზისში)" value={dFreeKm} onChange={setDFreeKm} edit={editing} display={`${rule.driverFreeKm} კმ`} />
           {rule.zone === "TBILISI" && (
             <Field label="იმ-დღეს cut-off (საათი)" value={cutoff} onChange={setCutoff} edit={editing} display={rule.sameDayCutoffHour == null ? "—" : `${rule.sameDayCutoffHour}:00`} />
           )}
           <Field label="მინ. დღეები" value={days} onChange={setDays} edit={editing} display={String(rule.deliveryDays)} />
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ
+        </p>
 
         {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
 

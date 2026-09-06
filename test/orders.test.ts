@@ -423,12 +423,79 @@ describe("ჩაბარებისას ფინანსური აღ�
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
     actAs(session(drv.user));
     for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "FAILED"]) {
-      await call(setStatus, { params: { id: o.id }, body: { status: s } });
+      await call(setStatus, {
+        params: { id: o.id },
+        body: { status: s, ...(s === "FAILED" ? { failureReason: "RECIPIENT_UNAVAILABLE" } : {}) },
+      });
     }
     const drv2 = await makeDriver({ approved: true });
     actAs(session(await makeUser("DISPATCHER")));
     const r = await call(assign, { params: { id: o.id }, body: { driverId: drv2.profile.id } });
     expect(r.status).toBe(200);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe("ASSIGNED");
+  });
+
+  it("FAILED მიზეზის გარეშე → 422", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT"]) {
+      await call(setStatus, { params: { id: o.id }, body: { status: s } });
+    }
+    expect((await call(setStatus, { params: { id: o.id }, body: { status: "FAILED" } })).status).toBe(422);
+  });
+
+  it("RTO: მიმღები ვერ მოიძებნა → returnFee გამგზავნს, კურიერს ნახევარი ანაზღაურება, COD არ გროვდება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id); // deliveryPrice 5, driverFee 3, codAmount 5
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT"]) {
+      await call(setStatus, { params: { id: o.id }, body: { status: s } });
+    }
+    const r = await call(setStatus, {
+      params: { id: o.id },
+      body: { status: "FAILED", failureReason: "RECIPIENT_UNAVAILABLE" },
+    });
+    expect(r.status).toBe(200);
+
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.failureReason).toBe("RECIPIENT_UNAVAILABLE");
+    expect(Number(db.returnFee)).toBe(2.5); // 5 × 0.5
+
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(Number(dp.unpaidEarnings)).toBe(1.5); // 3 × 0.5
+    expect(Number(dp.cashOnHand)).toBe(0); // COD არ აუღია
+    expect(dp.status).toBe("AVAILABLE");
+
+    const e = await prisma.driverEarning.findUniqueOrThrow({ where: { orderId: o.id } });
+    expect(Number(e.driverAmount)).toBe(1.5);
+    expect(e.collectedInCash).toBe(false);
+  });
+
+  it("RTO: ამანათი დაზიანდა (კურიერის ბრალი) → არც კომპენსაცია, არც returnFee", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT"]) {
+      await call(setStatus, { params: { id: o.id }, body: { status: s } });
+    }
+    await call(setStatus, {
+      params: { id: o.id },
+      body: { status: "FAILED", failureReason: "DAMAGED" },
+    });
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(Number(db.returnFee)).toBe(0);
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(Number(dp.unpaidEarnings)).toBe(0);
+    expect(await prisma.driverEarning.findUnique({ where: { orderId: o.id } })).toBeNull();
   });
 });

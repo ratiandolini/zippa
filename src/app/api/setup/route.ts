@@ -17,17 +17,20 @@ const RULES = [
   {
     zone: "TBILISI" as const,
     weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
-    codFee: "0", driverFlatFee: "3.00", sameDayCutoffHour: 16, deliveryDays: 0,
+    codFee: "0", driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5",
+    driverFlatFee: "3.00", sameDayCutoffHour: 16, deliveryDays: 0,
   },
   {
     zone: "REGIONAL_CITY" as const,
     weightBrackets: B([[6, 7], [10, 9], [15, 12], [20, 15], [30, 19], [40, 28], [50, 38]]),
-    codFee: "0", driverFlatFee: "5.00", deliveryDays: 1,
+    codFee: "0", driverBaseFee: "4.00", driverPerKm: "0.50", driverFreeKm: "5",
+    driverFlatFee: "5.00", deliveryDays: 1,
   },
   {
     zone: "TOWN_VILLAGE" as const,
     weightBrackets: B([[6, 11], [10, 13], [15, 16], [20, 19], [30, 23], [40, 33], [50, 43]]),
-    codFee: "0", driverFlatFee: "7.00", deliveryDays: 2,
+    codFee: "0", driverBaseFee: "6.00", driverPerKm: "0.50", driverFreeKm: "5",
+    driverFlatFee: "7.00", deliveryDays: 2,
   },
 ];
 

@@ -6,6 +6,7 @@ import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { POST as payout } from "@/app/api/drivers/[id]/payout/route";
 import { GET as driverDetail } from "@/app/api/drivers/[id]/route";
 import { POST as settle } from "@/app/api/driver/settlement/route";
+import { PATCH as reviewSettlement } from "@/app/api/settlements/[id]/route";
 
 const body = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მა რი", phone: "+995599111111" },
@@ -79,15 +80,45 @@ describe("payout (დისპეჩერი)", () => {
   });
 });
 
-describe("ნაღდის ჩაბარება (კურიერი)", () => {
-  it("ჩაბარება → cashOnHand მცირდება; ხელზე არსებულზე მეტი → 400", async () => {
-    const { drv } = await deliverN(2, "CASH"); // cashOnHand 10
+describe("ნაღდის ჩაბარება (კურიერი → დისპეჩერი)", () => {
+  it("გამოცხადება PENDING-ია; დისპეჩერის დადასტურებაზე cashOnHand მცირდება", async () => {
+    const { drv, disp } = await deliverN(2, "CASH"); // cashOnHand 10
     actAs(session(drv.user));
-    expect((await call(settle, { body: { amount: 5 } })).status).toBe(200);
+
+    const declared = await call(settle, { body: { amount: 5 } });
+    expect(declared.status).toBe(200);
+    const sid = (declared.body.settlement as { id: string }).id;
+
+    // ბალანსი ჯერ არ შეცვლილა
     let dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.cashOnHand)).toBe(5);
-    expect((await call(settle, { body: { amount: 999 } })).status).toBe(400);
+    expect(Number(dp.cashOnHand)).toBe(10);
+
+    // მეორე დაუდასტურებელი განაცხადი → 409
+    expect((await call(settle, { body: { amount: 3 } })).status).toBe(409);
+
+    // დისპეჩერი ადასტურებს
+    actAs(session(disp));
+    expect((await call(reviewSettlement, { params: { id: sid }, body: { action: "CONFIRM" } })).status).toBe(200);
     dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.cashOnHand)).toBe(5);
+
+    // ხელზე არსებულზე მეტი → 400
+    actAs(session(drv.user));
+    expect((await call(settle, { body: { amount: 999 } })).status).toBe(400);
+  });
+
+  it("დისპეჩერი უარყოფს — ბალანსი უცვლელი, კურიერს თავიდან შეუძლია", async () => {
+    const { drv, disp } = await deliverN(1, "CASH"); // cashOnHand 5
+    actAs(session(drv.user));
+    const declared = await call(settle, { body: { amount: 5 } });
+    const sid = (declared.body.settlement as { id: string }).id;
+
+    actAs(session(disp));
+    expect((await call(reviewSettlement, { params: { id: sid }, body: { action: "REJECT" } })).status).toBe(200);
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(Number(dp.cashOnHand)).toBe(5);
+
+    actAs(session(drv.user));
+    expect((await call(settle, { body: { amount: 5 } })).status).toBe(200);
   });
 });

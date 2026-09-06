@@ -7,6 +7,8 @@ import type {
   VehicleType,
   DeliveryKind,
   DeliveryZone,
+  OrderFailureReason,
+  SettlementStatus,
 } from "@prisma/client";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -38,7 +40,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 export const DRIVER_NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   ASSIGNED: ["ACCEPTED"],
   ACCEPTED: ["EN_ROUTE_PICKUP"],
-  EN_ROUTE_PICKUP: ["PICKED_UP"],
+  EN_ROUTE_PICKUP: ["PICKED_UP", "FAILED"], // გამგზავნი ვერ მოიძებნა
   PICKED_UP: ["IN_TRANSIT"],
   IN_TRANSIT: ["DELIVERED", "FAILED"],
 };
@@ -56,6 +58,29 @@ export const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
 export const FREE_CANCEL_STATUSES: OrderStatus[] = ["PENDING", "ASSIGNED", "ACCEPTED"];
 export const PAID_CANCEL_STATUSES: OrderStatus[] = ["EN_ROUTE_PICKUP"];
 export const CANCEL_FEE_GEL = 2;
+
+// მიტანის ჩაშლა (RTO) — სტანდარტული წესი
+// კურიერი იღებს დაკარგული სვლის კომპენსაციას; გამგზავნს ერიცხება დაბრუნების საფასური.
+// ორივე კონფიგურირებადია — შეცვლა აქ.
+export const FAILED_TRIP_DRIVER_PCT = 0.5; // driverFee-ის წილი, რასაც კურიერი მაინც იღებს
+export const RETURN_FEE_PCT = 0.5; // deliveryPrice-ის წილი, რასაც გამგზავნი იხდის დაბრუნებაზე
+
+// კურიერის ბრალით ჩაშლა — არც კომპენსაცია, არც დაბრუნების საფასური
+export const DRIVER_FAULT_FAILURE: OrderFailureReason[] = ["DAMAGED"];
+
+export const FAILURE_REASON_LABEL: Record<OrderFailureReason, string> = {
+  RECIPIENT_UNAVAILABLE: "მიმღები ვერ მოიძებნა",
+  RECIPIENT_REFUSED: "მიმღებმა უარი თქვა",
+  ADDRESS_INVALID: "მისამართი არასწორია",
+  DAMAGED: "ამანათი დაზიანდა",
+  OTHER: "სხვა",
+};
+
+export const SETTLEMENT_STATUS_LABEL: Record<SettlementStatus, string> = {
+  PENDING: "დადასტურების მოლოდინში",
+  CONFIRMED: "დადასტურებული",
+  REJECTED: "უარყოფილი",
+};
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   CASH: "ნაღდი (ხელზე)",

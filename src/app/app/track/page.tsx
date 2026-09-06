@@ -11,7 +11,7 @@ import { CancelOrderButton, RatingWidget } from "@/components/order-actions";
 import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
-import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL, ACTIVE_ORDER_STATUSES } from "@/lib/domain";
+import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL, ACTIVE_ORDER_STATUSES, FAILURE_REASON_LABEL } from "@/lib/domain";
 import { ArrowRight } from "lucide-react";
 
 const ACTIVE = ["PENDING", ...ACTIVE_ORDER_STATUSES];
@@ -160,6 +160,15 @@ function Detail({ id }: { id: string }) {
                       ? `კურიერი უკვე გზაშია ასაღებად — გაუქმებას ${CANCEL_FEE_GEL} ₾ ერიცხება.`
                       : "გაუქმება უფასოა, სანამ კურიერი გზას დაადგება ასაღებად."}
                   </p>
+                </div>
+              )}
+              {order.status === "FAILED" && (
+                <div className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  მიტანა ვერ შესრულდა
+                  {order.failureReason ? ` — ${FAILURE_REASON_LABEL[order.failureReason]}` : ""}.
+                  {order.returnFee > 0
+                    ? ` ამანათი ბრუნდება; დაბრუნების საფასური ${GEL(order.returnFee)}.`
+                    : " ამანათი ბრუნდება."}
                 </div>
               )}
               {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && (

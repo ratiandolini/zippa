@@ -14,6 +14,9 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (data.isActive !== undefined) patch.isActive = data.isActive;
     if (data.weightBrackets !== undefined) patch.weightBrackets = data.weightBrackets;
     if (data.codFee !== undefined) patch.codFee = data.codFee;
+    if (data.driverBaseFee !== undefined) patch.driverBaseFee = data.driverBaseFee;
+    if (data.driverPerKm !== undefined) patch.driverPerKm = data.driverPerKm;
+    if (data.driverFreeKm !== undefined) patch.driverFreeKm = data.driverFreeKm;
     if (data.driverFlatFee !== undefined) patch.driverFlatFee = data.driverFlatFee;
     if (data.driverPayoutPercent !== undefined) patch.driverPayoutPercent = data.driverPayoutPercent;
     if (data.sameDayCutoffHour !== undefined) patch.sameDayCutoffHour = data.sameDayCutoffHour;

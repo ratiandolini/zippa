@@ -3,12 +3,20 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
-import { DRIVER_NEXT_STATUS, ORDER_STATUS_LABEL, GEL, fmtDateTime } from "@/lib/domain";
+import {
+  DRIVER_NEXT_STATUS,
+  ORDER_STATUS_LABEL,
+  GEL,
+  fmtDateTime,
+  FAILURE_REASON_LABEL,
+} from "@/lib/domain";
 import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
 import type { OrderDTO } from "@/lib/serialize";
-import type { OrderStatus } from "@prisma/client";
-import { ArrowRight, Phone } from "lucide-react";
+import type { OrderStatus, OrderFailureReason } from "@prisma/client";
+import { Phone } from "lucide-react";
+
+const FAILURE_REASONS = Object.keys(FAILURE_REASON_LABEL) as OrderFailureReason[];
 
 const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   ACCEPTED: "შეკვეთის მიღება",
@@ -22,6 +30,7 @@ const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
 export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [failPick, setFailPick] = useState(false);
   const next = DRIVER_NEXT_STATUS[order.status] ?? [];
 
   const acceptedAt = [...order.events].reverse().find((e) => e.status === "ACCEPTED")?.createdAt;
@@ -41,7 +50,7 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
     }
   }
 
-  async function move(status: OrderStatus) {
+  async function move(status: OrderStatus, failureReason?: OrderFailureReason) {
     setBusy(status);
     setErr(null);
     try {
@@ -55,12 +64,13 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
           ),
         );
       }
-      await api(`/api/orders/${order.id}/status`, "PATCH", { status, ...coords });
+      await api(`/api/orders/${order.id}/status`, "PATCH", { status, failureReason, ...coords });
       onChange();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "შეცდომა");
     } finally {
       setBusy(null);
+      setFailPick(false);
     }
   }
 
@@ -109,7 +119,7 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
 
       {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
 
-      {next.length > 0 && (
+      {next.length > 0 && !failPick && (
         <div className="mt-3 flex flex-wrap gap-2">
           {next.map((s) => (
             <Button
@@ -117,7 +127,7 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
               size="sm"
               variant={s === "FAILED" ? "outline" : "default"}
               disabled={busy != null}
-              onClick={() => move(s)}
+              onClick={() => (s === "FAILED" ? setFailPick(true) : move(s))}
             >
               {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
             </Button>
@@ -127,6 +137,33 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
               {busy === "REJECT" ? "…" : "უარი"}
             </Button>
           )}
+        </div>
+      )}
+
+      {failPick && (
+        <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+          <p className="mb-2 text-xs font-medium">რატომ ჩაიშალა მიტანა?</p>
+          <div className="flex flex-col gap-1.5">
+            {FAILURE_REASONS.map((r) => (
+              <Button
+                key={r}
+                size="sm"
+                variant="outline"
+                className="justify-start"
+                disabled={busy != null}
+                onClick={() => move("FAILED", r)}
+              >
+                {busy === "FAILED" ? "…" : FAILURE_REASON_LABEL[r]}
+              </Button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-2 text-xs text-muted-foreground hover:underline"
+            onClick={() => setFailPick(false)}
+          >
+            გაუქმება
+          </button>
         </div>
       )}
     </div>

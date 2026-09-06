@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/db";
 import { requireUser, handle, ok, fail, ApiError } from "@/lib/api";
 import { updateStatusSchema } from "@/lib/validation";
-import { DRIVER_NEXT_STATUS, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL } from "@/lib/domain";
+import {
+  DRIVER_NEXT_STATUS,
+  FREE_CANCEL_STATUSES,
+  PAID_CANCEL_STATUSES,
+  CANCEL_FEE_GEL,
+  FAILED_TRIP_DRIVER_PCT,
+  RETURN_FEE_PCT,
+  DRIVER_FAULT_FAILURE,
+  FAILURE_REASON_LABEL,
+} from "@/lib/domain";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
 import { sendSms, smsTemplates } from "@/lib/sms";
@@ -59,12 +68,31 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         throw new ApiError(409, `სტატუსი ${order.status}-დან ${body.status}-ზე ვერ გადავა`);
     }
 
+    if (body.status === "FAILED" && !body.failureReason)
+      throw new ApiError(422, "მიუთითე ჩაშლის მიზეზი");
+
+    // ── მიტანის ჩაშლა (RTO) — ფინანსური ლოგიკა ──
+    const driverFault = body.failureReason
+      ? DRIVER_FAULT_FAILURE.includes(body.failureReason)
+      : false;
+    const failedTripComp =
+      body.status === "FAILED" && order.driverId && !driverFault
+        ? Math.round(Number(order.driverFee) * FAILED_TRIP_DRIVER_PCT * 100) / 100
+        : 0;
+    const returnFee =
+      body.status === "FAILED" && !driverFault
+        ? Math.round(Number(order.deliveryPrice) * RETURN_FEE_PCT * 100) / 100
+        : 0;
+
     const updated = await prisma.$transaction(async (tx) => {
       const o = await tx.order.update({
         where: { id: order.id },
         data: {
           status: body.status,
           ...(body.status === "CANCELLED" && cancelFee > 0 ? { cancelFee } : {}),
+          ...(body.status === "FAILED"
+            ? { failureReason: body.failureReason, returnFee }
+            : {}),
           ...(body.status === "DELIVERED" ? { deliveredAt: new Date() } : {}),
           ...(body.status === "DELIVERED" && order.paymentMethod === "CASH"
             ? { paymentStatus: "PAID" }
@@ -115,6 +143,24 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: { status: "AVAILABLE" },
         });
       }
+
+      // ჩაშლა — კურიერს ერიცხება დაკარგული სვლის კომპენსაცია (COD არ გროვდება)
+      if (body.status === "FAILED" && order.driverId && failedTripComp > 0) {
+        await tx.driverEarning.create({
+          data: {
+            driverId: order.driverId,
+            orderId: order.id,
+            grossPrice: returnFee,
+            driverAmount: failedTripComp,
+            companyAmount: Math.round((returnFee - failedTripComp) * 100) / 100,
+            collectedInCash: false,
+          },
+        });
+        await tx.driverProfile.update({
+          where: { id: order.driverId },
+          data: { unpaidEarnings: { increment: failedTripComp } },
+        });
+      }
       if (body.status === "CANCELLED" && order.assignedAt) {
         await tx.order.update({ where: { id: order.id }, data: { assignedAt: null } });
       }
@@ -135,7 +181,9 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
             ? `${driverName} · შეკვეთა ${order.trackingNumber}`
             : cancelFee > 0
               ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
-              : `შეკვეთა ${order.trackingNumber}`,
+              : st === "FAILED" && returnFee > 0
+                ? `შეკვეთა ${order.trackingNumber} · ამანათი ბრუნდება · დაბრუნების საფასური ${returnFee} ₾`
+                : `შეკვეთა ${order.trackingNumber}`,
         data: { orderId: order.id },
       });
     }
@@ -143,9 +191,11 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     // ── დისპეჩერს — აპში ──
     const dmsg = st === "FAILED" ? "მიტანა ჩაიშალა" : DISPATCHER_MSG[st];
     if (dmsg) {
+      const reasonTxt =
+        st === "FAILED" && body.failureReason ? ` · ${FAILURE_REASON_LABEL[body.failureReason]}` : "";
       await notifyDispatchers({
         title: dmsg,
-        body: `${order.trackingNumber}${driverName ? ` — ${driverName}` : ""}${body.note ? ` · ${body.note}` : ""}`,
+        body: `${order.trackingNumber}${driverName ? ` — ${driverName}` : ""}${reasonTxt}${body.note ? ` · ${body.note}` : ""}${returnFee > 0 ? ` · დაბრუნება ${returnFee} ₾` : ""}`,
         data: { orderId: order.id },
       });
     }
@@ -162,6 +212,16 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       await notifyDriver(order.driverId, {
         title: "მიტანა დასრულდა",
         body: `${order.trackingNumber} — დაგერიცხა ${Number(order.driverFee)} ₾`,
+        data: { orderId: order.id },
+      });
+    }
+    if (st === "FAILED" && order.driverId) {
+      await notifyDriver(order.driverId, {
+        title: "მიტანა ჩაიშალა",
+        body:
+          failedTripComp > 0
+            ? `${order.trackingNumber} — დაკარგული სვლის კომპენსაცია ${failedTripComp} ₾. ამანათი დააბრუნე.`
+            : `${order.trackingNumber} — ამანათი დააბრუნე.`,
         data: { orderId: order.id },
       });
     }

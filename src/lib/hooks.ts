@@ -93,10 +93,44 @@ export interface PricingRule {
   isActive: boolean;
   weightBrackets: WeightBracket[];
   codFee: number;
+  driverBaseFee: number;
+  driverPerKm: number;
+  driverFreeKm: number;
   driverFlatFee: number;
   driverPayoutPercent: number | null;
   sameDayCutoffHour: number | null;
   deliveryDays: number;
+}
+
+export interface SettlementItem {
+  id: string;
+  driverId?: string;
+  driverName?: string;
+  driverPhone?: string;
+  cashOnHand?: number;
+  amount: number;
+  note: string | null;
+  status: "PENDING" | "CONFIRMED" | "REJECTED";
+  createdAt: string;
+  confirmedAt: string | null;
+}
+
+export function useSettlements(query = "", refreshInterval = 20000) {
+  const { data, isLoading, mutate } = useSWR<{ settlements: SettlementItem[] }>(
+    `/api/settlements${query}`,
+    jsonFetcher,
+    { refreshInterval },
+  );
+  return { settlements: data?.settlements ?? [], isLoading, mutate };
+}
+
+export function useMySettlements(refreshInterval = 20000) {
+  const { data, isLoading, mutate } = useSWR<{ settlements: SettlementItem[] }>(
+    "/api/driver/settlement",
+    jsonFetcher,
+    { refreshInterval },
+  );
+  return { settlements: data?.settlements ?? [], isLoading, mutate };
 }
 
 export function usePricingRules() {

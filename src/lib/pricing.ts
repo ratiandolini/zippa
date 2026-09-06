@@ -68,14 +68,38 @@ export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown>
   const codFee = input.paymentMethod === "CASH" ? n(rule.codFee) : 0;
   const totalPrice = Math.round((deliveryPrice + codFee) * 100) / 100;
 
-  const driverFee =
-    n(rule.driverFlatFee) > 0
-      ? n(rule.driverFlatFee)
-      : Math.round(deliveryPrice * ((rule.driverPayoutPercent ?? 70) / 100) * 100) / 100;
-
   const distanceKm = Math.round(haversineKm(input.pickup, input.delivery) * 100) / 100;
+  const driverFee = driverFeeFor(rule, distanceKm, deliveryPrice);
 
   return { zone, distanceKm, deliveryPrice, codFee, totalPrice, driverFee, overWeight: over };
+}
+
+/**
+ * კურიერის ანაზღაურება ერთ მიტანაზე:
+ *  1. ბაზისი + კმ-თარიფი (driverFreeKm-ის მერე) — ახალი მოდელი
+ *  2. fallback: ფიქსირებული driverFlatFee
+ *  3. fallback: შემოსავლის %
+ */
+export function driverFeeFor(
+  rule: {
+    driverBaseFee?: unknown;
+    driverPerKm?: unknown;
+    driverFreeKm?: unknown;
+    driverFlatFee?: unknown;
+    driverPayoutPercent?: number | null;
+  },
+  distanceKm: number,
+  deliveryPrice: number,
+): number {
+  const base = n(rule.driverBaseFee);
+  if (base > 0) {
+    const freeKm = n(rule.driverFreeKm);
+    const perKm = n(rule.driverPerKm);
+    const billableKm = Math.max(0, distanceKm - freeKm);
+    return Math.round((base + billableKm * perKm) * 100) / 100;
+  }
+  if (n(rule.driverFlatFee) > 0) return n(rule.driverFlatFee);
+  return Math.round(deliveryPrice * ((rule.driverPayoutPercent ?? 70) / 100) * 100) / 100;
 }
 
 /** სავარაუდო მიტანის დრო ზონის წესის მიხედვით (თბილისის დროით) */
