@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -23,6 +23,15 @@ function ClickToPlace({ onPick }: { onPick: (lat: number, lng: number) => void }
   return null;
 }
 
+// გარედან შემოსული კოორდინატი (მაგ. სიიდან არჩევა) — რუკა და ნიშანი გადავიდეს
+function SyncView({ lat, lng }: { lat: number | null; lng: number | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat != null && lng != null) map.setView([lat, lng], map.getZoom());
+  }, [map, lat, lng]);
+  return null;
+}
+
 export default function MapPicker({
   lat,
   lng,
@@ -34,16 +43,22 @@ export default function MapPicker({
 }) {
   const [pos, setPos] = useState<[number, number]>(lat != null && lng != null ? [lat, lng] : TBILISI);
 
+  // გარედან შემოსული კოორდინატი
+  useEffect(() => {
+    if (lat != null && lng != null) setPos([lat, lng]);
+  }, [lat, lng]);
+
   function place(la: number, ln: number) {
     setPos([la, ln]);
     onChange({ lat: la, lng: ln });
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border">
+    <div className="isolate overflow-hidden rounded-xl border border-border">
       <MapContainer center={pos} zoom={14} scrollWheelZoom className="h-64 w-full">
         <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <ClickToPlace onPick={place} />
+        <SyncView lat={lat} lng={lng} />
         <Marker
           position={pos}
           icon={pinIcon}

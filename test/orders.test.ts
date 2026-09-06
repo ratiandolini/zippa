@@ -217,15 +217,16 @@ describe("უპასუხო მიბმის ტაიმაუტი", ()
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe("ASSIGNED");
   });
 
-  it("დადასტურების შემდეგ assignedAt ნულდება", async () => {
+  it("assignedAt ინახება მიბმის შემდეგ (კარდის თარიღისთვის), იშლება reject/cancel-ზე", async () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
     const drv = await makeDriver({ approved: true });
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).assignedAt).toBeInstanceOf(Date);
     actAs(session(drv.user));
     await call(setStatus, { params: { id: o.id }, body: { status: "ACCEPTED" } });
-    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).assignedAt).toBeNull();
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).assignedAt).toBeInstanceOf(Date);
   });
 });
 

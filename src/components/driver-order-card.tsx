@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
-import { DRIVER_NEXT_STATUS, ORDER_STATUS_LABEL, GEL } from "@/lib/domain";
+import { DRIVER_NEXT_STATUS, ORDER_STATUS_LABEL, GEL, fmtDateTime } from "@/lib/domain";
 import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
 import type { OrderDTO } from "@/lib/serialize";
@@ -23,6 +23,9 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const next = DRIVER_NEXT_STATUS[order.status] ?? [];
+
+  const acceptedAt = [...order.events].reverse().find((e) => e.status === "ACCEPTED")?.createdAt;
+  const pickedUpAt = [...order.events].reverse().find((e) => e.status === "PICKED_UP")?.createdAt;
 
   async function reject() {
     if (!confirm("დარწმუნებული ხარ, რომ უარს ამბობ ამ შეკვეთაზე?")) return;
@@ -90,6 +93,12 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
             ? `ნაღდად ${GEL(order.codAmount)}`
             : "გადახდილია"}
         </span>
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+        {order.assignedAt && <span>მოგენიჭა: {fmtDateTime(order.assignedAt)}</span>}
+        {acceptedAt && <span>დაადასტურე: {fmtDateTime(acceptedAt)}</span>}
+        {pickedUpAt && <span>აიღე: {fmtDateTime(pickedUpAt)}</span>}
       </div>
 
       {["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (

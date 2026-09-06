@@ -57,7 +57,7 @@ export default function Map({
     : [41.7151, 44.8271];
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-border ${className}`}>
+    <div className={`isolate overflow-hidden rounded-xl border border-border ${className}`}>
       <MapContainer center={center} zoom={12} scrollWheelZoom={false} className="h-full w-full">
         <TileLayer
           attribution='&copy; OpenStreetMap'

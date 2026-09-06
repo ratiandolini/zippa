@@ -3,7 +3,7 @@ import { requireUser, handle, ok, fail, ApiError } from "@/lib/api";
 import { updateStatusSchema } from "@/lib/validation";
 import { DRIVER_NEXT_STATUS, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL } from "@/lib/domain";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
-import { notify, notifyDispatchers } from "@/lib/notify";
+import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
 import { sendSms, smsTemplates } from "@/lib/sms";
 import type { OrderStatus } from "@prisma/client";
 
@@ -15,6 +15,12 @@ const CUSTOMER_MSG: Partial<Record<OrderStatus, string>> = {
   DELIVERED: "ამანათი ჩაბარდა 🎉",
   FAILED: "მიტანა ვერ შესრულდა",
   CANCELLED: "შეკვეთა გაუქმდა",
+};
+
+const DISPATCHER_MSG: Partial<Record<OrderStatus, string>> = {
+  ACCEPTED: "კურიერმა დაადასტურა შეკვეთა",
+  PICKED_UP: "კურიერმა აიღო ამანათი",
+  DELIVERED: "ამანათი ჩაბარდა",
 };
 
 export function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -58,7 +64,6 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         where: { id: order.id },
         data: {
           status: body.status,
-          ...(body.status === "ACCEPTED" ? { assignedAt: null } : {}),
           ...(body.status === "CANCELLED" && cancelFee > 0 ? { cancelFee } : {}),
           ...(body.status === "DELIVERED" ? { deliveredAt: new Date() } : {}),
           ...(body.status === "DELIVERED" && order.paymentMethod === "CASH"
@@ -117,24 +122,30 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       return o;
     });
 
-    const msg = CUSTOMER_MSG[body.status as OrderStatus];
-    if (msg) {
-      const driverName =
-        body.status === "ACCEPTED" ? updated.driver?.user.name ?? null : null;
+    const st = body.status as OrderStatus;
+    const driverName = updated.driver?.user.name ?? null;
+
+    // ── მომხმარებელს (გამგზავნს) — აპში ──
+    const cmsg = CUSTOMER_MSG[st];
+    if (cmsg) {
       await notify(order.customerId, {
-        title: msg,
-        body: driverName
-          ? `${driverName} · შეკვეთა ${order.trackingNumber}`
-          : cancelFee > 0
-            ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
-            : `შეკვეთა ${order.trackingNumber}`,
+        title: cmsg,
+        body:
+          st === "ACCEPTED" && driverName
+            ? `${driverName} · შეკვეთა ${order.trackingNumber}`
+            : cancelFee > 0
+              ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
+              : `შეკვეთა ${order.trackingNumber}`,
         data: { orderId: order.id },
       });
     }
-    if (body.status === "FAILED") {
+
+    // ── დისპეჩერს — აპში ──
+    const dmsg = st === "FAILED" ? "მიტანა ჩაიშალა" : DISPATCHER_MSG[st];
+    if (dmsg) {
       await notifyDispatchers({
-        title: "მიტანა ჩაიშალა",
-        body: `${order.trackingNumber}${body.note ? ` — ${body.note}` : ""}`,
+        title: dmsg,
+        body: `${order.trackingNumber}${driverName ? ` — ${driverName}` : ""}${body.note ? ` · ${body.note}` : ""}`,
         data: { orderId: order.id },
       });
     }
@@ -146,12 +157,27 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       });
     }
 
-    // SMS მიმღებს/გამგზავნს (ანგარიში არ სჭირდებათ)
-    if (body.status === "IN_TRANSIT") {
+    // ── კურიერს — აპში (ჩაბარებისას) ──
+    if (st === "DELIVERED" && order.driverId) {
+      await notifyDriver(order.driverId, {
+        title: "მიტანა დასრულდა",
+        body: `${order.trackingNumber} — დაგერიცხა ${Number(order.driverFee)} ₾`,
+        data: { orderId: order.id },
+      });
+    }
+
+    // ── SMS — გამგზავნსა და მიმღებს (ანგარიში არ სჭირდებათ; ფასიანია) ──
+    if (st === "PICKED_UP") {
+      void sendSms(order.senderPhone, smsTemplates.pickedUpForSender(order.trackingNumber));
+      void sendSms(order.recipientPhone, smsTemplates.pickedUpForRecipient(order.trackingNumber));
+    }
+    if (st === "IN_TRANSIT" && order.status !== "PICKED_UP") {
+      // მხოლოდ იმ შემთხვევაში, თუ PICKED_UP-ის SMS არ გაშვებულა (გამოტოვებული ნაბიჯი)
       void sendSms(order.recipientPhone, smsTemplates.onTheWay(order.trackingNumber));
     }
-    if (body.status === "DELIVERED") {
+    if (st === "DELIVERED") {
       void sendSms(order.senderPhone, smsTemplates.delivered(order.trackingNumber));
+      void sendSms(order.recipientPhone, smsTemplates.delivered(order.trackingNumber));
     }
 
     return ok({ order: serializeOrder(updated) });

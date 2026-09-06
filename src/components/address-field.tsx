@@ -65,21 +65,24 @@ export function AddressField({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  // რუკაზე წერტილის მონიშვნა — მისამართის ტექსტიც ავტომატურად ემთხვევა პინს (რევერს-გეოკოდი)
   async function pickOnMap(pt: { lat: number; lng: number }) {
-    let address = value.address.trim();
-    if (!address) {
-      setLocating(true);
-      const rg = await reverseGeocode(pt.lat, pt.lng).catch(() => null);
-      setLocating(false);
-      address = rg || "მისამართი მონიშნულია რუკაზე";
-    }
+    setLocating(true);
+    const rg = await reverseGeocode(pt.lat, pt.lng).catch(() => null);
+    setLocating(false);
+    const address = rg || value.address.trim() || "მისამართი მონიშნულია რუკაზე";
     onChange({ address, lat: pt.lat, lng: pt.lng });
+  }
+
+  function selectResult(r: GeoResult) {
+    onChange({ address: r.label, lat: r.lat, lng: r.lng });
+    setOpen(false);
   }
 
   return (
     <div className="space-y-1.5" ref={boxRef}>
       <Label>{label}</Label>
-      <div className="relative">
+      <div className="relative z-20">
         <Input
           value={value.address}
           placeholder={placeholder}
@@ -95,16 +98,13 @@ export function AddressField({
         )}
 
         {open && results.length > 0 && (
-          <ul className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-background shadow-card">
+          <ul className="absolute z-[1000] mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-background shadow-card">
             {results.map((r, i) => (
               <li key={i}>
                 <button
                   type="button"
                   className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    onChange({ address: r.label, lat: r.lat, lng: r.lng });
-                    setOpen(false);
-                  }}
+                  onClick={() => selectResult(r)}
                 >
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="line-clamp-2">{r.label}</span>
@@ -132,7 +132,7 @@ export function AddressField({
         <div className="pt-1">
           <MapPickerLazy lat={value.lat} lng={value.lng} onChange={pickOnMap} />
           <p className="mt-1 text-xs text-muted-foreground">
-            დააჭირე რუკას სასურველ წერტილზე ან გადაათრიე ნიშანი — მისამართის ტექსტს თვითონ დაწერ/შეინარჩუნებ.
+            დააჭირე რუკას სასურველ წერტილზე ან გადაათრიე ნიშანი — მისამართი ავტომატურად შეივსება.
           </p>
         </div>
       )}

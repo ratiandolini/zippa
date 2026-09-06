@@ -47,6 +47,9 @@ const APP_URL = appUrl();
 export const smsTemplates = {
   onTheWay: (tn: string) =>
     `კურიერი მოდის თქვენს ამანათთან. ტრეკინგი: ${APP_URL}/track/${tn}`,
+  pickedUpForRecipient: (tn: string) =>
+    `კურიერმა აიღო ამანათი ${tn} და მოაქვს თქვენთან. ტრეკინგი: ${APP_URL}/track/${tn}`,
+  pickedUpForSender: (tn: string) => `კურიერმა აიღო თქვენი ამანათი ${tn}. Zippa`,
   delivered: (tn: string) => `ამანათი ${tn} ჩაბარდა. მადლობა, რომ სარგებლობთ ჩვენი სერვისით.`,
   resetCode: (code: string) => `Zippa — პაროლის აღდგენის კოდი — ${code}. მოქმედია 15 წუთი.`,
 };

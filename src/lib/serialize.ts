@@ -22,6 +22,7 @@ export function serializeOrder(o: OrderWith) {
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
     deliveredAt: o.deliveredAt?.toISOString() ?? null,
+    assignedAt: o.assignedAt?.toISOString() ?? null,
     estimatedDeliveryAt: o.estimatedDeliveryAt?.toISOString() ?? null,
 
     customerId: o.customerId,

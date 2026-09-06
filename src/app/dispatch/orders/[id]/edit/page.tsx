@@ -14,7 +14,7 @@ import { api } from "@/lib/fetcher";
 import { PAYMENT_METHOD_LABEL } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 
-const EDITABLE = ["PENDING", "ASSIGNED", "ACCEPTED"];
+const EDITABLE = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"];
 
 export default function EditOrderPage() {
   const { id } = useParams<{ id: string }>();
