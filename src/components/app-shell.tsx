@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { NotificationBell } from "@/components/notification-bell";
+import { PushSetup } from "@/components/push-setup";
 
 function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -34,11 +35,13 @@ export function AppShell({
   nav,
   roleLabel,
   userName,
+  push,
   children,
 }: {
   nav: NavItem[];
   roleLabel: string;
   userName: string;
+  push?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -98,7 +101,10 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-5 py-6 pb-24 lg:pb-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-5 py-6 pb-24 lg:pb-6">
+          {push && <PushSetup />}
+          {children}
+        </main>
       </div>
 
       {/* Bottom tab bar — mobile */}

@@ -5,7 +5,7 @@ import { ROLE_NAV } from "@/lib/nav";
 export default async function DispatchLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession("DISPATCHER");
   return (
-    <AppShell roleLabel="დისპეჩერი" userName={session.name} nav={ROLE_NAV.DISPATCHER}>
+    <AppShell roleLabel="დისპეჩერი" userName={session.name} nav={ROLE_NAV.DISPATCHER} push>
       {children}
     </AppShell>
   );

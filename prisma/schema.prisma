@@ -54,7 +54,8 @@ model User {
   notifications    Notification[]
   reviewsWritten   Review[]        @relation("ReviewAuthor")
   passwordResets   PasswordReset[]
-  codRemittances   CodRemittance[] @relation("CustomerCodRemittances")
+  codRemittances   CodRemittance[]    @relation("CustomerCodRemittances")
+  pushSubs         PushSubscription[]
 
   @@index([role])
 }
@@ -469,6 +470,20 @@ enum NotificationType {
   PAYMENT
   SYSTEM
   PROMO
+}
+
+// Web Push გამოწერა (ბრაუზერი/მოწყობილობა)
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  ua        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Notification {

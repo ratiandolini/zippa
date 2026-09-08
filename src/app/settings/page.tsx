@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { jsonFetcher, api } from "@/lib/fetcher";
 import { useDriverMe, useCities } from "@/lib/hooks";
+import { PushToggle } from "@/components/push-setup";
 import { VEHICLE_LABEL } from "@/lib/domain";
 import type { Role, VehicleType } from "@prisma/client";
 
@@ -40,6 +41,17 @@ export default function SettingsPage() {
         {user && <ProfileForm user={user} onSaved={() => { mutate(); router.refresh(); }} />}
         <PasswordForm />
         {user?.role === "DRIVER" && <VehicleForm />}
+        <Card>
+          <CardHeader>
+            <CardTitle>შეტყობინებები</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              მიიღე შეტყობინება მოწყობილობაზე მაშინაც, როცა აპი დახურულია.
+            </p>
+            <PushToggle />
+          </CardContent>
+        </Card>
       </div>
     </>
   );
