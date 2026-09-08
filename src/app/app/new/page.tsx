@@ -41,8 +41,12 @@ export default function NewOrderPage() {
   const [description, setDescription] = useState("");
   const [parcelValue, setParcelValue] = useState("");
   const [collectAmount, setCollectAmount] = useState("");
-  const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("RECIPIENT");
+  const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("SENDER");
   const payment = "CASH" as const;
+  const hasCollect = collectAmount.trim() !== "" && parseFloat(collectAmount) > 0;
+  useEffect(() => {
+    if (!hasCollect) setPayerSide("SENDER");
+  }, [hasCollect]);
 
   const { senders } = useContacts();
 
@@ -230,29 +234,33 @@ export default function NewOrderPage() {
               <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
                 <div className="font-medium">{PAYMENT_METHOD_LABEL.CASH}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  მიტანის საფასური ნაღდით ბარდება კურიერს.
+                  {hasCollect
+                    ? "მიმღები კურიერს ნაღდად უხდის ნივთის თანხას. მიტანის საფასურს ან შენ იხდი, ან მიმღები — მიუთითე ქვემოთ."
+                    : "მიტანის საფასურს გადაიხდი შენ, კურიერის აღებისას."}
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>მიტანის საფასურს იხდის</Label>
-                <div className="flex gap-2">
-                  {(["RECIPIENT", "SENDER"] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setPayerSide(s)}
-                      className={cn(
-                        "flex-1 rounded-lg border px-3 py-2 text-sm",
-                        payerSide === s
-                          ? "border-accent bg-accent/10 font-medium text-accent"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      {s === "RECIPIENT" ? "მიმღები (ჩაბარებისას)" : "გამგზავნი (აღებისას)"}
-                    </button>
-                  ))}
+              {hasCollect && (
+                <div className="space-y-1.5">
+                  <Label>მიტანის საფასურს იხდის</Label>
+                  <div className="flex gap-2">
+                    {(["SENDER", "RECIPIENT"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setPayerSide(s)}
+                        className={cn(
+                          "flex-1 rounded-lg border px-3 py-2 text-sm",
+                          payerSide === s
+                            ? "border-accent bg-accent/10 font-medium text-accent"
+                            : "border-border text-muted-foreground",
+                        )}
+                      >
+                        {s === "SENDER" ? "მე (გამგზავნი)" : "მიმღები"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -291,20 +299,22 @@ export default function NewOrderPage() {
                     <div className="space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
                       {payerSide === "SENDER" && (
                         <div className="flex justify-between">
-                          <span>თქვენ იხდით (აღებისას)</span>
+                          <span>თქვენ იხდით კურიერს (აღებისას)</span>
                           <span className="tabular-nums">{GEL(quote.totalPrice)}</span>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span>კურიერი მიმღებისგან აიღებს</span>
-                        <span className="tabular-nums">
-                          {GEL(
-                            payerSide === "SENDER"
-                              ? quote.codAmount - quote.totalPrice
-                              : quote.codAmount,
-                          )}
-                        </span>
-                      </div>
+                      {(payerSide === "RECIPIENT" || quote.codAmount - quote.totalPrice > 0) && (
+                        <div className="flex justify-between">
+                          <span>კურიერი მიმღებისგან აიღებს</span>
+                          <span className="tabular-nums">
+                            {GEL(
+                              payerSide === "SENDER"
+                                ? quote.codAmount - quote.totalPrice
+                                : quote.codAmount,
+                            )}
+                          </span>
+                        </div>
+                      )}
                       {quote.codCommission > 0 && (
                         <>
                           <div className="flex justify-between">

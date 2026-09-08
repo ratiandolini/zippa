@@ -43,3 +43,4 @@ _legacy/
 
 # vitest
 /test-results/
+backups/
