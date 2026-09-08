@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import useSWR from "swr";
 import { usePricingRules, type PricingRule, type WeightBracket } from "@/lib/hooks";
-import { api } from "@/lib/fetcher";
+import { api, jsonFetcher } from "@/lib/fetcher";
 import { GEL, DELIVERY_ZONE_LABEL } from "@/lib/domain";
 
 export default function PricingPage() {
@@ -20,6 +21,7 @@ export default function PricingPage() {
         title="ტარიფები"
         description="ფასი წონის მიხედვით, ზონებით. ზონა განისაზღვრება მიტანის მისამართით."
       />
+      <CodCommissionCard />
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
       <div className="space-y-4">
         {rules.map((r) => (
@@ -30,6 +32,66 @@ export default function PricingPage() {
         „კურიერს ერგება" — ბონუსი თითო მიტანაზე. ბაზური ხელფასი ცალკე ირიცხება (payroll).
       </p>
     </>
+  );
+}
+
+function CodCommissionCard() {
+  const { data, mutate } = useSWR<{ settings: { cod_commission_percent: number } }>(
+    "/api/dispatch/settings",
+    jsonFetcher,
+  );
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pct = data?.settings.cod_commission_percent ?? 0;
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api("/api/dispatch/settings", "PATCH", { cod_commission_percent: Number(val) });
+      setEditing(false);
+      mutate();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <div className="font-medium">COD საკომისიო</div>
+          <p className="text-sm text-muted-foreground">
+            იმ თანხის %, რომელსაც Zippa იტოვებს გამგზავნისთვის COD-ის გადარიცხვისას.
+          </p>
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.5"
+              className="h-9 w-24"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+            />
+            <span className="text-sm">%</span>
+            <Button size="sm" disabled={busy} onClick={save}>
+              {busy ? "…" : "შენახვა"}
+            </Button>
+          </div>
+        ) : (
+          <button
+            className="text-sm font-medium text-accent hover:underline"
+            onClick={() => {
+              setVal(String(pct));
+              setEditing(true);
+            }}
+          >
+            {pct}% · შეცვლა
+          </button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

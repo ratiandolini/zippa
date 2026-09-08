@@ -3,6 +3,7 @@ import { requireUser, handle, ok, fail, ApiError } from "@/lib/api";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { editOrderSchema } from "@/lib/validation";
 import { calculatePrice, resolveCityId, estimateDelivery } from "@/lib/pricing";
+import { getSetting } from "@/lib/settings";
 import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
 import type { Prisma } from "@prisma/client";
 
@@ -134,6 +135,8 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       upd.totalPrice = price.totalPrice;
       upd.driverFee = price.driverFee;
       upd.codAmount = (paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
+      const codPct = collectAmount > 0 ? await getSetting("cod_commission_percent") : 0;
+      upd.codCommission = Math.round(collectAmount * (codPct / 100) * 100) / 100;
       upd.estimatedDeliveryAt = eta;
     }
 

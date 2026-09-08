@@ -98,15 +98,33 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
           <Phone className="h-3 w-3" /> {order.recipient.phone}
         </a>
         <span>{order.weightKg} კგ</span>
-        <span>
-          {order.codAmount > 0
-            ? `ასაღები ნაღდი ${GEL(order.codAmount)}`
-            : "გადახდილია"}
-        </span>
-        {order.collectAmount > 0 && (
-          <span className="text-accent">მათ შორის ნივთში {GEL(order.collectAmount)}</span>
-        )}
       </div>
+
+      {order.codAmount > 0 ? (
+        <div className="mt-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-[11px]">
+          {order.payerSide === "SENDER" && order.price.total > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">აღებისას გამგზავნისგან</span>
+              <span className="font-medium tabular-nums">{GEL(order.price.total)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">ჩაბარებისას მიმღებისგან</span>
+            <span className="font-medium tabular-nums">
+              {GEL(
+                order.payerSide === "SENDER"
+                  ? order.codAmount - order.price.total
+                  : order.codAmount,
+              )}
+            </span>
+          </div>
+          {order.collectAmount > 0 && (
+            <div className="mt-0.5 text-accent">მათ შორის ნივთის ღირებულება {GEL(order.collectAmount)}</div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-1.5 text-[11px] text-muted-foreground">გადახდილია</div>
+      )}
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
         {order.assignedAt && <span>მოგენიჭა: {fmtDateTime(order.assignedAt)}</span>}

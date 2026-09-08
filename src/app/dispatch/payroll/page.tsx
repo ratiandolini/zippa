@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { useSettlements } from "@/lib/hooks";
+import { useSettlements, useDispatchCod } from "@/lib/hooks";
 import { GEL, fmtDate, fmtDateTime } from "@/lib/domain";
 
 interface Row {
@@ -52,9 +52,25 @@ export default function PayrollPage() {
     { refreshInterval: 20000 },
   );
   const { settlements: pending, mutate: mutatePending } = useSettlements("", 12000);
+  const { outstanding: cod, history: codHistory, mutate: mutateCod } = useDispatchCod();
 
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  async function payCod(customerId: string, name: string, net: number) {
+    const method = prompt(`${name}: COD გადარიცხვა ${GEL(net)}. მეთოდი (მაგ. ბანკი):`, "ბანკი");
+    if (method === null) return;
+    setBusy("cod" + customerId);
+    setErr(null);
+    try {
+      await api("/api/dispatch/cod", "POST", { customerId, method: method || undefined });
+      mutateCod();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function reviewCash(id: string, action: "CONFIRM" | "REJECT") {
     setBusy("cash" + id + action);
@@ -229,6 +245,86 @@ export default function PayrollPage() {
       <p className="mt-4 text-xs text-muted-foreground">
         „გადახდა" ფარავს კურიერის მთელ დარჩენილ ანაზღაურებას. ნაწილობრივი გადახდისთვის გახსენი კურიერის გვერდი.
       </p>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>COD — გამგზავნებთან ანგარიშსწორება</CardTitle>
+        </CardHeader>
+        {cod.length === 0 ? (
+          <CardContent className="text-sm text-muted-foreground">გადასარიცხი COD არ არის.</CardContent>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2 font-medium">გამგზავნი</th>
+                  <th className="px-4 py-2 font-medium">შეკვეთა</th>
+                  <th className="px-4 py-2 font-medium">შეგროვილი</th>
+                  <th className="px-4 py-2 font-medium">საკომისიო</th>
+                  <th className="px-4 py-2 font-medium">გადასარიცხი</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {cod.map((r) => (
+                  <tr key={r.customerId} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3">
+                      {r.name}
+                      <div className="text-xs text-muted-foreground">{r.phone}</div>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">{r.count}</td>
+                    <td className="px-4 py-3 tabular-nums">{GEL(r.gross)}</td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">−{GEL(r.commission)}</td>
+                    <td className="px-4 py-3 font-medium tabular-nums">{GEL(r.net)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy != null}
+                        onClick={() => payCod(r.customerId, r.name, r.net)}
+                      >
+                        {busy === "cod" + r.customerId ? "…" : "გადარიცხვა"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {codHistory.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>COD გადარიცხვების ისტორია</CardTitle>
+          </CardHeader>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2 font-medium">თარიღი</th>
+                  <th className="px-4 py-2 font-medium">გამგზავნი</th>
+                  <th className="px-4 py-2 font-medium">შეკვეთა</th>
+                  <th className="px-4 py-2 font-medium">გადარიცხული</th>
+                  <th className="px-4 py-2 font-medium">მეთოდი</th>
+                </tr>
+              </thead>
+              <tbody>
+                {codHistory.map((h) => (
+                  <tr key={h.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3">{fmtDate(h.createdAt)}</td>
+                    <td className="px-4 py-3">{h.customerName}</td>
+                    <td className="px-4 py-3 tabular-nums">{h.orderCount}</td>
+                    <td className="px-4 py-3 font-medium tabular-nums">{GEL(h.net)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{h.method ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

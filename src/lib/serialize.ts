@@ -51,6 +51,8 @@ export function serializeOrder(o: OrderWith) {
     description: o.description,
     parcelValue: o.parcelValue == null ? null : num(o.parcelValue),
     collectAmount: num(o.collectAmount),
+    codCommission: num(o.codCommission),
+    codRemitted: o.codRemittanceId != null,
 
     distanceKm: num(o.distanceKm),
     price: {

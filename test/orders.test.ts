@@ -5,7 +5,22 @@ import { GET as getOrder, PATCH as editOrder, DELETE as deleteOrder } from "@/ap
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { POST as rejectOrder } from "@/app/api/orders/[id]/reject/route";
+import { GET as codGet, POST as codPay } from "@/app/api/dispatch/cod/route";
+import { GET as myCod } from "@/app/api/orders/cod/route";
 import { expireStaleAssignments } from "@/lib/assignments";
+
+async function deliver(oid: string, drvProfileId: string) {
+  actAs(session(await makeUser("DISPATCHER")));
+  await call(assign, { params: { id: oid }, body: { driverId: drvProfileId } });
+  const drvUser = await prisma.driverProfile.findUniqueOrThrow({
+    where: { id: drvProfileId },
+    include: { user: true },
+  });
+  actAs(session(drvUser.user));
+  for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
+    await call(setStatus, { params: { id: oid }, body: { status: s } });
+  }
+}
 
 const orderBody = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მარიამ გ", phone: "+995599111111" },
@@ -427,7 +442,7 @@ describe("ჩაბარებისას ფინანსური აღ�
     expect(Number(dp.cashOnHand)).toBe(5);
     expect(dp.totalDeliveries).toBe(1);
     expect(dp.status).toBe("AVAILABLE");
-    const e = await prisma.driverEarning.findUniqueOrThrow({ where: { orderId: o.id } });
+    const e = await prisma.driverEarning.findFirstOrThrow({ where: { orderId: o.id } });
     expect(Number(e.driverAmount)).toBe(3);
     expect(e.collectedInCash).toBe(true);
   });
@@ -450,6 +465,33 @@ describe("ჩაბარებისას ფინანსური აღ�
     const r = await call(assign, { params: { id: o.id }, body: { driverId: drv2.profile.id } });
     expect(r.status).toBe(200);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe("ASSIGNED");
+  });
+
+  it("FAILED → ხელახლა მინიჭება → DELIVERED: ორივე დარიცხვა ცალკე (unique constraint არ ტყდება)", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv1 = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv1.profile.id } });
+    actAs(session(drv1.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "FAILED"]) {
+      await call(setStatus, {
+        params: { id: o.id },
+        body: { status: s, ...(s === "FAILED" ? { failureReason: "RECIPIENT_UNAVAILABLE" } : {}) },
+      });
+    }
+    const drv2 = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv2.profile.id } });
+    actAs(session(drv2.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"]) {
+      const rr = await call(setStatus, { params: { id: o.id }, body: { status: s } });
+      expect(rr.status).toBe(200); // DELIVERED აღარ ტყდება
+    }
+    const earnings = await prisma.driverEarning.findMany({ where: { orderId: o.id } });
+    expect(earnings).toHaveLength(2);
+    expect(earnings.find((e) => e.kind === "FAILED_TRIP")?.driverId).toBe(drv1.profile.id);
+    expect(earnings.find((e) => e.kind === "DELIVERY")?.driverId).toBe(drv2.profile.id);
   });
 
   it("FAILED მიზეზის გარეშე → 422", async () => {
@@ -490,7 +532,7 @@ describe("ჩაბარებისას ფინანსური აღ�
     expect(Number(dp.cashOnHand)).toBe(0); // COD არ აუღია
     expect(dp.status).toBe("AVAILABLE");
 
-    const e = await prisma.driverEarning.findUniqueOrThrow({ where: { orderId: o.id } });
+    const e = await prisma.driverEarning.findFirstOrThrow({ where: { orderId: o.id } });
     expect(Number(e.driverAmount)).toBe(1.5);
     expect(e.collectedInCash).toBe(false);
   });
@@ -513,6 +555,49 @@ describe("ჩაბარებისას ფინანსური აღ�
     expect(Number(db.returnFee)).toBe(0);
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.unpaidEarnings)).toBe(0);
-    expect(await prisma.driverEarning.findUnique({ where: { orderId: o.id } })).toBeNull();
+    expect(await prisma.driverEarning.findFirst({ where: { orderId: o.id } })).toBeNull();
+  });
+});
+
+describe("COD — გამგზავნისთვის გადარიცხვა", () => {
+  it("codCommission იჭრება შექმნისას (2% ნაგულისხმევი); parcelValue არ ერევა", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id, { parcelValue: 300, collectAmount: 200 });
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(Number(db.collectAmount)).toBe(200);
+    expect(Number(db.codCommission)).toBe(4); // 200 × 2%
+    expect(Number(db.codAmount)).toBe(205); // მიტანა 5 + 200
+  });
+
+  it("ჩაბარების შემდეგ დისპეჩერი რიცხავს COD-ს; ორმაგად ვერ გადაირიცხება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const drv = await makeDriver({ approved: true });
+    const o1 = await newOrder(c.id, { collectAmount: 100 });
+    const o2 = await newOrder(c.id, { collectAmount: 50 });
+    await deliver(o1.id, drv.profile.id);
+    await deliver(o2.id, drv.profile.id);
+
+    actAs(session(await makeUser("DISPATCHER")));
+    const list = await call(codGet, {});
+    const row = (list.body.outstanding as Record<string, number>[]).find(
+      (r) => (r.customerId as never) === c.id,
+    );
+    expect(row).toBeTruthy();
+    expect(row!.gross).toBe(150);
+    expect(row!.commission).toBe(3); // (100+50) × 2%
+    expect(row!.net).toBe(147);
+
+    const pay = await call(codPay, { body: { customerId: c.id, method: "ბანკი" } });
+    expect(pay.status).toBe(200);
+    expect((pay.body as { net: number }).net).toBe(147);
+
+    // მეორედ — გადასარიცხი აღარ არის
+    expect((await call(codPay, { body: { customerId: c.id } })).status).toBe(400);
+
+    // მომხმარებელი ხედავს ისტორიას
+    actAs(session(c));
+    const mine = await call(myCod, {});
+    expect((mine.body as { outstandingNet: number }).outstandingNet).toBe(0);
+    expect((mine.body as { history: unknown[] }).history).toHaveLength(1);
   });
 });

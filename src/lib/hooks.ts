@@ -141,6 +141,56 @@ export function useContacts() {
   return { senders: data?.senders ?? [], recipients: data?.recipients ?? [] };
 }
 
+export interface CodOutstanding {
+  customerId: string;
+  name: string;
+  phone: string;
+  gross: number;
+  commission: number;
+  net: number;
+  count: number;
+  oldest: string | null;
+}
+export interface CodRemittanceItem {
+  id: string;
+  customerName?: string;
+  gross: number;
+  commission: number;
+  net: number;
+  orderCount: number;
+  method: string | null;
+  createdAt: string;
+}
+export function useDispatchCod(refreshInterval = 20000) {
+  const { data, isLoading, mutate } = useSWR<{
+    outstanding: CodOutstanding[];
+    history: CodRemittanceItem[];
+  }>("/api/dispatch/cod", jsonFetcher, { refreshInterval });
+  return {
+    outstanding: data?.outstanding ?? [],
+    history: data?.history ?? [],
+    isLoading,
+    mutate,
+  };
+}
+
+export interface MyCod {
+  outstandingNet: number;
+  outstandingCount: number;
+  pending: {
+    trackingNumber: string;
+    collectAmount: number;
+    commission: number;
+    net: number;
+    deliveredAt: string | null;
+  }[];
+  history: CodRemittanceItem[];
+}
+export function useMyCod(refreshInterval = 30000) {
+  const { data, mutate } = useSWR<MyCod>("/api/orders/cod", jsonFetcher, { refreshInterval });
+  return { cod: data ?? null, mutate };
+}
+
 export function useMySettlements(refreshInterval = 20000) {
   const { data, isLoading, mutate } = useSWR<{ settlements: SettlementItem[] }>(
     "/api/driver/settlement",

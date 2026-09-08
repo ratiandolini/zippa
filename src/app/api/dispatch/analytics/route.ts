@@ -18,6 +18,7 @@ export function GET() {
         deliveredAt: true,
         status: true,
         totalPrice: true,
+        codCommission: true,
       },
     });
 
@@ -38,6 +39,7 @@ export function GET() {
 
     const statusCount: Record<string, number> = {};
     let totalRevenue = 0;
+    let codCommissionTotal = 0;
     let deliveredCount = 0;
     let endedCount = 0; // DELIVERED + FAILED + CANCELLED
 
@@ -53,6 +55,7 @@ export function GET() {
           days[di].revenue += Number(o.totalPrice);
         }
         totalRevenue += Number(o.totalPrice);
+        codCommissionTotal += Number(o.codCommission);
         deliveredCount++;
       }
     }
@@ -89,7 +92,8 @@ export function GET() {
         orders: orders.length,
         delivered: deliveredCount,
         revenue: Math.round(totalRevenue * 100) / 100,
-        companyEarnings,
+        companyEarnings: Math.round((companyEarnings + codCommissionTotal) * 100) / 100,
+        codCommission: Math.round(codCommissionTotal * 100) / 100,
         driverPay,
         avgMinutes,
         completionRate: endedCount ? Math.round((deliveredCount / endedCount) * 100) : 0,

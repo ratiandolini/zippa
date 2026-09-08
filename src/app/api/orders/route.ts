@@ -9,6 +9,7 @@ import { generateTrackingNumber } from "@/lib/utils";
 import { notifyDispatchers } from "@/lib/notify";
 import { streetOf } from "@/lib/domain";
 import { expireStaleAssignments } from "@/lib/assignments";
+import { getSetting } from "@/lib/settings";
 
 export function GET(req: Request) {
   return handle(async () => {
@@ -58,6 +59,8 @@ export function POST(req: Request) {
     const collectAmount = data.collectAmount ?? 0;
     const codAmount =
       (data.paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
+    const codPct = collectAmount > 0 ? await getSetting("cod_commission_percent") : 0;
+    const codCommission = Math.round(collectAmount * (codPct / 100) * 100) / 100;
     const eta = await estimateDelivery(price.zone);
 
     const order = await prisma.order.create({
@@ -89,6 +92,7 @@ export function POST(req: Request) {
         description: data.description,
         parcelValue: data.parcelValue,
         collectAmount,
+        codCommission,
 
         distanceKm: price.distanceKm,
         deliveryPrice: price.deliveryPrice,

@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { OrderRow } from "@/components/order-row";
 import { OrderStatusBadge } from "@/components/order-status-badge";
-import { useOrders } from "@/lib/hooks";
+import { useOrders, useMyCod } from "@/lib/hooks";
 import { GEL, streetOf, ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
-import { Plus, MapPin } from "lucide-react";
+import { Plus, MapPin, Wallet } from "lucide-react";
 
 export default function CustomerHome() {
   const { orders, isLoading } = useOrders("", 15000);
+  const { cod } = useMyCod();
   const active = [...orders]
     .filter((o) => ACTIVE.includes(o.status))
     .sort((a, b) => ACTIVE.indexOf(b.status) - ACTIVE.indexOf(a.status))[0];
@@ -31,6 +32,23 @@ export default function CustomerHome() {
           </Link>
         }
       />
+
+      {cod && cod.outstandingNet > 0 && (
+        <Card className="mb-6 border-accent/30 bg-accent/[0.04]">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-accent" />
+              <span className="font-medium">მისაღები COD: {GEL(cod.outstandingNet)}</span>
+              <span className="text-sm text-muted-foreground">
+                {cod.outstandingCount} ჩაბარებული შეკვეთა · გადმოგერიცხებათ
+              </span>
+            </div>
+            <Link href="/app/cod" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              დეტალები
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {active && (
         <Card className="mb-6 border-accent/30 bg-accent/[0.04]">

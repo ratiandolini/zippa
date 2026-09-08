@@ -120,6 +120,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: {
             driverId: order.driverId,
             orderId: order.id,
+            kind: "DELIVERY",
             grossPrice: gross,
             driverAmount,
             companyAmount,
@@ -150,6 +151,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: {
             driverId: order.driverId,
             orderId: order.id,
+            kind: "FAILED_TRIP",
             grossPrice: returnFee,
             driverAmount: failedTripComp,
             companyAmount: Math.round((returnFee - failedTripComp) * 100) / 100,

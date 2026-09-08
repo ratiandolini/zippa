@@ -23,6 +23,8 @@ interface Quote {
   codFee: number;
   totalPrice: number;
   codAmount: number;
+  codCommission: number;
+  codNet: number;
   overWeight: boolean;
   estimatedDeliveryAt: string;
 }
@@ -39,6 +41,7 @@ export default function NewOrderPage() {
   const [description, setDescription] = useState("");
   const [parcelValue, setParcelValue] = useState("");
   const [collectAmount, setCollectAmount] = useState("");
+  const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("RECIPIENT");
   const payment = "CASH" as const;
 
   const { senders } = useContacts();
@@ -108,6 +111,7 @@ export default function NewOrderPage() {
         parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
         collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : undefined,
         paymentMethod: payment,
+        payerSide,
       });
       router.push(`/app/track?id=${order.id}`);
     } catch (e) {
@@ -222,11 +226,31 @@ export default function NewOrderPage() {
             <CardHeader>
               <CardTitle>გადახდა</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm">
+            <CardContent className="space-y-3 text-sm">
               <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
                 <div className="font-medium">{PAYMENT_METHOD_LABEL.CASH}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  მიტანის საფასური ნაღდით ბარდება კურიერს — გამგზავნისგან ან მიმღებისგან.
+                  მიტანის საფასური ნაღდით ბარდება კურიერს.
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>მიტანის საფასურს იხდის</Label>
+                <div className="flex gap-2">
+                  {(["RECIPIENT", "SENDER"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setPayerSide(s)}
+                      className={cn(
+                        "flex-1 rounded-lg border px-3 py-2 text-sm",
+                        payerSide === s
+                          ? "border-accent bg-accent/10 font-medium text-accent"
+                          : "border-border text-muted-foreground",
+                      )}
+                    >
+                      {s === "RECIPIENT" ? "მიმღები (ჩაბარებისას)" : "გამგზავნი (აღებისას)"}
+                    </button>
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -264,12 +288,36 @@ export default function NewOrderPage() {
                     </p>
                   )}
                   {payment === "CASH" && (
-                    <p className="text-xs text-muted-foreground">
-                      კურიერი მიმღებისგან აიღებს {GEL(quote.codAmount)}
-                      {collectAmount.trim() && parseFloat(collectAmount) > 0
-                        ? ` (მიტანა ${GEL(quote.totalPrice)} + ნივთი ${GEL(parseFloat(collectAmount))})`
-                        : ""}
-                    </p>
+                    <div className="space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
+                      {payerSide === "SENDER" && (
+                        <div className="flex justify-between">
+                          <span>თქვენ იხდით (აღებისას)</span>
+                          <span className="tabular-nums">{GEL(quote.totalPrice)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>კურიერი მიმღებისგან აიღებს</span>
+                        <span className="tabular-nums">
+                          {GEL(
+                            payerSide === "SENDER"
+                              ? quote.codAmount - quote.totalPrice
+                              : quote.codAmount,
+                          )}
+                        </span>
+                      </div>
+                      {quote.codCommission > 0 && (
+                        <>
+                          <div className="flex justify-between">
+                            <span>Zippa-ს COD საკომისიო</span>
+                            <span className="tabular-nums">−{GEL(quote.codCommission)}</span>
+                          </div>
+                          <div className="flex justify-between font-medium text-foreground">
+                            <span>თქვენ მიიღებთ (COD)</span>
+                            <span className="tabular-nums">{GEL(quote.codNet)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   )}
                 </>
               )}
