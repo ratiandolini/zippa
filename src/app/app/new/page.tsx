@@ -51,6 +51,35 @@ export default function NewOrderPage() {
 
   const { senders } = useContacts();
 
+  // „გამეორება" — წინა შეკვეთის მონაცემებით შევსება
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("zippa_repeat_order");
+      if (!raw) return;
+      sessionStorage.removeItem("zippa_repeat_order");
+      const r = JSON.parse(raw);
+      if (r.sender) {
+        setSenderName(r.sender.name ?? "");
+        setSenderPhone(r.sender.phone ?? "");
+      }
+      if (r.recipient) {
+        setRecipientName(r.recipient.name ?? "");
+        setRecipientPhone(r.recipient.phone ?? "");
+      }
+      if (r.pickup?.lat != null)
+        setPickup({ address: r.pickup.address, lat: r.pickup.lat, lng: r.pickup.lng });
+      if (r.delivery?.lat != null) {
+        setDelivery({ address: r.delivery.address, lat: r.delivery.lat, lng: r.delivery.lng });
+        if (r.delivery.note) setCourierNote(r.delivery.note);
+      }
+      if (r.weightKg) setWeight(String(r.weightKg));
+      if (r.description) setDescription(r.description);
+      if (r.parcelValue != null) setParcelValue(String(r.parcelValue));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   function fillSender(c: SavedContact) {
     setSenderName(c.name);
     setSenderPhone(c.phone);
