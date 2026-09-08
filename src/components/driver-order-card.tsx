@@ -11,12 +11,44 @@ import {
   fmtDateTime,
   FAILURE_REASON_LABEL,
 } from "@/lib/domain";
-import { Clock } from "lucide-react";
+import { Clock, Navigation, Phone } from "lucide-react";
 import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
 import type { OrderDTO } from "@/lib/serialize";
 import type { OrderStatus, OrderFailureReason } from "@prisma/client";
-import { Phone } from "lucide-react";
+
+function AddressRow({
+  color,
+  address,
+  lat,
+  lng,
+}: {
+  color: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+}) {
+  const nav =
+    lat != null && lng != null
+      ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  return (
+    <div className="flex items-start gap-2">
+      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${color}`} />
+      <div className="min-w-0 flex-1">
+        <span>{address}</span>
+        <a
+          href={nav}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-2 inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-accent"
+        >
+          <Navigation className="h-3 w-3" /> ნავიგაცია
+        </a>
+      </div>
+    </div>
+  );
+}
 
 const FAILURE_REASONS = Object.keys(FAILURE_REASON_LABEL) as OrderFailureReason[];
 
@@ -89,15 +121,19 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         </div>
       )}
 
-      <div className="mt-2 space-y-1 text-sm">
-        <div className="flex items-start gap-2">
-          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-          <span>{order.pickup.address}</span>
-        </div>
-        <div className="flex items-start gap-2">
-          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" />
-          <span>{order.delivery.address}</span>
-        </div>
+      <div className="mt-2 space-y-1.5 text-sm">
+        <AddressRow
+          color="bg-blue-500"
+          address={order.pickup.address}
+          lat={order.pickup.lat}
+          lng={order.pickup.lng}
+        />
+        <AddressRow
+          color="bg-accent"
+          address={order.delivery.address}
+          lat={order.delivery.lat}
+          lng={order.delivery.lng}
+        />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

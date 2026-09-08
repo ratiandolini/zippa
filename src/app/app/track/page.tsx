@@ -12,6 +12,7 @@ import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
 import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL, ACTIVE_ORDER_STATUSES, FAILURE_REASON_LABEL } from "@/lib/domain";
+import { haversineKm } from "@/lib/geo";
 import { ArrowRight } from "lucide-react";
 
 const ACTIVE = ["PENDING", ...ACTIVE_ORDER_STATUSES];
@@ -95,6 +96,20 @@ function Detail({ id }: { id: string }) {
       : []),
   ];
 
+  // სავარაუდო დრო კურიერამდე/კურიერიდან (ცოცხალი GPS-ის მიხედვით)
+  const etaMin = (() => {
+    if (!order.driverLocation) return null;
+    const target =
+      order.status === "IN_TRANSIT" || order.status === "PICKED_UP"
+        ? order.delivery
+        : ["ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status)
+          ? order.pickup
+          : null;
+    if (!target) return null;
+    const km = haversineKm(order.driverLocation, { lat: target.lat, lng: target.lng }) * 1.3;
+    return Math.max(1, Math.round((km / 18) * 60)); // ~18 კმ/სთ ქალაქში
+  })();
+
   return (
     <>
       <PageHeader
@@ -114,6 +129,15 @@ function Detail({ id }: { id: string }) {
       />
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
+          {etaMin != null && (
+            <div className="rounded-lg border border-accent/30 bg-accent/[0.06] px-4 py-2.5 text-sm">
+              <span className="font-medium">კურიერი გზაშია</span>
+              <span className="ml-1 text-muted-foreground">
+                — {order.driverName ? `${order.driverName}, ` : ""}დაახლ. {etaMin} წუთში
+                {["ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status) ? " მიდის ასაღებად" : ""}
+              </span>
+            </div>
+          )}
           <LazyMap points={points} className="h-80 w-full" />
           <Card>
             <CardHeader>
