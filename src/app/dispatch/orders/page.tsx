@@ -109,6 +109,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const canCancel = !TERMINAL.includes(order.status);
@@ -154,6 +155,28 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         <span>{order.driverName ?? "კურიერი არ ჰყავს"}</span>
         <span>{GEL(order.price.total)}</span>
       </div>
+
+      {order.returnRequestedAt && !order.returnResolvedAt && (
+        <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900">
+          <div className="font-medium">↩ დაბრუნების მოთხოვნა</div>
+          {order.returnReason && <div className="mt-0.5">{order.returnReason}</div>}
+          <button
+            className="mt-1 font-medium text-accent hover:underline disabled:opacity-50"
+            disabled={resolving}
+            onClick={async () => {
+              setResolving(true);
+              try {
+                await api(`/api/orders/${order.id}/return-request`, "PATCH", {});
+                onChange();
+              } finally {
+                setResolving(false);
+              }
+            }}
+          >
+            {resolving ? "…" : "დამუშავებულად მონიშვნა"}
+          </button>
+        </div>
+      )}
 
       {order.proofPhotoUrl && (
         <div className="mt-2">

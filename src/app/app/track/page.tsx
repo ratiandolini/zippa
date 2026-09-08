@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { OrderTimeline } from "@/components/order-timeline";
-import { CancelOrderButton, RatingWidget } from "@/components/order-actions";
+import { CancelOrderButton, RatingWidget, ReturnRequest } from "@/components/order-actions";
 import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
 import { useOrder, useOrders } from "@/lib/hooks";
@@ -171,15 +171,10 @@ function Detail({ id }: { id: string }) {
                     : " ამანათი ბრუნდება."}
                 </div>
               )}
-              {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && (
-                <p className="pt-2 text-xs text-muted-foreground">
-                  ამანათი უკვე კურიერთანაა — გაუქმება აღარ შეიძლება. დაბრუნების მოთხოვნისთვის
-                  მოგვწერეთ{" "}
-                  <a href="mailto:support@zippa.ge" className="text-accent hover:underline">
-                    support-ს
-                  </a>
-                  .
-                </p>
+              {["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (
+                <div className="pt-2">
+                  <ReturnRequest order={order} onDone={() => mutate()} />
+                </div>
               )}
             </CardContent>
           </Card>

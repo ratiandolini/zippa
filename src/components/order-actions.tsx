@@ -4,8 +4,79 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
+import { fmtDateTime } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
-import { Star } from "lucide-react";
+import { Star, RotateCcw } from "lucide-react";
+
+export function ReturnRequest({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (order.returnRequestedAt) {
+    return (
+      <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        დაბრუნების მოთხოვნა გაგზავნილია ({fmtDateTime(order.returnRequestedAt)}). დისპეჩერი
+        დაგიკავშირდებათ.
+        {order.returnResolvedAt && (
+          <div className="mt-1 font-medium">დამუშავებულია — {fmtDateTime(order.returnResolvedAt)}</div>
+        )}
+      </div>
+    );
+  }
+
+  async function submit() {
+    if (reason.trim().length < 3) {
+      setErr("მიუთითე მიზეზი");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/api/orders/${order.id}/return-request`, "POST", { reason: reason.trim() });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+      setBusy(false);
+    }
+  }
+
+  if (!open)
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+      >
+        <RotateCcw className="h-3.5 w-3.5" /> დაბრუნების მოთხოვნა
+      </button>
+    );
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        ამანათი უკვე კურიერთანაა და გაუქმება აღარ შეიძლება. აღწერე რატომ გინდა დაბრუნება —
+        დისპეჩერი მოაწესრიგებს.
+      </p>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="მაგ. მიმღები აღარ იღებს, არასწორი მისამართი…"
+        rows={2}
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      <div className="flex gap-2">
+        <Button size="sm" disabled={busy} onClick={submit}>
+          {busy ? "იგზავნება…" : "გაგზავნა"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          გაუქმება
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function CancelOrderButton({
   orderId,

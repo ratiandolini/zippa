@@ -80,6 +80,9 @@ export function serializeOrder(o: OrderWith) {
     cancelFee: num(o.cancelFee),
     returnFee: num(o.returnFee),
     failureReason: o.failureReason,
+    returnRequestedAt: o.returnRequestedAt?.toISOString() ?? null,
+    returnReason: o.returnReason,
+    returnResolvedAt: o.returnResolvedAt?.toISOString() ?? null,
 
     proofPhotoUrl: o.proofPhotoUrl,
 

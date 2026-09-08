@@ -601,3 +601,50 @@ describe("COD — გამგზავნისთვის გადარი�
     expect((mine.body as { history: unknown[] }).history).toHaveLength(1);
   });
 });
+
+describe("დაბრუნების მოთხოვნა", () => {
+  it("აღებამდე → 409; აღების მერე → იქმნება; ორმაგად → 409; დისპეჩერი ხურავს", async () => {
+    const { POST: reqReturn, PATCH: resolveReturn } = await import(
+      "@/app/api/orders/[id]/return-request/route"
+    );
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+
+    // აღებამდე — 409
+    actAs(session(c));
+    expect((await call(reqReturn, { params: { id: o.id }, body: { reason: "გადავიფიქრე" } })).status).toBe(409);
+
+    // ავიღოთ
+    actAs(session(drv.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP"]) {
+      await call(setStatus, { params: { id: o.id }, body: { status: s } });
+    }
+
+    actAs(session(c));
+    expect((await call(reqReturn, { params: { id: o.id }, body: { reason: "მიმღები აღარ იღებს" } })).status).toBe(200);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.returnRequestedAt).toBeTruthy();
+    expect(db.returnReason).toBe("მიმღები აღარ იღებს");
+
+    // ორმაგად — 409
+    expect((await call(reqReturn, { params: { id: o.id }, body: { reason: "კიდევ" } })).status).toBe(409);
+
+    // დისპეჩერი ხურავს
+    actAs(session(await makeUser("DISPATCHER")));
+    expect((await call(resolveReturn, { method: "PATCH", params: { id: o.id }, body: {} })).status).toBe(200);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).returnResolvedAt).toBeTruthy();
+  });
+
+  it("სხვისი შეკვეთის დაბრუნება → 403", async () => {
+    const { POST: reqReturn } = await import("@/app/api/orders/[id]/return-request/route");
+    const a = await makeUser("CUSTOMER");
+    const b = await makeUser("CUSTOMER");
+    const o = await newOrder(a.id);
+    await prisma.order.update({ where: { id: o.id }, data: { status: "PICKED_UP" } });
+    actAs(session(b));
+    expect((await call(reqReturn, { params: { id: o.id }, body: { reason: "hack" } })).status).toBe(403);
+  });
+});

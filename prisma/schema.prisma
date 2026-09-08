@@ -308,6 +308,11 @@ model Order {
   // გამგზავნის დავალიანება Zippa-სთან (returnFee + cancelFee) — იფარება COD-ის გადარიცხვისას
   chargeSettledAt DateTime?
 
+  // დაბრუნების მოთხოვნა (ამანათის აღების შემდეგ, როცა გაუქმება აღარ შეიძლება)
+  returnRequestedAt DateTime?
+  returnReason      String?
+  returnResolvedAt  DateTime?
+
   estimatedDeliveryAt DateTime?
   assignedAt          DateTime? // კურიერზე მიბმის დრო (ტაიმაუტისთვის)
 
