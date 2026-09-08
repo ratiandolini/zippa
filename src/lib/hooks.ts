@@ -30,6 +30,7 @@ export interface DriverMe {
   vehicleType: string;
   vehicleNumber: string | null;
   city: string | null;
+  cityId: string | null;
   rating: number;
   totalDeliveries: number;
   cashOnHand: number;
@@ -131,6 +132,17 @@ export interface SavedContact {
   lat: number | null;
   lng: number | null;
   count: number;
+}
+
+export interface CityItem {
+  id: string;
+  name: string;
+  centerLat: number;
+  centerLng: number;
+}
+export function useCities() {
+  const { data } = useSWR<{ cities: CityItem[] }>("/api/cities", jsonFetcher);
+  return { cities: data?.cities ?? [] };
 }
 
 export function useContacts() {

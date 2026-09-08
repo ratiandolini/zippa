@@ -189,46 +189,45 @@ export default function PayrollPage() {
         )}
         {data && data.rows.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2 font-medium">კურიერი</th>
-                  <th className="px-4 py-2 font-medium">მიტანა</th>
-                  <th className="px-4 py-2 font-medium">ანაზღაურება</th>
-                  <th className="px-4 py-2 font-medium">გადახდილი</th>
-                  <th className="px-4 py-2 font-medium">ჩააბარა ნაღდი</th>
-                  <th className="px-4 py-2 font-medium">გადასახდელი ახლა</th>
-                  <th className="px-4 py-2 font-medium">ხელზე ნაღდი</th>
-                  <th className="px-4 py-2 font-medium">ბოლო გადახდა</th>
-                  <th className="px-4 py-2" />
+                <tr className="border-b border-border text-xs text-muted-foreground [&>th]:whitespace-nowrap [&>th]:px-4 [&>th]:py-2 [&>th]:font-medium">
+                  <th className="text-left">კურიერი</th>
+                  <th className="text-right">მიტანა</th>
+                  <th className="text-right">ანაზღაურება</th>
+                  <th className="text-right">გადახდილი</th>
+                  <th className="text-right">ჩააბარა ნაღდი</th>
+                  <th className="text-right">გადასახდელი ახლა</th>
+                  <th className="text-right">ხელზე ნაღდი</th>
+                  <th className="text-left">ბოლო გადახდა</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.driverId} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={r.driverId}
+                    className="border-b border-border last:border-0 [&>td]:whitespace-nowrap [&>td]:px-4 [&>td]:py-3"
+                  >
+                    <td>
                       <Link href={`/dispatch/drivers/${r.driverId}`} className="font-medium hover:text-accent">
                         {r.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{r.deliveries}</td>
-                    <td className="px-4 py-3 tabular-nums">{GEL(r.earnedInPeriod)}</td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{GEL(r.paidInPeriod)}</td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{GEL(r.remittedInPeriod)}</td>
-                    <td className="px-4 py-3 tabular-nums font-medium">{GEL(r.unpaidEarnings)}</td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {r.cashOnHand > 0 ? (
-                        <Badge tone="accent">{GEL(r.cashOnHand)}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <td className="text-right tabular-nums">{r.deliveries}</td>
+                    <td className="text-right tabular-nums">{GEL(r.earnedInPeriod)}</td>
+                    <td className="text-right tabular-nums text-muted-foreground">{GEL(r.paidInPeriod)}</td>
+                    <td className="text-right tabular-nums text-muted-foreground">{GEL(r.remittedInPeriod)}</td>
+                    <td className="text-right font-medium tabular-nums">{GEL(r.unpaidEarnings)}</td>
+                    <td className="text-right tabular-nums">
+                      {r.cashOnHand > 0 ? GEL(r.cashOnHand) : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    <td className="text-xs text-muted-foreground">
                       {r.lastPayoutAt
                         ? `${fmtDate(r.lastPayoutAt)} · ${GEL(r.lastPayoutAmount ?? 0)}`
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="text-right">
                       <Button
                         size="sm"
                         variant="outline"

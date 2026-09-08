@@ -71,6 +71,45 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.overWeight).toBe(true);
     expect(p.deliveryPrice).toBe(20);
   });
+
+  it("კალათის ზუსტი ზღვარი: 6.00 კგ → 5₾, 6.01 კგ → 6₾", async () => {
+    const cityId = await tbId();
+    const a = await calculatePrice({ pickup: TB, delivery: TB2, weightKg: 6, paymentMethod: "CARD", deliveryCityId: cityId });
+    const b = await calculatePrice({ pickup: TB, delivery: TB2, weightKg: 6.01, paymentMethod: "CARD", deliveryCityId: cityId });
+    expect(a.deliveryPrice).toBe(5);
+    expect(b.deliveryPrice).toBe(6);
+  });
+
+  it("distanceKm = სწორი ხაზი × 1.3 (გზის კოეფიციენტი)", async () => {
+    const p = await calculatePrice({
+      pickup: { lat: 41.72, lng: 44.79 },
+      delivery: { lat: 41.65, lng: 44.85 }, // ~8.7 კმ სწორ ხაზზე
+      weightKg: 3,
+      paymentMethod: "CARD",
+      deliveryCityId: await tbId(),
+    });
+    // haversine(...) ≈ 9.2 → × 1.3 ≈ 12
+    expect(p.distanceKm).toBeGreaterThan(10.5);
+    expect(p.distanceKm).toBeLessThan(13);
+  });
+
+  it("ბაზისი+კმ: შორ მიტანაზე კურიერს მეტი ერგება", async () => {
+    await prisma.pricingRule.update({
+      where: { zone: "TBILISI" },
+      data: { driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5" },
+    });
+    const cityId = await tbId();
+    const near = await calculatePrice({ pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CARD", deliveryCityId: cityId });
+    const far = await calculatePrice({
+      pickup: { lat: 41.72, lng: 44.79 },
+      delivery: { lat: 41.62, lng: 44.9 },
+      weightKg: 3,
+      paymentMethod: "CARD",
+      deliveryCityId: cityId,
+    });
+    expect(near.driverFee).toBe(2.5); // ახლოს — მხოლოდ ბაზისი
+    expect(far.driverFee).toBeGreaterThan(3.5); // შორს — ბაზისი + კმ
+  });
 });
 
 describe("calculatePrice — რეგიონი / სოფელი", () => {

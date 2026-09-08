@@ -8,6 +8,7 @@ import { GET as driverDetail } from "@/app/api/drivers/[id]/route";
 import { POST as settle } from "@/app/api/driver/settlement/route";
 import { PATCH as reviewSettlement } from "@/app/api/settlements/[id]/route";
 import { GET as payroll } from "@/app/api/dispatch/payroll/route";
+import { DELETE as deactivateDriver } from "@/app/api/drivers/[id]/route";
 
 const body = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მა რი", phone: "+995599111111" },
@@ -148,5 +149,48 @@ describe("ნაღდის ჩაბარება (კურიერი →
 
     actAs(session(drv.user));
     expect((await call(settle, { body: { amount: 5 } })).status).toBe(200);
+  });
+});
+
+describe("კურიერის დეაქტივაცია", () => {
+  it("ხელზე ნაღდით → 409; ანაზღაურებით უ-payout → 409; payout=1 → იხდის და თიშავს", async () => {
+    const { drv, disp } = await deliverN(2, "CASH"); // unpaid 6, cash 10
+    actAs(session(disp));
+
+    // ხელზე ნაღდი — ვერ დეაქტივდება
+    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
+
+    // ნაღდი ჩააბარა
+    actAs(session(drv.user));
+    const s = await call(settle, { body: { amount: 10 } });
+    actAs(session(disp));
+    await call(reviewSettlement, { params: { id: (s.body.settlement as { id: string }).id }, body: { action: "CONFIRM" } });
+
+    // ანაზღაურება ისევ ღიაა — payout ფლაგის გარეშე 409
+    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
+
+    // payout=1 → იხდის და თიშავს
+    const r = await call(deactivateDriver, { params: { id: drv.profile.id }, query: { payout: "1" } });
+    expect(r.status).toBe(200);
+    expect((r.body as { paidOut: number }).paidOut).toBe(6);
+
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.status).toBe("OFFLINE");
+    expect(Number(dp.unpaidEarnings)).toBe(0);
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: drv.user.id } });
+    expect(u.isActive).toBe(false);
+    expect(u.tokenVersion).toBe(1);
+    expect(await prisma.payout.count({ where: { driverId: drv.profile.id } })).toBe(1);
+  });
+
+  it("მიმდინარე შეკვეთით → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const drv = await makeDriver({ approved: true });
+    const disp = await makeUser("DISPATCHER");
+    actAs(session(c));
+    const o = (await call(createOrder, { body: body() })).body.order as { id: string };
+    actAs(session(disp));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
   });
 });

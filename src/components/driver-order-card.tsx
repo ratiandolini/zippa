@@ -7,9 +7,11 @@ import {
   DRIVER_NEXT_STATUS,
   ORDER_STATUS_LABEL,
   GEL,
+  fmtDate,
   fmtDateTime,
   FAILURE_REASON_LABEL,
 } from "@/lib/domain";
+import { Clock } from "lucide-react";
 import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
 import type { OrderDTO } from "@/lib/serialize";
@@ -80,6 +82,12 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         <span className="font-mono text-xs text-muted-foreground">{order.trackingNumber}</span>
         <OrderStatusBadge status={order.status} />
       </div>
+
+      {order.estimatedDeliveryAt && order.status !== "DELIVERED" && order.status !== "FAILED" && (
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+          <Clock className="h-3 w-3" /> ჩაბარების ვადა: {fmtDate(order.estimatedDeliveryAt)}
+        </div>
+      )}
 
       <div className="mt-2 space-y-1 text-sm">
         <div className="flex items-start gap-2">

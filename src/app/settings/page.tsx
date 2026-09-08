@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { useDriverMe } from "@/lib/hooks";
+import { useDriverMe, useCities } from "@/lib/hooks";
 import { VEHICLE_LABEL } from "@/lib/domain";
 import type { Role, VehicleType } from "@prisma/client";
 
@@ -203,8 +203,10 @@ function PasswordForm() {
 
 function VehicleForm() {
   const { driver, mutate } = useDriverMe(0);
+  const { cities } = useCities();
   const [type, setType] = useState<VehicleType>("MOTORCYCLE");
   const [numberPlate, setNumberPlate] = useState("");
+  const [cityId, setCityId] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -212,6 +214,7 @@ function VehicleForm() {
     if (driver) {
       setType(driver.vehicleType as VehicleType);
       setNumberPlate(driver.vehicleNumber ?? "");
+      setCityId(driver.cityId ?? "");
     }
   }, [driver]);
 
@@ -219,7 +222,11 @@ function VehicleForm() {
     setBusy(true);
     setMsg(null);
     try {
-      await api("/api/driver/me", "PATCH", { vehicleType: type, vehicleNumber: numberPlate });
+      await api("/api/driver/me", "PATCH", {
+        vehicleType: type,
+        vehicleNumber: numberPlate,
+        cityId: cityId || null,
+      });
       setMsg({ ok: true, text: "შენახულია" });
       mutate();
     } catch (e) {
@@ -230,7 +237,7 @@ function VehicleForm() {
   }
 
   return (
-    <Section title="ტრანსპორტი" onSubmit={save} busy={busy} msg={msg}>
+    <Section title="ტრანსპორტი და ქალაქი" onSubmit={save} busy={busy} msg={msg}>
       <div className="space-y-1.5">
         <Label>ტიპი</Label>
         <Select value={type} onChange={(e) => setType(e.target.value as VehicleType)}>
@@ -244,6 +251,17 @@ function VehicleForm() {
       <div className="space-y-1.5">
         <Label>სახელმწიფო ნომერი</Label>
         <Input value={numberPlate} onChange={(e) => setNumberPlate(e.target.value)} placeholder="AA-123-BB" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>ქალაქი (სად მუშაობ ძირითადად)</Label>
+        <Select value={cityId} onChange={(e) => setCityId(e.target.value)}>
+          <option value="">— აირჩიე —</option>
+          {cities.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
       </div>
     </Section>
   );

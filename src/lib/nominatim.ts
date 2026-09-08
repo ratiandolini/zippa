@@ -74,13 +74,25 @@ export async function nominatimSearch(query: string): Promise<GeoResult[]> {
         display_name: string;
         lat: string;
         lon: string;
-        address?: NominatimAddress;
+        address?: (NominatimAddress & { postcode?: string }) | undefined;
+        importance?: number;
       }>;
-      return data.map((d) => ({
-        label: shortAddress(d.address, d.display_name),
-        lat: parseFloat(d.lat),
-        lng: parseFloat(d.lon),
-      }));
+      const mapped = data
+        .map((d) => {
+          const base = shortAddress(d.address, d.display_name);
+          const pc = d.address?.postcode;
+          return {
+            label: pc && !base.includes(pc) ? `${base} (${pc})` : base,
+            key: base.toLowerCase(),
+            lat: parseFloat(d.lat),
+            lng: parseFloat(d.lon),
+          };
+        })
+        // დუბლიკატების მოცილება — ერთი და იგივე მოკლე მისამართი მხოლოდ ერთხელ
+        .filter((r, i, arr) => arr.findIndex((x) => x.key === r.key) === i)
+        .slice(0, 4)
+        .map(({ label, lat, lng }) => ({ label, lat, lng }));
+      return mapped;
     } catch {
       return [];
     }

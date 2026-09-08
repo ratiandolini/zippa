@@ -68,11 +68,17 @@ export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown>
   const codFee = input.paymentMethod === "CASH" ? n(rule.codFee) : 0;
   const totalPrice = Math.round((deliveryPrice + codFee) * 100) / 100;
 
-  const distanceKm = Math.round(haversineKm(input.pickup, input.delivery) * 100) / 100;
+  // სწორ ხაზზე მანძილი × გზის კოეფიციენტი ≈ ფაქტობრივი გავლილი მანძილი (ქუჩების გამო).
+  // საკურიერო ინდუსტრიის სტანდარტული მიახლოება — ამცირებს კურიერთან დავებს კმ-ანაზღაურებაზე.
+  const straightKm = haversineKm(input.pickup, input.delivery);
+  const distanceKm = Math.round(straightKm * ROAD_FACTOR * 100) / 100;
   const driverFee = driverFeeFor(rule, distanceKm, deliveryPrice);
 
   return { zone, distanceKm, deliveryPrice, codFee, totalPrice, driverFee, overWeight: over };
 }
+
+/** სწორი ხაზი → ფაქტობრივი მარშრუტი (ქალაქის ქუჩების გამო) */
+export const ROAD_FACTOR = 1.3;
 
 /**
  * კურიერის ანაზღაურება ერთ მიტანაზე:

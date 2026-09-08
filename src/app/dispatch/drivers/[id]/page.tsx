@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
+import { useCities } from "@/lib/hooks";
 import { PageHeader } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,8 @@ interface DriverDetail {
     phone: string;
     email: string;
     city: string | null;
+    cityId: string | null;
+    isActive: boolean;
     vehicleType: string;
     vehicleNumber: string | null;
     isApproved: boolean;
@@ -69,6 +73,8 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
     jsonFetcher,
     { refreshInterval: 20000 },
   );
+  const { cities } = useCities();
+  const router = useRouter();
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -97,6 +103,33 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "შეცდომა");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setCity(cityId: string) {
+    await api(`/api/drivers/${d.id}`, "PATCH", { cityId: cityId || null });
+    mutate();
+  }
+
+  async function deactivate() {
+    if (!confirm(`ნამდვილად გსურს ${d.name}-ის ანგარიშის გაუქმება? კურიერი ვეღარ შევა სისტემაში.`))
+      return;
+    let payout = false;
+    if (d.unpaidEarnings > 0) {
+      const yes = confirm(
+        `კურიერს ერგება ${GEL(d.unpaidEarnings)} ანაზღაურება. გადავუხადოთ ახლავე? (გაუქმება → OK, დატოვება → Cancel და ჯერ გადაუხადე ცალკე)`,
+      );
+      if (!yes) return;
+      payout = true;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api(`/api/drivers/${d.id}${payout ? "?payout=1" : ""}`, "DELETE");
+      router.push("/dispatch/drivers");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "შეცდომა");
       setBusy(false);
     }
   }
@@ -140,6 +173,36 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
           </div>
         );
       })()}
+
+      <Card className="mb-6">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">ქალაქი</span>
+            <select
+              value={d.cityId ?? ""}
+              onChange={(e) => setCity(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-background px-2 text-sm"
+            >
+              <option value="">— არჩეული არ არის —</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10"
+            disabled={busy}
+            onClick={deactivate}
+          >
+            ანგარიშის გაუქმება
+          </Button>
+        </CardContent>
+      </Card>
+      {msg && <p className="mb-4 text-sm text-destructive">{msg}</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

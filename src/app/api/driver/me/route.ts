@@ -17,6 +17,7 @@ function dto(d: NonNullable<Awaited<ReturnType<typeof profile>>>) {
     vehicleType: d.vehicleType,
     vehicleNumber: d.vehicleNumber,
     city: d.city?.name ?? null,
+    cityId: d.cityId,
     rating: d.ratingAvg,
     totalDeliveries: d.totalDeliveries,
     cashOnHand: Number(d.cashOnHand),
@@ -43,6 +44,7 @@ const patchSchema = z.object({
   lng: z.number().optional(),
   vehicleType: z.enum(["BIKE", "MOTORCYCLE", "CAR", "VAN"]).optional(),
   vehicleNumber: z.string().trim().max(20).optional(),
+  cityId: z.string().cuid().nullable().optional(),
 });
 
 export function PATCH(req: Request) {
@@ -62,6 +64,7 @@ export function PATCH(req: Request) {
           : {}),
         ...(body.vehicleType ? { vehicleType: body.vehicleType } : {}),
         ...(body.vehicleNumber !== undefined ? { vehicleNumber: body.vehicleNumber } : {}),
+        ...(body.cityId !== undefined ? { cityId: body.cityId } : {}),
       },
       include: { city: { select: { name: true } } },
     });

@@ -123,8 +123,9 @@ export const DELIVERY_ZONE_LABEL: Record<DeliveryZone, string> = {
 export function GEL(n: number | string): string {
   const num = Number(n) || 0;
   const [int, frac] = Math.abs(num).toFixed(2).split(".");
-  const withSep = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return `${num < 0 ? "−" : ""}${withSep},${frac} ₾`;
+  // thousands separator და ₾-ის წინ — უწყვეტი ჰარი ( ), რომ ციფრი არ გადავიდეს ახალ ხაზზე
+  const withSep = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${num < 0 ? "−" : ""}${withSep},${frac} ₾`;
 }
 
 const KA_MONTHS = ["იან", "თებ", "მარ", "აპრ", "მაი", "ივნ", "ივლ", "აგვ", "სექ", "ოქტ", "ნოე", "დეკ"];
