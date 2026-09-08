@@ -11,7 +11,16 @@ export const orderInclude = {
   driver: {
     include: { user: { select: { name: true, phone: true } } },
   },
-  customer: { select: { name: true, phone: true } },
+  customer: {
+    select: {
+      name: true,
+      phone: true,
+      email: true,
+      accountType: true,
+      companyName: true,
+      taxId: true,
+    },
+  },
   events: { orderBy: { createdAt: "asc" } },
   review: { select: { rating: true, comment: true } },
 } satisfies Prisma.OrderInclude;
@@ -33,6 +42,14 @@ export function serializeOrder(o: OrderWith) {
 
     customerId: o.customerId,
     customerName: o.customer.name,
+    customer: {
+      name: o.customer.name,
+      phone: o.customer.phone,
+      email: o.customer.email,
+      accountType: o.customer.accountType,
+      companyName: o.customer.companyName,
+      taxId: o.customer.taxId,
+    },
 
     driverId: o.driverId,
     driverName: o.driver?.user.name ?? null,

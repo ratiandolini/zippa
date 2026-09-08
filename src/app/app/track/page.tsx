@@ -100,7 +100,17 @@ function Detail({ id }: { id: string }) {
       <PageHeader
         title={order.trackingNumber}
         description="შეკვეთის ადგილმდებარეობა"
-        action={<OrderStatusBadge status={order.status} />}
+        action={
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/receipt/${order.id}`}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              ქვითარი
+            </Link>
+            <OrderStatusBadge status={order.status} />
+          </div>
+        }
       />
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">

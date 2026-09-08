@@ -205,7 +205,14 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         </div>
       )}
 
-      <div className="mt-1.5 flex items-center gap-3">
+      <div className="mt-1.5 flex flex-wrap items-center gap-3">
+        <Link
+          href={`/receipt/${order.id}`}
+          target="_blank"
+          className="text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          ქვითარი
+        </Link>
         {canEdit && (
           <Link
             href={`/dispatch/orders/${order.id}/edit`}

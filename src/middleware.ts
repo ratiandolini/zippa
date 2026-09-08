@@ -24,8 +24,8 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(cookieName)?.value;
   const session = token ? await verifySession(token) : null;
 
-  // ავტორიზაცია საჭიროა ნებისმიერი როლისთვის
-  if (pathname.startsWith("/settings") && !session) {
+  // ავტორიზაცია საჭიროა ნებისმიერი როლისთვის (settings, receipt)
+  if ((pathname.startsWith("/settings") || pathname.startsWith("/receipt")) && !session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -64,6 +64,7 @@ export const config = {
     "/driver/:path*",
     "/dispatch/:path*",
     "/settings/:path*",
+    "/receipt/:path*",
     "/login",
     "/register",
   ],
