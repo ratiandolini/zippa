@@ -265,6 +265,7 @@ export default function PayrollPage() {
                   <th className="px-4 py-2 font-medium">კურიერმა აიღო</th>
                   <th className="px-4 py-2 font-medium">საკომისიო</th>
                   <th className="px-4 py-2 font-medium">დავალიანება</th>
+                  <th className="px-4 py-2 font-medium">ანაზღაურება</th>
                   <th className="px-4 py-2 font-medium">ჩასარიცხი</th>
                   <th className="px-4 py-2" />
                 </tr>
@@ -283,6 +284,9 @@ export default function PayrollPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums text-muted-foreground">
                       {r.charges > 0 ? `−${GEL(r.charges)}` : "—"}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-accent">
+                      {r.credits > 0 ? `+${GEL(r.credits)}` : "—"}
                     </td>
                     <td
                       className={

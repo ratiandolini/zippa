@@ -23,8 +23,8 @@ export { prisma };
 
 const TABLES = [
   "PasswordReset", "Review", "DriverEarning", "CashSettlement", "Payout",
-  "CodRemittance", "Payment", "OrderEvent", "Order", "Notification", "PushSubscription",
-  "DriverProfile", "PricingRule", "Zone", "City", "User", "Setting",
+  "CustomerAdjustment", "CodRemittance", "Payment", "OrderEvent", "Order", "Notification",
+  "PushSubscription", "DriverProfile", "PricingRule", "Zone", "City", "User", "Setting",
 ];
 
 const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));

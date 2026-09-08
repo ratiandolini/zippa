@@ -41,6 +41,36 @@ export default function CustomerCodPage() {
             />
           </div>
 
+          {cod.credits.length > 0 && (
+            <Card className="mb-6 border-accent/30">
+              <CardHeader>
+                <CardTitle>ანაზღაურება</CardTitle>
+              </CardHeader>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th className="px-5 py-2 font-medium">ტრეკინგი</th>
+                      <th className="px-5 py-2 font-medium">მიზეზი</th>
+                      <th className="px-5 py-2 font-medium">თანხა</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cod.credits.map((c, i) => (
+                      <tr key={i} className="border-b border-border last:border-0">
+                        <td className="px-5 py-2.5 font-mono text-xs text-muted-foreground">
+                          {c.trackingNumber ?? "—"}
+                        </td>
+                        <td className="px-5 py-2.5">{c.reason}</td>
+                        <td className="px-5 py-2.5 tabular-nums text-accent">+{GEL(c.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
           {cod.charges.length > 0 && (
             <Card className="mb-6 border-destructive/30">
               <CardHeader>

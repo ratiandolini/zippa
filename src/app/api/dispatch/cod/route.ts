@@ -34,6 +34,12 @@ export function GET() {
       },
     });
 
+    // დისპეჩერის მიერ დარიცხული ანაზღაურება (ჯერ არ გადახდილი)
+    const credits = await prisma.customerAdjustment.findMany({
+      where: { settledAt: null },
+      select: { customerId: true, amount: true, customer: { select: { name: true, phone: true } } },
+    });
+
     type Row = {
       customerId: string;
       name: string;
@@ -41,6 +47,7 @@ export function GET() {
       gross: number;
       commission: number;
       charges: number;
+      credits: number;
       count: number;
       oldest: string | null;
     };
@@ -48,7 +55,7 @@ export function GET() {
     const get = (id: string, name: string, phone: string): Row => {
       let r = map.get(id);
       if (!r) {
-        r = { customerId: id, name, phone, gross: 0, commission: 0, charges: 0, count: 0, oldest: null };
+        r = { customerId: id, name, phone, gross: 0, commission: 0, charges: 0, credits: 0, count: 0, oldest: null };
         map.set(id, r);
       }
       return r;
@@ -66,13 +73,18 @@ export function GET() {
       const r = get(o.customerId, o.customer.name, o.customer.phone);
       r.charges += n(o.returnFee) + n(o.cancelFee);
     }
+    for (const a of credits) {
+      const r = get(a.customerId, a.customer.name, a.customer.phone);
+      r.credits += n(a.amount);
+    }
 
     const rows = [...map.values()].map((r) => ({
       ...r,
       gross: Math.round(r.gross * 100) / 100,
       commission: Math.round(r.commission * 100) / 100,
       charges: Math.round(r.charges * 100) / 100,
-      net: Math.round((r.gross - r.commission - r.charges) * 100) / 100,
+      credits: Math.round(r.credits * 100) / 100,
+      net: Math.round((r.gross - r.commission - r.charges + r.credits) * 100) / 100,
     }));
 
     const recent = await prisma.codRemittance.findMany({
@@ -89,6 +101,7 @@ export function GET() {
         gross: n(r.grossAmount),
         commission: n(r.commission),
         charges: n(r.chargesDeducted),
+        credits: n(r.creditsAdded),
         net: n(r.netAmount),
         orderCount: r.orderCount,
         method: r.method,
@@ -121,14 +134,19 @@ export function POST(req: Request) {
       },
       select: { id: true, returnFee: true, cancelFee: true },
     });
-    if (codOrders.length === 0 && chargeOrders.length === 0)
+    const creditRows = await prisma.customerAdjustment.findMany({
+      where: { customerId, settledAt: null },
+      select: { id: true, amount: true },
+    });
+    if (codOrders.length === 0 && chargeOrders.length === 0 && creditRows.length === 0)
       throw new ApiError(400, "ამ გამგზავნთან გასასწორებელი არაფერია");
 
     const gross = Math.round(codOrders.reduce((s, o) => s + n(o.collectAmount), 0) * 100) / 100;
     const commission = Math.round(codOrders.reduce((s, o) => s + n(o.codCommission), 0) * 100) / 100;
     const charges =
       Math.round(chargeOrders.reduce((s, o) => s + n(o.returnFee) + n(o.cancelFee), 0) * 100) / 100;
-    const net = Math.round((gross - commission - charges) * 100) / 100;
+    const creditsTotal = Math.round(creditRows.reduce((s, a) => s + n(a.amount), 0) * 100) / 100;
+    const net = Math.round((gross - commission - charges + creditsTotal) * 100) / 100;
 
     const rem = await prisma.$transaction(async (tx) => {
       const r = await tx.codRemittance.create({
@@ -137,6 +155,7 @@ export function POST(req: Request) {
           grossAmount: gross,
           commission,
           chargesDeducted: charges,
+          creditsAdded: creditsTotal,
           netAmount: net,
           orderCount: codOrders.length,
           method,
@@ -153,6 +172,11 @@ export function POST(req: Request) {
         await tx.order.updateMany({
           where: { id: { in: chargeOrders.map((o) => o.id) } },
           data: { chargeSettledAt: new Date() },
+        });
+      if (creditRows.length)
+        await tx.customerAdjustment.updateMany({
+          where: { id: { in: creditRows.map((a) => a.id) } },
+          data: { settledAt: new Date() },
         });
       return r;
     });

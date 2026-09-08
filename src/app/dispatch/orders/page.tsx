@@ -246,11 +246,38 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const canCancel = !TERMINAL.includes(order.status);
   const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
   const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
+  const canAdjust =
+    order.status === "FAILED" || order.status === "CANCELLED" || !!order.returnRequestedAt;
+
+  async function adjust() {
+    const amtStr = prompt(
+      `${order.trackingNumber} — ანაზღაურება მომხმარებელს (₾).\nჩაირიცხება „მიღებულ თანხებში".`,
+      order.returnFee > 0 ? String(order.price.delivery) : "",
+    );
+    if (amtStr === null) return;
+    const amount = parseFloat(amtStr);
+    if (!(amount > 0)) return;
+    const reason = prompt("მიზეზი (მაგ. კურიერის ბრალით დაზიანდა, Zippa-ს დაგვიანება):", "");
+    if (!reason) return;
+    setAdjusting(true);
+    try {
+      await api(`/api/orders/${order.id}/adjust`, "POST", {
+        amount,
+        kind: "COMPENSATION",
+        reason,
+        waiveReturnFee: order.returnFee > 0,
+      });
+      onChange();
+    } finally {
+      setAdjusting(false);
+    }
+  }
 
   async function cancel() {
     setCancelling(true);
@@ -359,6 +386,15 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
           >
             რედაქტირება
           </Link>
+        )}
+        {canAdjust && (
+          <button
+            onClick={adjust}
+            disabled={adjusting}
+            className="text-[11px] font-medium text-accent hover:underline disabled:opacity-50"
+          >
+            {adjusting ? "…" : "ანაზღაურება მომხმარებელს"}
+          </button>
         )}
         {canCancel && (
           <button

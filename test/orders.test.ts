@@ -694,3 +694,54 @@ describe("მარშრუტად მინიჭება (batch)", () => {
     expect((await call(assignBatch, { body: { orderIds: [o.id], driverId: drv.profile.id } })).status).toBe(403);
   });
 });
+
+describe("მომხმარებლის ანაზღაურება (adjust)", () => {
+  it("კურიერის ბრალით ჩაშლა → დისპეჩერი რიცხავს ანაზღაურებას, აუქმებს returnFee-ს, ემატება COD-ს", async () => {
+    const { POST: adjust } = await import("@/app/api/orders/[id]/adjust/route");
+    const c = await makeUser("CUSTOMER");
+    const drv = await makeDriver({ approved: true });
+    const disp = await makeUser("DISPATCHER");
+
+    // შეკვეთა ჩაიშლება (არა-კურიერის ბრალით → returnFee 2.5)
+    const o1 = await newOrder(c.id, { collectAmount: 0 });
+    actAs(session(disp));
+    await call(assign, { params: { id: o1.id }, body: { driverId: drv.profile.id } });
+    actAs(session(drv.user));
+    for (const s of ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT"]) {
+      await call(setStatus, { params: { id: o1.id }, body: { status: s } });
+    }
+    await call(setStatus, { params: { id: o1.id }, body: { status: "FAILED", failureReason: "OTHER" } });
+    expect(Number((await prisma.order.findUniqueOrThrow({ where: { id: o1.id } })).returnFee)).toBe(2.5);
+
+    // დისპეჩერი: ანაზღაურება 5₾ + returnFee-ს გაუქმება
+    actAs(session(disp));
+    const r = await call(adjust, {
+      params: { id: o1.id },
+      body: { amount: 5, kind: "COMPENSATION", reason: "კურიერის ბრალით დაზიანდა", waiveReturnFee: true },
+    });
+    expect(r.status).toBe(200);
+    expect(Number((await prisma.order.findUniqueOrThrow({ where: { id: o1.id } })).returnFee)).toBe(0);
+    expect(await prisma.customerAdjustment.count({ where: { customerId: c.id, settledAt: null } })).toBe(1);
+
+    // COD-ის გადარიცხვა — ანაზღაურება ემატება
+    const list = await call(codGet, {});
+    const row = (list.body.outstanding as Record<string, number>[]).find(
+      (x) => (x.customerId as never) === c.id,
+    );
+    expect(row!.credits).toBe(5);
+    expect(row!.charges).toBe(0); // გაუქმდა
+    expect(row!.net).toBe(5);
+
+    const pay = await call(codPay, { body: { customerId: c.id, method: "ბანკი" } });
+    expect((pay.body as { net: number }).net).toBe(5);
+    expect(await prisma.customerAdjustment.count({ where: { customerId: c.id, settledAt: null } })).toBe(0);
+  });
+
+  it("არა-დისპეჩერი ვერ რიცხავს → 403", async () => {
+    const { POST: adjust } = await import("@/app/api/orders/[id]/adjust/route");
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    actAs(session(c));
+    expect((await call(adjust, { params: { id: o.id }, body: { amount: 5, reason: "test" } })).status).toBe(403);
+  });
+});

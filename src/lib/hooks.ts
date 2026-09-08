@@ -160,6 +160,7 @@ export interface CodOutstanding {
   gross: number;
   commission: number;
   charges: number;
+  credits: number;
   net: number;
   count: number;
   oldest: string | null;
@@ -170,6 +171,7 @@ export interface CodRemittanceItem {
   gross: number;
   commission: number;
   charges?: number;
+  credits?: number;
   net: number;
   orderCount: number;
   method: string | null;
@@ -192,7 +194,9 @@ export interface MyCod {
   outstandingNet: number;
   outstandingCount: number;
   chargesTotal: number;
+  creditsTotal: number;
   charges: { trackingNumber: string; amount: number; reason: string }[];
+  credits: { trackingNumber: string | null; amount: number; reason: string }[];
   pending: {
     trackingNumber: string;
     collectAmount: number;

@@ -55,6 +55,7 @@ model User {
   reviewsWritten   Review[]        @relation("ReviewAuthor")
   passwordResets   PasswordReset[]
   codRemittances   CodRemittance[]    @relation("CustomerCodRemittances")
+  adjustments      CustomerAdjustment[] @relation("CustomerAdjustments")
   pushSubs         PushSubscription[]
 
   @@index([role])
@@ -319,10 +320,11 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events   OrderEvent[]
-  payment  Payment?
-  review   Review?
-  earnings DriverEarning[]
+  events      OrderEvent[]
+  payment     Payment?
+  review      Review?
+  earnings    DriverEarning[]
+  adjustments CustomerAdjustment[]
 
   @@index([status])
   @@index([customerId])
@@ -417,6 +419,24 @@ model CashSettlement {
   @@index([status])
 }
 
+// დისპეჩერის მიერ მომხმარებლისთვის დარიცხული ანაზღაურება/დაბრუნება
+// (მიტანის საფასურის დაბრუნება, ნივთის ანაზღაურება ჩაშლისას, goodwill)
+model CustomerAdjustment {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    User      @relation("CustomerAdjustments", fields: [customerId], references: [id])
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  amount      Decimal   @db.Decimal(10, 2) // დადებითი = Zippa უხდის მომხმარებელს
+  kind        String // REFUND | COMPENSATION | GOODWILL
+  reason      String
+  createdById String?
+  settledAt   DateTime? // გადაიხადა COD-ის გადარიცხვისას
+  createdAt   DateTime  @default(now())
+
+  @@index([customerId, settledAt])
+}
+
 // COD-ის გადარიცხვა გამგზავნისთვის (შეგროვილი ფული მინუს Zippa-ს საკომისიო)
 model CodRemittance {
   id          String   @id @default(cuid())
@@ -425,6 +445,7 @@ model CodRemittance {
   grossAmount     Decimal @db.Decimal(10, 2) // სულ შეგროვილი collectAmount
   commission      Decimal @db.Decimal(10, 2) // Zippa-ს საკომისიო
   chargesDeducted Decimal @default(0) @db.Decimal(10, 2) // გამოკლებული დავალიანება (returnFee + cancelFee)
+  creditsAdded    Decimal @default(0) @db.Decimal(10, 2) // დამატებული ანაზღაურება (დისპეჩერის დარიცხვა)
   netAmount       Decimal @db.Decimal(10, 2) // გამგზავნისთვის (უარყოფითი = გამგზავნი გვმართებს)
   orderCount      Int
   method      String? // "ბანკი" / "ნაღდი"
