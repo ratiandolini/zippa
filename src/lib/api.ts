@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/nextjs";
 import { getSession, type SessionPayload } from "@/lib/auth/session";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import type { Role } from "@prisma/client";
@@ -40,6 +41,7 @@ export function handle(fn: () => Promise<Response>) {
       );
     }
     console.error("[API]", err);
+    Sentry.captureException(err);
     return fail(500, "სერვერის შიდა შეცდომა");
   });
 }
