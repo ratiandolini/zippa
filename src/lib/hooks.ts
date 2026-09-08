@@ -124,6 +124,23 @@ export function useSettlements(query = "", refreshInterval = 20000) {
   return { settlements: data?.settlements ?? [], isLoading, mutate };
 }
 
+export interface SavedContact {
+  name: string;
+  phone: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  count: number;
+}
+
+export function useContacts() {
+  const { data } = useSWR<{ senders: SavedContact[]; recipients: SavedContact[] }>(
+    "/api/orders/contacts",
+    jsonFetcher,
+  );
+  return { senders: data?.senders ?? [], recipients: data?.recipients ?? [] };
+}
+
 export function useMySettlements(refreshInterval = 20000) {
   const { data, isLoading, mutate } = useSWR<{ settlements: SettlementItem[] }>(
     "/api/driver/settlement",

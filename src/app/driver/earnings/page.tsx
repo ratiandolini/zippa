@@ -45,11 +45,22 @@ export default function EarningsPage() {
       {isLoading ? (
         <p className="mb-6 text-sm text-muted-foreground">იტვირთება…</p>
       ) : (
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <Stat label="გადასახდელი ანაზღაურება" value={GEL(driver?.unpaidEarnings ?? 0)} />
-          <Stat label="ნაღდი ხელზე" value={GEL(driver?.cashOnHand ?? 0)} sub="კომპანიას ჩასაბარებელი" />
-          <Stat label="სულ მიტანები" value={String(driver?.totalDeliveries ?? 0)} />
-        </div>
+        <>
+          <div className="mb-4 grid gap-4 sm:grid-cols-3">
+            <Stat label="კომპანია გმართებს" value={GEL(driver?.unpaidEarnings ?? 0)} sub="დარიცხული ანაზღაურება" />
+            <Stat label="შენ გმართებ კომპანიას" value={GEL(driver?.cashOnHand ?? 0)} sub="შეგროვილი ნაღდი, ჩასაბარებელი" />
+            <Stat label="სულ მიტანები" value={String(driver?.totalDeliveries ?? 0)} />
+          </div>
+          <div className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+            წმინდა ბალანსი:{" "}
+            <span className="font-semibold tabular-nums">
+              {GEL((driver?.unpaidEarnings ?? 0) - (driver?.cashOnHand ?? 0))}
+            </span>{" "}
+            <span className="text-muted-foreground">
+              (ანაზღაურება − ჩასაბარებელი ნაღდი). დადებითი = კომპანია გიხდის, უარყოფითი = შენ აბარებ.
+            </span>
+          </div>
+        </>
       )}
 
       {pendingSettlement ? (
@@ -57,7 +68,7 @@ export default function EarningsPage() {
           <CardContent className="p-5">
             <div className="font-medium">ნაღდის ჩაბარება — {GEL(pendingSettlement.amount)}</div>
             <p className="text-sm text-muted-foreground">
-              დისპეჩერის დადასტურების მოლოდინში. დადასტურების შემდეგ ბალანსიდან ჩამოგეჭრება.
+              დისპეჩერის დადასტურების მოლოდინში. როცა დაადასტურებს, „შენ გმართებ კომპანიას" ამ თანხით შემცირდება.
             </p>
             {msg && <p className="mt-1 text-xs text-muted-foreground">{msg}</p>}
           </CardContent>

@@ -271,7 +271,7 @@ model Order {
   // ამანათი
   weightKg    Decimal  @default(1) @db.Decimal(10, 2)
   description String?
-  parcelValue Decimal? @db.Decimal(10, 2) // გამოცხადებული ღირებულება (COD-სთვის)
+  parcelValue Decimal? @db.Decimal(10, 2) // ნივთის ღირებულება — COD-ში ემატება + დაზღვევის ლიმიტი
 
   // ფასი (გამოთვლილი შექმნისას — სნეპშოტი)
   distanceKm    Decimal @default(0) @db.Decimal(10, 2) // მხოლოდ ინფორმაციული (მარშრუტი/ETA)

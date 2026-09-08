@@ -21,7 +21,15 @@ import type { OrderStatus } from "@prisma/client";
 
 interface Analytics {
   days: { label: string; orders: number; delivered: number; revenue: number }[];
-  totals: { orders: number; delivered: number; revenue: number; avgMinutes: number; completionRate: number };
+  totals: {
+    orders: number;
+    delivered: number;
+    revenue: number;
+    companyEarnings: number;
+    driverPay: number;
+    avgMinutes: number;
+    completionRate: number;
+  };
   statusCount: Record<string, number>;
   topDrivers: { name: string; deliveries: number; rating: number }[];
 }
@@ -51,8 +59,10 @@ export default function AnalyticsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="შეკვეთა" value={String(totals.orders)} />
         <Stat label="ჩაბარებული" value={String(totals.delivered)} sub={`${totals.completionRate}% ჩაბარების მაჩვენებელი`} />
-        <Stat label="შემოსავალი" value={GEL(totals.revenue)} />
+        <Stat label="ბრუნვა (ჩაბარებული)" value={GEL(totals.revenue)} />
         <Stat label="საშ. მიტანა" value={`${totals.avgMinutes} წთ`} />
+        <Stat label="კომპანიის წილი" value={GEL(totals.companyEarnings)} sub="ბრუნვა − კურიერების ანაზღაურება" />
+        <Stat label="კურიერების ანაზღაურება" value={GEL(totals.driverPay)} sub="დარიცხული ამ პერიოდში" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

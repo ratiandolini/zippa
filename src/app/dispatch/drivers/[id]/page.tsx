@@ -106,11 +106,18 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
         action={<Badge tone={d.status === "AVAILABLE" ? "green" : d.status === "BUSY" ? "accent" : "neutral"}>{DRIVER_STATUS_LABEL[d.status]}</Badge>}
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="მიტანები" value={String(d.totalDeliveries)} />
         <Stat label="რეიტინგი" value={`★ ${d.rating.toFixed(1)}`} sub={`${d.ratingCount} შეფასება`} />
-        <Stat label="გადასახდელი ანაზღაურება" value={GEL(d.unpaidEarnings)} />
-        <Stat label="ნაღდი ხელზე" value={GEL(d.cashOnHand)} sub="კომპანიას ჩასაბარებელი" />
+        <Stat label="კურიერს ვუხდით" value={GEL(d.unpaidEarnings)} sub="დარიცხული ანაზღაურება" />
+        <Stat label="კურიერი გვაბარებს" value={GEL(d.cashOnHand)} sub="შეგროვილი ნაღდი" />
+      </div>
+      <div className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+        წმინდა:{" "}
+        <span className="font-semibold tabular-nums">{GEL(d.unpaidEarnings - d.cashOnHand)}</span>{" "}
+        <span className="text-muted-foreground">
+          — დადებითი: კურიერს ამდენი უნდა გადავურიცხოთ. უარყოფითი: კურიერმა ამდენი ნაღდი უნდა ჩააბაროს.
+        </span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

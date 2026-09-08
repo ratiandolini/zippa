@@ -11,6 +11,7 @@ import { AddressField, type AddressValue } from "@/components/address-field";
 import { GEL, PAYMENT_METHOD_LABEL, DELIVERY_ZONE_LABEL, fmtDate } from "@/lib/domain";
 import { api, HttpError } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
+import { useContacts, type SavedContact } from "@/lib/hooks";
 import type { OrderDTO } from "@/lib/serialize";
 
 const empty: AddressValue = { address: "", lat: null, lng: null };
@@ -36,7 +37,25 @@ export default function NewOrderPage() {
   const [delivery, setDelivery] = useState<AddressValue>(empty);
   const [weight, setWeight] = useState("");
   const [description, setDescription] = useState("");
+  const [parcelValue, setParcelValue] = useState("");
   const payment = "CASH" as const;
+
+  const { senders, recipients } = useContacts();
+
+  function fillSender(c: SavedContact) {
+    setSenderName(c.name);
+    setSenderPhone(c.phone);
+    if (c.lat != null && c.lng != null) {
+      setPickup({ address: c.address, lat: c.lat, lng: c.lng });
+    }
+  }
+  function fillRecipient(c: SavedContact) {
+    setRecipientName(c.name);
+    setRecipientPhone(c.phone);
+    if (c.lat != null && c.lng != null) {
+      setDelivery({ address: c.address, lat: c.lat, lng: c.lng });
+    }
+  }
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -64,6 +83,7 @@ export default function NewOrderPage() {
           delivery: { lat: delivery.lat, lng: delivery.lng },
           weightKg: weightNum,
           paymentMethod: payment,
+          parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
         });
         setQuote(q);
       } catch {
@@ -72,7 +92,7 @@ export default function NewOrderPage() {
         setQuoting(false);
       }
     }, 350);
-  }, [ready, pickup.lat, pickup.lng, delivery.lat, delivery.lng, weightNum, payment]);
+  }, [ready, pickup.lat, pickup.lng, delivery.lat, delivery.lng, weightNum, payment, parcelValue]);
 
   async function submit() {
     setError(null);
@@ -91,6 +111,7 @@ export default function NewOrderPage() {
         },
         weightKg: weightNum,
         description: description || undefined,
+        parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
         paymentMethod: payment,
       });
       router.push(`/app/track?id=${order.id}`);
@@ -134,6 +155,11 @@ export default function NewOrderPage() {
                   error={fe("pickup.address")}
                 />
               </div>
+              {senders.length > 0 && (
+                <div className="sm:col-span-2">
+                  <ContactChips contacts={senders} onPick={fillSender} />
+                </div>
+              )}
               <Text label="გამგზავნი" value={senderName} onChange={setSenderName} placeholder="სახელი გვარი" error={fe("sender.name")} />
               <Text label="ტელეფონი" value={senderPhone} onChange={setSenderPhone} placeholder="5XX XX XX XX" error={fe("sender.phone")} />
             </CardContent>
@@ -153,6 +179,11 @@ export default function NewOrderPage() {
                   error={fe("delivery.address")}
                 />
               </div>
+              {recipients.length > 0 && (
+                <div className="sm:col-span-2">
+                  <ContactChips contacts={recipients} onPick={fillRecipient} />
+                </div>
+              )}
               <Text label="მიმღები" value={recipientName} onChange={setRecipientName} placeholder="სახელი გვარი" error={fe("recipient.name")} />
               <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="5XX XX XX XX" error={fe("recipient.phone")} />
             </CardContent>
@@ -174,6 +205,16 @@ export default function NewOrderPage() {
                 error={fe("weightKg")}
               />
               <Text label="აღწერა" value={description} onChange={setDescription} placeholder="მაგ. დოკუმენტები, ტანსაცმელი" />
+              <Text
+                label="ნივთის ღირებულება, ₾"
+                value={parcelValue}
+                onChange={setParcelValue}
+                placeholder="არასავალდებულო"
+                type="number"
+                step="1"
+                hint="ნაღდით გადახდისას კურიერი მიმღებისგან აიღებს მიტანის საფასურს + ამ თანხას. დაზღვევის ლიმიტიც ამ ღირებულებით განისაზღვრება."
+                error={fe("parcelValue")}
+              />
             </CardContent>
           </Card>
 
@@ -242,6 +283,32 @@ export default function NewOrderPage() {
         </div>
       </div>
     </>
+  );
+}
+
+function ContactChips({
+  contacts,
+  onPick,
+}: {
+  contacts: SavedContact[];
+  onPick: (c: SavedContact) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">ბოლოს გამოყენებული</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {contacts.map((c, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(c)}
+            className="rounded-full border border-border px-2.5 py-1 text-xs hover:border-accent hover:bg-accent/5"
+          >
+            {c.name} · {c.phone}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

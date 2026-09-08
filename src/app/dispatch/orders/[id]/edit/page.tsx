@@ -144,7 +144,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="წონა, კგ (მაგ. 0.5)" value={weight} onChange={setWeight} type="number" />
-          <Field label="გამოცხადებული ღირებულება (₾)" value={parcelValue} onChange={setParcelValue} type="number" />
+          <Field label="ნივთის ღირებულება, ₾ (ასაღები მიმღებისგან)" value={parcelValue} onChange={setParcelValue} type="number" />
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />
           </div>

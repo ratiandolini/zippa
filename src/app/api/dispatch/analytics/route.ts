@@ -68,6 +68,14 @@ export function GET() {
         )
       : 0;
 
+    // კომპანიის წილი vs კურიერების ანაზღაურება (დარიცხული ამ პერიოდში)
+    const earnings = await prisma.driverEarning.aggregate({
+      where: { createdAt: { gte: from } },
+      _sum: { companyAmount: true, driverAmount: true },
+    });
+    const companyEarnings = Math.round(Number(earnings._sum.companyAmount ?? 0) * 100) / 100;
+    const driverPay = Math.round(Number(earnings._sum.driverAmount ?? 0) * 100) / 100;
+
     const topDrivers = await prisma.driverProfile.findMany({
       where: { totalDeliveries: { gt: 0 } },
       include: { user: { select: { name: true } } },
@@ -81,6 +89,8 @@ export function GET() {
         orders: orders.length,
         delivered: deliveredCount,
         revenue: Math.round(totalRevenue * 100) / 100,
+        companyEarnings,
+        driverPay,
         avgMinutes,
         completionRate: endedCount ? Math.round((deliveredCount / endedCount) * 100) : 0,
       },

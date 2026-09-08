@@ -13,11 +13,11 @@ import Link from "next/link";
 import { ProofPhoto } from "@/components/proof-photo";
 import { cn } from "@/lib/utils";
 
-const columns: { key: OrderDTO["status"][]; title: string }[] = [
+const columns: { key: OrderDTO["status"][]; title: string; done?: boolean }[] = [
   { key: ["PENDING"], title: "მოლოდინში" },
   { key: ["ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"], title: "მინიჭებული" },
   { key: ["PICKED_UP", "IN_TRANSIT"], title: "გზაშია" },
-  { key: ["DELIVERED", "FAILED", "CANCELLED"], title: "დასრულებული" },
+  { key: ["DELIVERED", "FAILED", "CANCELLED"], title: "დასრულებული", done: true },
 ];
 
 function matches(o: OrderDTO, q: string) {
@@ -76,17 +76,24 @@ export default function OrdersBoard() {
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {columns.map((col) => {
-          const items = filtered.filter((o) => col.key.includes(o.status));
+          const all = filtered.filter((o) => col.key.includes(o.status));
+          // „დასრულებული" სვეტი დროთა განმავლობაში იზრდება — ვჭრით ბოლო 20-ზე (ძებნა ყველას ხედავს)
+          const capped = col.done && !q ? all.slice(0, 20) : all;
           return (
             <div key={col.title} className="rounded-xl bg-muted/50 p-3">
               <div className="mb-3 flex items-center justify-between px-1">
                 <span className="text-sm font-medium">{col.title}</span>
-                <span className="text-xs text-muted-foreground">{items.length}</span>
+                <span className="text-xs text-muted-foreground">{all.length}</span>
               </div>
-              <div className="space-y-2">
-                {items.map((o) => (
+              <div className="max-h-[70vh] space-y-2 overflow-y-auto">
+                {capped.map((o) => (
                   <OrderCard key={o.id} order={o} onChange={mutate} />
                 ))}
+                {capped.length < all.length && (
+                  <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+                    +{all.length - capped.length} ძველი — მოძებნე ნომრით ან მისამართით
+                  </p>
+                )}
               </div>
             </div>
           );

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { geocode, reverseGeocode, type GeoResult } from "@/lib/geo";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, LocateFixed } from "lucide-react";
 import { MapPickerLazy } from "@/components/map-picker-lazy";
 
 export interface AddressValue {
@@ -76,6 +76,20 @@ export function AddressField({
     onChange({ address, lat: pt.lat, lng: pt.lng });
   }
 
+  // მოწყობილობის მდებარეობა → პინი რუკაზე
+  function useMyLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    setLocating(true);
+    setShowMap(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        void pickOnMap({ lat: p.coords.latitude, lng: p.coords.longitude });
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }
+
   function selectResult(r: GeoResult) {
     onChange({ address: r.label, lat: r.lat, lng: r.lng });
     setOpen(false);
@@ -129,6 +143,13 @@ export function AddressField({
           className="text-xs font-medium text-accent hover:underline"
         >
           {showMap ? "რუკის დახურვა" : value.lat != null ? "მდებარეობის შეცვლა რუკაზე" : "მონიშვნა რუკაზე"}
+        </button>
+        <button
+          type="button"
+          onClick={useMyLocation}
+          className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+        >
+          <LocateFixed className="h-3.5 w-3.5" /> ჩემი მდებარეობა
         </button>
       </div>
 
