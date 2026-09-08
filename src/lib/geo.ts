@@ -1,4 +1,5 @@
-// გეოგრაფიული დამხმარეები — Haversine + Nominatim (OpenStreetMap)
+// გეოგრაფიული დამხმარეები — Haversine + მისამართის ფორმატირება.
+// Nominatim-თან რეალური კომუნიკაცია სერვერზეა (throttle + cache): src/lib/nominatim.ts + /api/geo/*
 
 export function haversineKm(
   a: { lat: number; lng: number },
@@ -15,15 +16,13 @@ export function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
-const NOMINATIM = process.env.NEXT_PUBLIC_NOMINATIM_URL || "https://nominatim.openstreetmap.org";
-
 export interface GeoResult {
   label: string;
   lat: number;
   lng: number;
 }
 
-interface NominatimAddress {
+export interface NominatimAddress {
   road?: string;
   house_number?: string;
   pedestrian?: string;
@@ -64,39 +63,32 @@ export function compactAddress(s: string): string {
   return segs.slice(0, 2).join(", ") || s.trim();
 }
 
-/** მისამართის ძებნა (autocomplete). ბრაუზერიდანაც და სერვერიდანაც. */
+// ─── კლიენტის მხარე — ჩვენივე proxy-ს ეძახის, არა პირდაპირ Nominatim-ს ───
+
+/** მისამართის ძებნა (autocomplete) — ბრაუზერიდან. */
 export async function geocode(query: string, signal?: AbortSignal): Promise<GeoResult[]> {
   if (query.trim().length < 3) return [];
-  const url =
-    `${NOMINATIM}/search?format=jsonv2&limit=6&addressdetails=1&accept-language=ka` +
-    `&countrycodes=ge&q=${encodeURIComponent(query)}`;
-  const res = await fetch(url, {
-    signal,
-    headers: { "User-Agent": "zippa/0.1" },
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as Array<{
-    display_name: string;
-    lat: string;
-    lon: string;
-    address?: NominatimAddress;
-  }>;
-  return data.map((d) => ({
-    label: shortAddress(d.address, d.display_name),
-    lat: parseFloat(d.lat),
-    lng: parseFloat(d.lon),
-  }));
+  try {
+    const res = await fetch(`/api/geo/search?q=${encodeURIComponent(query)}`, { signal });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: GeoResult[] };
+    return data.results ?? [];
+  } catch {
+    return [];
+  }
 }
 
-/** კოორდინატიდან მისამართის ტექსტი (რუკაზე მონიშვნისას, თუ მომხმარებელს ტექსტი არ აქვს დაწერილი) */
-export async function reverseGeocode(lat: number, lng: number, signal?: AbortSignal): Promise<string | null> {
-  const url = `${NOMINATIM}/reverse?format=jsonv2&addressdetails=1&accept-language=ka&lat=${lat}&lon=${lng}`;
+/** კოორდინატიდან მისამართის ტექსტი (რუკაზე მონიშვნისას). */
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal,
+): Promise<string | null> {
   try {
-    const res = await fetch(url, { signal, headers: { "User-Agent": "zippa/0.1" } });
+    const res = await fetch(`/api/geo/reverse?lat=${lat}&lng=${lng}`, { signal });
     if (!res.ok) return null;
-    const data = (await res.json()) as { display_name?: string; address?: NominatimAddress };
-    if (!data.display_name) return null;
-    return shortAddress(data.address, data.display_name);
+    const data = (await res.json()) as { address?: string | null };
+    return data.address ?? null;
   } catch {
     return null;
   }
