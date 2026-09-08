@@ -1,10 +1,16 @@
 import type { Prisma } from "@prisma/client";
+import { ACTIVE_ORDER_STATUSES } from "@/lib/domain";
 
 const num = (v: Prisma.Decimal | number | null | undefined) =>
   v == null ? 0 : Number(v);
 
+// კურიერის მდებარეობა ვაჩვენოთ მხოლოდ ამ ხნის განმავლობაში ბოლო განახლების შემდეგ
+const LOCATION_FRESH_MS = 10 * 60_000;
+
 export const orderInclude = {
-  driver: { include: { user: { select: { name: true, phone: true } } } },
+  driver: {
+    include: { user: { select: { name: true, phone: true } } },
+  },
   customer: { select: { name: true, phone: true } },
   events: { orderBy: { createdAt: "asc" } },
   review: { select: { rating: true, comment: true } },
@@ -31,8 +37,13 @@ export function serializeOrder(o: OrderWith) {
     driverId: o.driverId,
     driverName: o.driver?.user.name ?? null,
     driverPhone: o.driver?.user.phone ?? null,
+    // მდებარეობა მხოლოდ მიმდინარე მიტანაზე და მხოლოდ ახალი (≤10 წთ) — თორემ „გაყინული" ჩვენება
     driverLocation:
-      o.driver?.currentLat != null && o.driver?.currentLng != null
+      o.driver?.currentLat != null &&
+      o.driver?.currentLng != null &&
+      ACTIVE_ORDER_STATUSES.includes(o.status) &&
+      o.driver.locationUpdatedAt != null &&
+      Date.now() - o.driver.locationUpdatedAt.getTime() < LOCATION_FRESH_MS
         ? { lat: o.driver.currentLat, lng: o.driver.currentLng }
         : null,
 

@@ -102,19 +102,29 @@ export function AppShell({
       </div>
 
       {/* Bottom tab bar — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur lg:hidden">
-        <div className="mx-auto flex w-full max-w-md overflow-x-auto">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+        <div
+          className={cn(
+            "flex",
+            nav.length > 5
+              ? "gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : "mx-auto max-w-md",
+          )}
+        >
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex min-w-[64px] flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition-colors",
+                "flex flex-col items-center gap-1 py-2 text-[10px] font-medium leading-tight transition-colors",
+                nav.length > 5 ? "w-16 shrink-0" : "min-w-0 flex-1 px-1",
                 active(item.href) ? "text-accent" : "text-muted-foreground",
               )}
             >
               <span className="h-5 w-5">{item.icon}</span>
-              <span className="truncate">{item.label}</span>
+              <span className={cn("text-center", nav.length > 5 ? "" : "truncate")}>
+                {item.label}
+              </span>
             </Link>
           ))}
         </div>
