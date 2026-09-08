@@ -27,7 +27,8 @@ export async function notify(userId: string, n: NotifyInput) {
   } catch (e) {
     console.error("[notify]", e);
   }
-  void sendPush(userId, { title: n.title, body: n.body, url: pushUrl(n) }).catch(() => {});
+  // await — serverless-ზე fire-and-forget promise შეიძლება მოკვდეს response-ის მერე
+  await sendPush(userId, { title: n.title, body: n.body, url: pushUrl(n) }).catch(() => {});
 }
 
 /** ყველა დისპეჩერს */
@@ -45,13 +46,13 @@ export async function notifyDispatchers(n: NotifyInput) {
       data: n.data,
     })),
   });
-  for (const d of dispatchers) {
-    void sendPush(d.id, {
-      title: n.title,
-      body: n.body,
-      url: n.url ?? "/dispatch/orders",
-    }).catch(() => {});
-  }
+  await Promise.all(
+    dispatchers.map((d) =>
+      sendPush(d.id, { title: n.title, body: n.body, url: n.url ?? "/dispatch/orders" }).catch(
+        () => {},
+      ),
+    ),
+  );
 }
 
 /** კურიერის პროფილის id-დან user-ს */
