@@ -304,6 +304,9 @@ model Order {
   failureReason OrderFailureReason?
   returnFee     Decimal            @default(0) @db.Decimal(10, 2) // გამგზავნს დაბრუნებისთვის დარიცხული
 
+  // გამგზავნის დავალიანება Zippa-სთან (returnFee + cancelFee) — იფარება COD-ის გადარიცხვისას
+  chargeSettledAt DateTime?
+
   estimatedDeliveryAt DateTime?
   assignedAt          DateTime? // კურიერზე მიბმის დრო (ტაიმაუტისთვის)
 
@@ -413,10 +416,11 @@ model CodRemittance {
   id          String   @id @default(cuid())
   customerId  String
   customer    User     @relation("CustomerCodRemittances", fields: [customerId], references: [id])
-  grossAmount Decimal  @db.Decimal(10, 2) // სულ შეგროვილი collectAmount
-  commission  Decimal  @db.Decimal(10, 2) // Zippa-ს საკომისიო
-  netAmount   Decimal  @db.Decimal(10, 2) // გამგზავნს გადარიცხული
-  orderCount  Int
+  grossAmount     Decimal @db.Decimal(10, 2) // სულ შეგროვილი collectAmount
+  commission      Decimal @db.Decimal(10, 2) // Zippa-ს საკომისიო
+  chargesDeducted Decimal @default(0) @db.Decimal(10, 2) // გამოკლებული დავალიანება (returnFee + cancelFee)
+  netAmount       Decimal @db.Decimal(10, 2) // გამგზავნისთვის (უარყოფითი = გამგზავნი გვმართებს)
+  orderCount      Int
   method      String? // "ბანკი" / "ნაღდი"
   note        String?
   createdById String?

@@ -147,6 +147,7 @@ export interface CodOutstanding {
   phone: string;
   gross: number;
   commission: number;
+  charges: number;
   net: number;
   count: number;
   oldest: string | null;
@@ -156,6 +157,7 @@ export interface CodRemittanceItem {
   customerName?: string;
   gross: number;
   commission: number;
+  charges?: number;
   net: number;
   orderCount: number;
   method: string | null;
@@ -177,6 +179,8 @@ export function useDispatchCod(refreshInterval = 20000) {
 export interface MyCod {
   outstandingNet: number;
   outstandingCount: number;
+  chargesTotal: number;
+  charges: { trackingNumber: string; amount: number; reason: string }[];
   pending: {
     trackingNumber: string;
     collectAmount: number;

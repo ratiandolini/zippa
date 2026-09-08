@@ -23,7 +23,7 @@ export { prisma };
 
 const TABLES = [
   "PasswordReset", "Review", "DriverEarning", "CashSettlement", "Payout",
-  "Payment", "OrderEvent", "Order", "Notification", "DriverProfile",
+  "CodRemittance", "Payment", "OrderEvent", "Order", "Notification", "DriverProfile",
   "PricingRule", "Zone", "City", "User", "Setting",
 ];
 

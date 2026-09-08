@@ -58,7 +58,11 @@ export default function PayrollPage() {
   const [err, setErr] = useState<string | null>(null);
 
   async function payCod(customerId: string, name: string, net: number) {
-    const method = prompt(`${name}: COD გადარიცხვა ${GEL(net)}. მეთოდი (მაგ. ბანკი):`, "ბანკი");
+    const msg =
+      net >= 0
+        ? `${name}: გადავრიცხოთ ${GEL(net)}. მეთოდი (მაგ. ბანკი):`
+        : `${name}: გამგზავნი გვმართებს ${GEL(-net)}. ჩაწერე როგორ გასწორდა (მაგ. მიიღო ნაღდი / ჩამოიწერა):`;
+    const method = prompt(msg, net >= 0 ? "ბანკი" : "მიიღო ნაღდი");
     if (method === null) return;
     setBusy("cod" + customerId);
     setErr(null);
@@ -251,7 +255,7 @@ export default function PayrollPage() {
           <CardTitle>COD — გამგზავნებთან ანგარიშსწორება</CardTitle>
         </CardHeader>
         {cod.length === 0 ? (
-          <CardContent className="text-sm text-muted-foreground">გადასარიცხი COD არ არის.</CardContent>
+          <CardContent className="text-sm text-muted-foreground">გასასწორებელი არაფერია.</CardContent>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -261,7 +265,8 @@ export default function PayrollPage() {
                   <th className="px-4 py-2 font-medium">შეკვეთა</th>
                   <th className="px-4 py-2 font-medium">შეგროვილი</th>
                   <th className="px-4 py-2 font-medium">საკომისიო</th>
-                  <th className="px-4 py-2 font-medium">გადასარიცხი</th>
+                  <th className="px-4 py-2 font-medium">დავალიანება</th>
+                  <th className="px-4 py-2 font-medium">შედეგი</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
@@ -274,8 +279,19 @@ export default function PayrollPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums">{r.count}</td>
                     <td className="px-4 py-3 tabular-nums">{GEL(r.gross)}</td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">−{GEL(r.commission)}</td>
-                    <td className="px-4 py-3 font-medium tabular-nums">{GEL(r.net)}</td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                      {r.commission > 0 ? `−${GEL(r.commission)}` : "—"}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                      {r.charges > 0 ? `−${GEL(r.charges)}` : "—"}
+                    </td>
+                    <td
+                      className={
+                        "px-4 py-3 font-medium tabular-nums " + (r.net < 0 ? "text-destructive" : "")
+                      }
+                    >
+                      {r.net >= 0 ? GEL(r.net) : `გვმართებს ${GEL(-r.net)}`}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <Button
                         size="sm"
@@ -283,7 +299,11 @@ export default function PayrollPage() {
                         disabled={busy != null}
                         onClick={() => payCod(r.customerId, r.name, r.net)}
                       >
-                        {busy === "cod" + r.customerId ? "…" : "გადარიცხვა"}
+                        {busy === "cod" + r.customerId
+                          ? "…"
+                          : r.net >= 0
+                            ? "გადარიცხვა"
+                            : "გასწორება"}
                       </Button>
                     </td>
                   </tr>

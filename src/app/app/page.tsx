@@ -33,14 +33,28 @@ export default function CustomerHome() {
         }
       />
 
-      {cod && cod.outstandingNet > 0 && (
-        <Card className="mb-6 border-accent/30 bg-accent/[0.04]">
+      {cod && (cod.outstandingNet !== 0 || cod.chargesTotal > 0) && (
+        <Card
+          className={
+            "mb-6 " +
+            (cod.outstandingNet < 0
+              ? "border-destructive/30 bg-destructive/[0.04]"
+              : "border-accent/30 bg-accent/[0.04]")
+          }
+        >
           <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
             <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-accent" />
-              <span className="font-medium">მისაღები COD: {GEL(cod.outstandingNet)}</span>
+              <Wallet
+                className={"h-4 w-4 " + (cod.outstandingNet < 0 ? "text-destructive" : "text-accent")}
+              />
+              <span className="font-medium">
+                {cod.outstandingNet >= 0
+                  ? `მისაღები COD: ${GEL(cod.outstandingNet)}`
+                  : `დავალიანება: ${GEL(-cod.outstandingNet)}`}
+              </span>
               <span className="text-sm text-muted-foreground">
-                {cod.outstandingCount} ჩაბარებული შეკვეთა · გადმოგერიცხებათ
+                {cod.outstandingCount} შეკვეთა
+                {cod.chargesTotal > 0 ? ` · დაბრუნება/გაუქმება −${GEL(cod.chargesTotal)}` : ""}
               </span>
             </div>
             <Link href="/app/cod" className={buttonVariants({ variant: "outline", size: "sm" })}>

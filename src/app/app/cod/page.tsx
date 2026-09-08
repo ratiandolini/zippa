@@ -25,13 +25,48 @@ export default function CustomerCodPage() {
         <p className="text-sm text-muted-foreground">იტვირთება…</p>
       ) : (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2">
-            <Stat label="მისაღები (წმინდა)" value={GEL(cod.outstandingNet)} sub={`${cod.outstandingCount} შეკვეთა`} />
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <Stat
+              label={cod.outstandingNet >= 0 ? "მისაღები (წმინდა)" : "დავალიანება"}
+              value={GEL(Math.abs(cod.outstandingNet))}
+              sub={`${cod.outstandingCount} შეკვეთა`}
+            />
+            <Stat label="დაბრუნება / გაუქმება" value={GEL(cod.chargesTotal)} sub="გამოიქვითება COD-იდან" />
             <Stat
               label="სულ გადმორიცხული"
-              value={GEL(cod.history.reduce((s, h) => s + h.net, 0))}
+              value={GEL(cod.history.reduce((s, h) => s + Math.max(0, h.net), 0))}
             />
           </div>
+
+          {cod.charges.length > 0 && (
+            <Card className="mb-6 border-destructive/30">
+              <CardHeader>
+                <CardTitle>დაბრუნების / გაუქმების საფასური</CardTitle>
+              </CardHeader>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th className="px-5 py-2 font-medium">ტრეკინგი</th>
+                      <th className="px-5 py-2 font-medium">მიზეზი</th>
+                      <th className="px-5 py-2 font-medium">თანხა</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cod.charges.map((c) => (
+                      <tr key={c.trackingNumber} className="border-b border-border last:border-0">
+                        <td className="px-5 py-2.5 font-mono text-xs text-muted-foreground">
+                          {c.trackingNumber}
+                        </td>
+                        <td className="px-5 py-2.5">{c.reason}</td>
+                        <td className="px-5 py-2.5 tabular-nums text-destructive">−{GEL(c.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           <Card className="mb-6">
             <CardHeader>

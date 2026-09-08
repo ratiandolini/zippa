@@ -4,54 +4,75 @@ import { requireRole, handle, ok, ApiError } from "@/lib/api";
 import { notify } from "@/lib/notify";
 import { GEL } from "@/lib/domain";
 
-// გამგზავნები, რომლებსაც COD ერგებათ (ჩაბარებული, ჯერ არ გადარიცხული)
+const n = (v: unknown) => Number(v);
+
+// გამგზავნებთან ანგარიშსწორება: მიღებული COD მინუს საკომისიო მინუს დავალიანება (returnFee + cancelFee)
 export function GET() {
   return handle(async () => {
     await requireRole("DISPATCHER");
 
-    const orders = await prisma.order.findMany({
-      where: {
-        status: "DELIVERED",
-        collectAmount: { gt: 0 },
-        codRemittanceId: null,
-      },
+    // COD-ის მქონე ჩაბარებული, ჯერ არ გადარიცხული შეკვეთები
+    const codOrders = await prisma.order.findMany({
+      where: { status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
       select: {
-        id: true,
         customerId: true,
-        trackingNumber: true,
         collectAmount: true,
         codCommission: true,
         deliveredAt: true,
         customer: { select: { name: true, phone: true } },
       },
-      orderBy: { deliveredAt: "asc" },
     });
 
-    const byCustomer = new Map<
-      string,
-      { customerId: string; name: string; phone: string; gross: number; commission: number; count: number; oldest: string | null }
-    >();
-    for (const o of orders) {
-      const g = byCustomer.get(o.customerId) ?? {
-        customerId: o.customerId,
-        name: o.customer.name,
-        phone: o.customer.phone,
-        gross: 0,
-        commission: 0,
-        count: 0,
-        oldest: o.deliveredAt?.toISOString() ?? null,
-      };
-      g.gross += Number(o.collectAmount);
-      g.commission += Number(o.codCommission);
-      g.count++;
-      byCustomer.set(o.customerId, g);
+    // დაუფარავი დავალიანება (ნებისმიერი სტატუსი)
+    const chargeOrders = await prisma.order.findMany({
+      where: { chargeSettledAt: null, OR: [{ returnFee: { gt: 0 } }, { cancelFee: { gt: 0 } }] },
+      select: {
+        customerId: true,
+        returnFee: true,
+        cancelFee: true,
+        customer: { select: { name: true, phone: true } },
+      },
+    });
+
+    type Row = {
+      customerId: string;
+      name: string;
+      phone: string;
+      gross: number;
+      commission: number;
+      charges: number;
+      count: number;
+      oldest: string | null;
+    };
+    const map = new Map<string, Row>();
+    const get = (id: string, name: string, phone: string): Row => {
+      let r = map.get(id);
+      if (!r) {
+        r = { customerId: id, name, phone, gross: 0, commission: 0, charges: 0, count: 0, oldest: null };
+        map.set(id, r);
+      }
+      return r;
+    };
+
+    for (const o of codOrders) {
+      const r = get(o.customerId, o.customer.name, o.customer.phone);
+      r.gross += n(o.collectAmount);
+      r.commission += n(o.codCommission);
+      r.count++;
+      const d = o.deliveredAt?.toISOString() ?? null;
+      if (d && (!r.oldest || d < r.oldest)) r.oldest = d;
+    }
+    for (const o of chargeOrders) {
+      const r = get(o.customerId, o.customer.name, o.customer.phone);
+      r.charges += n(o.returnFee) + n(o.cancelFee);
     }
 
-    const rows = [...byCustomer.values()].map((g) => ({
-      ...g,
-      gross: Math.round(g.gross * 100) / 100,
-      commission: Math.round(g.commission * 100) / 100,
-      net: Math.round((g.gross - g.commission) * 100) / 100,
+    const rows = [...map.values()].map((r) => ({
+      ...r,
+      gross: Math.round(r.gross * 100) / 100,
+      commission: Math.round(r.commission * 100) / 100,
+      charges: Math.round(r.charges * 100) / 100,
+      net: Math.round((r.gross - r.commission - r.charges) * 100) / 100,
     }));
 
     const recent = await prisma.codRemittance.findMany({
@@ -65,9 +86,10 @@ export function GET() {
       history: recent.map((r) => ({
         id: r.id,
         customerName: r.customer.name,
-        gross: Number(r.grossAmount),
-        commission: Number(r.commission),
-        net: Number(r.netAmount),
+        gross: n(r.grossAmount),
+        commission: n(r.commission),
+        charges: n(r.chargesDeducted),
+        net: n(r.netAmount),
         orderCount: r.orderCount,
         method: r.method,
         createdAt: r.createdAt.toISOString(),
@@ -82,26 +104,31 @@ const paySchema = z.object({
   note: z.string().trim().max(200).optional(),
 });
 
-// გამგზავნისთვის COD-ის გადარიცხვა — ჯამავს ყველა შესაბამის შეკვეთას
 export function POST(req: Request) {
   return handle(async () => {
     const session = await requireRole("DISPATCHER");
     const { customerId, method, note } = paySchema.parse(await req.json());
 
-    const orders = await prisma.order.findMany({
-      where: {
-        customerId,
-        status: "DELIVERED",
-        collectAmount: { gt: 0 },
-        codRemittanceId: null,
-      },
+    const codOrders = await prisma.order.findMany({
+      where: { customerId, status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
       select: { id: true, collectAmount: true, codCommission: true },
     });
-    if (orders.length === 0) throw new ApiError(400, "გადასარიცხი COD არ არის");
+    const chargeOrders = await prisma.order.findMany({
+      where: {
+        customerId,
+        chargeSettledAt: null,
+        OR: [{ returnFee: { gt: 0 } }, { cancelFee: { gt: 0 } }],
+      },
+      select: { id: true, returnFee: true, cancelFee: true },
+    });
+    if (codOrders.length === 0 && chargeOrders.length === 0)
+      throw new ApiError(400, "ამ გამგზავნთან გასასწორებელი არაფერია");
 
-    const gross = Math.round(orders.reduce((s, o) => s + Number(o.collectAmount), 0) * 100) / 100;
-    const commission = Math.round(orders.reduce((s, o) => s + Number(o.codCommission), 0) * 100) / 100;
-    const net = Math.round((gross - commission) * 100) / 100;
+    const gross = Math.round(codOrders.reduce((s, o) => s + n(o.collectAmount), 0) * 100) / 100;
+    const commission = Math.round(codOrders.reduce((s, o) => s + n(o.codCommission), 0) * 100) / 100;
+    const charges =
+      Math.round(chargeOrders.reduce((s, o) => s + n(o.returnFee) + n(o.cancelFee), 0) * 100) / 100;
+    const net = Math.round((gross - commission - charges) * 100) / 100;
 
     const rem = await prisma.$transaction(async (tx) => {
       const r = await tx.codRemittance.create({
@@ -109,24 +136,34 @@ export function POST(req: Request) {
           customerId,
           grossAmount: gross,
           commission,
+          chargesDeducted: charges,
           netAmount: net,
-          orderCount: orders.length,
+          orderCount: codOrders.length,
           method,
           note,
           createdById: session.sub,
         },
       });
-      await tx.order.updateMany({
-        where: { id: { in: orders.map((o) => o.id) } },
-        data: { codRemittanceId: r.id },
-      });
+      if (codOrders.length)
+        await tx.order.updateMany({
+          where: { id: { in: codOrders.map((o) => o.id) } },
+          data: { codRemittanceId: r.id },
+        });
+      if (chargeOrders.length)
+        await tx.order.updateMany({
+          where: { id: { in: chargeOrders.map((o) => o.id) } },
+          data: { chargeSettledAt: new Date() },
+        });
       return r;
     });
 
     await notify(customerId, {
       type: "PAYMENT",
-      title: "COD გადმოგერიცხათ",
-      body: `${GEL(net)} (${orders.length} შეკვეთა, საკომისიო ${GEL(commission)})${method ? ` · ${method}` : ""}`,
+      title: net >= 0 ? "COD გადმოგერიცხათ" : "ანგარიშსწორება",
+      body:
+        net >= 0
+          ? `${GEL(net)}${charges > 0 ? ` (დავალიანება −${GEL(charges)})` : ""}${method ? ` · ${method}` : ""}`
+          : `დავალიანება ${GEL(-net)} გასწორდა`,
       data: { remittanceId: rem.id },
     });
 
