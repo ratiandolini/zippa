@@ -13,6 +13,7 @@ const orderBody = (over: Record<string, unknown> = {}) => ({
   pickup: { address: "თბილისი, რუსთაველის 10", lat: 41.72, lng: 44.79 },
   delivery: { address: "თბილისი, ვაკე 25", lat: 41.71, lng: 44.77 },
   weightKg: 3,
+  parcelValue: 50,
   paymentMethod: "CASH",
   ...over,
 });
@@ -42,6 +43,22 @@ describe("შეკვეთის შექმნა", () => {
     actAs(null);
     const r = await call(createOrder, { body: orderBody() });
     expect(r.status).toBe(401);
+  });
+
+  it("ნივთის ღირებულების გარეშე → 422", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs({ sub: c.id, role: "CUSTOMER", name: "c", email: "c@t.ge" });
+    const r = await call(createOrder, { body: orderBody({ parcelValue: undefined }) });
+    expect(r.status).toBe(422);
+  });
+
+  it("collectAmount (COD) ემატება codAmount-ს, parcelValue — არა", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id, { parcelValue: 500, collectAmount: 120 });
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    // totalPrice 5 (მიტანა) + 120 (ასაღები) = 125; parcelValue 500 არ ითვლება
+    expect(Number(db.codAmount)).toBe(125);
+    expect(Number(db.collectAmount)).toBe(120);
   });
 });
 

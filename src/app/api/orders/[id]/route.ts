@@ -87,11 +87,16 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     }
     if (data.description !== undefined) upd.description = data.description;
     if (data.parcelValue !== undefined) upd.parcelValue = data.parcelValue;
+    if (data.collectAmount !== undefined) upd.collectAmount = data.collectAmount ?? 0;
     if (data.payerSide) upd.payerSide = data.payerSide;
 
-    // ფასის/ზონის/ვადის თავიდან გამოთვლა, თუ შეიცვალა მისამართი, წონა ან გადახდის მეთოდი
+    // ფასის/ზონის/ვადის თავიდან გამოთვლა, თუ შეიცვალა მისამართი, წონა, გადახდა ან ასაღები თანხა
     const priceAffecting =
-      data.pickup || data.delivery || data.weightKg != null || data.paymentMethod;
+      data.pickup ||
+      data.delivery ||
+      data.weightKg != null ||
+      data.paymentMethod ||
+      data.collectAmount !== undefined;
 
     if (data.weightKg != null) upd.weightKg = data.weightKg;
     if (data.paymentMethod) upd.paymentMethod = data.paymentMethod;
@@ -101,12 +106,10 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       const delivery = data.delivery ?? { lat: order.deliveryLat, lng: order.deliveryLng };
       const weightKg = data.weightKg ?? Number(order.weightKg);
       const paymentMethod = data.paymentMethod ?? order.paymentMethod;
-      const parcelValue =
-        data.parcelValue !== undefined
-          ? data.parcelValue
-          : order.parcelValue == null
-            ? null
-            : Number(order.parcelValue);
+      const collectAmount =
+        data.collectAmount !== undefined
+          ? (data.collectAmount ?? 0)
+          : Number(order.collectAmount);
 
       const [pickupCityId, deliveryCityId] = await Promise.all([
         resolveCityId(pickup),
@@ -130,7 +133,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       upd.codFee = price.codFee;
       upd.totalPrice = price.totalPrice;
       upd.driverFee = price.driverFee;
-      upd.codAmount = paymentMethod === "CASH" ? price.totalPrice + (parcelValue ?? 0) : 0;
+      upd.codAmount = (paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
       upd.estimatedDeliveryAt = eta;
     }
 

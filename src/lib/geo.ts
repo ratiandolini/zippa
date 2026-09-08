@@ -38,24 +38,30 @@ interface NominatimAddress {
 }
 
 /**
- * გრძელი Nominatim display_name → მოკლე, წასაკითხი მისამართი.
- * მაგ. „ვაჟა-ფშაველას გამზირი, საბურთალო, თბილისი" ნაცვლად 8-ნაწილიანი სტრიქონისა.
+ * გრძელი Nominatim display_name → მოკლე მისამართი: „ქუჩა ნომერი, ქალაქი".
+ * მაგ. „ვაჟა-ფშაველას გამზირი 5, თბილისი".
  */
 export function shortAddress(addr: NominatimAddress | undefined, fallbackDisplayName: string): string {
   if (addr) {
     const street = addr.road || addr.pedestrian;
     const line1 = street
       ? [street, addr.house_number].filter(Boolean).join(" ")
-      : addr.neighbourhood || addr.suburb || addr.quarter;
-    const area = addr.suburb || addr.quarter || addr.city_district || addr.neighbourhood;
+      : addr.neighbourhood || addr.suburb || addr.quarter || addr.village;
     const city = addr.city || addr.town || addr.village || addr.municipality;
-    const parts = [line1, area && area !== line1 ? area : null, city && city !== area ? city : null]
-      .filter(Boolean)
-      .slice(0, 3);
+    const parts = [line1, city && city !== line1 ? city : null].filter(Boolean);
     if (parts.length) return parts.join(", ");
   }
-  // fallback: display_name-ის პირველი 3 სეგმენტი
-  return fallbackDisplayName.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 3).join(", ");
+  return compactAddress(fallbackDisplayName);
+}
+
+/** ნებისმიერი (უკვე შენახული) მისამართის სტრიქონი → მოკლე: პირველი 2 მნიშვნელოვანი სეგმენტი. */
+export function compactAddress(s: string): string {
+  const drop = /^\d{4,}$|საქართველო|georgia|postal|რაიონი|მუნიციპალიტეტი/i;
+  const segs = s
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x && !drop.test(x));
+  return segs.slice(0, 2).join(", ") || s.trim();
 }
 
 /** მისამართის ძებნა (autocomplete). ბრაუზერიდანაც და სერვერიდანაც. */

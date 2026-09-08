@@ -55,8 +55,9 @@ export function POST(req: Request) {
       deliveryCityId,
     });
 
+    const collectAmount = data.collectAmount ?? 0;
     const codAmount =
-      data.paymentMethod === "CASH" ? price.totalPrice + (data.parcelValue ?? 0) : 0;
+      (data.paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
     const eta = await estimateDelivery(price.zone);
 
     const order = await prisma.order.create({
@@ -87,6 +88,7 @@ export function POST(req: Request) {
         weightKg: data.weightKg,
         description: data.description,
         parcelValue: data.parcelValue,
+        collectAmount,
 
         distanceKm: price.distanceKm,
         deliveryPrice: price.deliveryPrice,

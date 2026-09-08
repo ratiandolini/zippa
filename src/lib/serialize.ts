@@ -50,6 +50,7 @@ export function serializeOrder(o: OrderWith) {
     weightKg: num(o.weightKg),
     description: o.description,
     parcelValue: o.parcelValue == null ? null : num(o.parcelValue),
+    collectAmount: num(o.collectAmount),
 
     distanceKm: num(o.distanceKm),
     price: {

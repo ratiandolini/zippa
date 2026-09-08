@@ -7,6 +7,7 @@ import { POST as payout } from "@/app/api/drivers/[id]/payout/route";
 import { GET as driverDetail } from "@/app/api/drivers/[id]/route";
 import { POST as settle } from "@/app/api/driver/settlement/route";
 import { PATCH as reviewSettlement } from "@/app/api/settlements/[id]/route";
+import { GET as payroll } from "@/app/api/dispatch/payroll/route";
 
 const body = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მა რი", phone: "+995599111111" },
@@ -14,6 +15,7 @@ const body = (over: Record<string, unknown> = {}) => ({
   pickup: { address: "თბილისი, ა 1", lat: 41.72, lng: 44.79 },
   delivery: { address: "თბილისი, ბ 2", lat: 41.71, lng: 44.77 },
   weightKg: 3,
+  parcelValue: 50,
   paymentMethod: "CASH",
   ...over,
 });
@@ -77,6 +79,32 @@ describe("payout (დისპეჩერი)", () => {
     const r = await call(driverDetail, { params: { id: drv.profile.id } });
     expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(6);
     expect((r.body.driver as { unsettledEarningsCount: number }).unsettledEarningsCount).toBe(2);
+  });
+});
+
+describe("ანგარიშსწორების ცხრილი (payroll)", () => {
+  it("აჯამებს ანაზღაურებას, კომპანიის წილს და გადახდას პერიოდში", async () => {
+    const { drv, disp } = await deliverN(2, "CARD"); // 2 მიტანა, თითო driverFee 3, total 5
+    actAs(session(disp));
+    await call(payout, { params: { id: drv.profile.id }, body: { amount: 4 } });
+
+    const r = await call(payroll, { query: { period: "month" } });
+    expect(r.status).toBe(200);
+    const b = r.body as { rows: Record<string, number>[]; totals: Record<string, number> };
+    const row = b.rows.find((x) => x.driverId === (drv.profile.id as never));
+    expect(row).toBeTruthy();
+    expect(row!.deliveries).toBe(2);
+    expect(row!.earnedInPeriod).toBe(6); // 2 × 3
+    expect(row!.companyInPeriod).toBe(4); // 2 × (5 − 3)
+    expect(row!.paidInPeriod).toBe(4);
+    expect(row!.unpaidEarnings).toBe(2); // 6 − 4
+    expect(b.totals.earned).toBe(6);
+  });
+
+  it("არა-დისპეჩერი → 403", async () => {
+    actAs(session(await makeUser("DRIVER")));
+    const r = await call(payroll, { query: { period: "week" } });
+    expect(r.status).toBe(403);
   });
 });
 

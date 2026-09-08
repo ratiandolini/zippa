@@ -7,7 +7,7 @@ const schema = z.object({
   delivery: z.object({ lat: z.number(), lng: z.number() }),
   weightKg: z.number().positive().max(1000),
   paymentMethod: z.enum(["CASH", "CARD"]).default("CASH"),
-  parcelValue: z.number().nonnegative().optional(),
+  collectAmount: z.number().nonnegative().optional(),
 });
 
 export function POST(req: Request) {
@@ -17,7 +17,7 @@ export function POST(req: Request) {
     const deliveryCityId = await resolveCityId(data.delivery);
     const price = await calculatePrice({ ...data, deliveryCityId });
     const codAmount =
-      data.paymentMethod === "CASH" ? price.totalPrice + (data.parcelValue ?? 0) : 0;
+      (data.paymentMethod === "CASH" ? price.totalPrice : 0) + (data.collectAmount ?? 0);
     const eta = await estimateDelivery(price.zone);
     // driverFee არ ვუბრუნებთ კლიენტს
     return ok({

@@ -38,22 +38,16 @@ export default function NewOrderPage() {
   const [weight, setWeight] = useState("");
   const [description, setDescription] = useState("");
   const [parcelValue, setParcelValue] = useState("");
+  const [collectAmount, setCollectAmount] = useState("");
   const payment = "CASH" as const;
 
-  const { senders, recipients } = useContacts();
+  const { senders } = useContacts();
 
   function fillSender(c: SavedContact) {
     setSenderName(c.name);
     setSenderPhone(c.phone);
     if (c.lat != null && c.lng != null) {
       setPickup({ address: c.address, lat: c.lat, lng: c.lng });
-    }
-  }
-  function fillRecipient(c: SavedContact) {
-    setRecipientName(c.name);
-    setRecipientPhone(c.phone);
-    if (c.lat != null && c.lng != null) {
-      setDelivery({ address: c.address, lat: c.lat, lng: c.lng });
     }
   }
 
@@ -83,7 +77,7 @@ export default function NewOrderPage() {
           delivery: { lat: delivery.lat, lng: delivery.lng },
           weightKg: weightNum,
           paymentMethod: payment,
-          parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
+          collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : undefined,
         });
         setQuote(q);
       } catch {
@@ -92,7 +86,7 @@ export default function NewOrderPage() {
         setQuoting(false);
       }
     }, 350);
-  }, [ready, pickup.lat, pickup.lng, delivery.lat, delivery.lng, weightNum, payment, parcelValue]);
+  }, [ready, pickup.lat, pickup.lng, delivery.lat, delivery.lng, weightNum, payment, collectAmount]);
 
   async function submit() {
     setError(null);
@@ -112,6 +106,7 @@ export default function NewOrderPage() {
         weightKg: weightNum,
         description: description || undefined,
         parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
+        collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : undefined,
         paymentMethod: payment,
       });
       router.push(`/app/track?id=${order.id}`);
@@ -133,6 +128,7 @@ export default function NewOrderPage() {
     senderPhone.trim() &&
     recipientName.trim() &&
     recipientPhone.trim() &&
+    parseFloat(parcelValue) > 0 &&
     !submitting;
 
   return (
@@ -179,11 +175,6 @@ export default function NewOrderPage() {
                   error={fe("delivery.address")}
                 />
               </div>
-              {recipients.length > 0 && (
-                <div className="sm:col-span-2">
-                  <ContactChips contacts={recipients} onPick={fillRecipient} />
-                </div>
-              )}
               <Text label="მიმღები" value={recipientName} onChange={setRecipientName} placeholder="სახელი გვარი" error={fe("recipient.name")} />
               <Text label="ტელეფონი" value={recipientPhone} onChange={setRecipientPhone} placeholder="5XX XX XX XX" error={fe("recipient.phone")} />
             </CardContent>
@@ -209,11 +200,20 @@ export default function NewOrderPage() {
                 label="ნივთის ღირებულება, ₾"
                 value={parcelValue}
                 onChange={setParcelValue}
-                placeholder="არასავალდებულო"
                 type="number"
                 step="1"
-                hint="ნაღდით გადახდისას კურიერი მიმღებისგან აიღებს მიტანის საფასურს + ამ თანხას. დაზღვევის ლიმიტიც ამ ღირებულებით განისაზღვრება."
+                hint="რამდენად აფასებთ ამანათს. ეს თანხა განსაზღვრავს დაზღვევის ლიმიტს დაზიანების ან დაკარგვის შემთხვევაში. მიმღები ამას არ იხდის."
                 error={fe("parcelValue")}
+              />
+              <Text
+                label="მიმღებისგან ასაღები თანხა, ₾"
+                value={collectAmount}
+                onChange={setCollectAmount}
+                placeholder="0"
+                type="number"
+                step="1"
+                hint="თუ მიმღებმა ნივთში ნაღდი უნდა გადაიხადოს (მაღაზიის შეკვეთა), მიუთითეთ თანხა. კურიერი ამ თანხას მიგიტანთ. სხვა შემთხვევაში დატოვეთ ცარიელი."
+                error={fe("collectAmount")}
               />
             </CardContent>
           </Card>
@@ -265,7 +265,10 @@ export default function NewOrderPage() {
                   )}
                   {payment === "CASH" && (
                     <p className="text-xs text-muted-foreground">
-                      კურიერი ნაღდად აიღებს {GEL(quote.codAmount)}
+                      კურიერი მიმღებისგან აიღებს {GEL(quote.codAmount)}
+                      {collectAmount.trim() && parseFloat(collectAmount) > 0
+                        ? ` (მიტანა ${GEL(quote.totalPrice)} + ნივთი ${GEL(parseFloat(collectAmount))})`
+                        : ""}
                     </p>
                   )}
                 </>

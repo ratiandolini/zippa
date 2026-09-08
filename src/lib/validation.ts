@@ -76,7 +76,8 @@ export const createOrderSchema = z.object({
   delivery: point.extend({ note: z.string().trim().max(200).optional() }),
   weightKg: z.number().positive("წონა 0-ზე მეტი").max(500),
   description: z.string().trim().max(400).optional(),
-  parcelValue: z.number().nonnegative().max(100000).optional(),
+  parcelValue: z.number().positive("მიუთითე ნივთის ღირებულება").max(100000),
+  collectAmount: z.number().nonnegative().max(100000).optional(),
   paymentMethod: z.enum(["CASH", "CARD"]).default("CASH"),
   payerSide: z.enum(["SENDER", "RECIPIENT"]).default("SENDER"),
 });
@@ -99,6 +100,7 @@ export const editOrderSchema = z
     weightKg: z.number().positive("წონა 0-ზე მეტი").max(500),
     description: z.string().trim().max(400).nullable(),
     parcelValue: z.number().nonnegative().max(100000).nullable(),
+    collectAmount: z.number().nonnegative().max(100000).nullable(),
     paymentMethod: z.enum(["CASH", "CARD"]),
     payerSide: z.enum(["SENDER", "RECIPIENT"]),
   })

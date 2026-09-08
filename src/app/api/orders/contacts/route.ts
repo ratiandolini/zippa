@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUser, handle, ok } from "@/lib/api";
+import { compactAddress } from "@/lib/geo";
 
 interface Contact {
   name: string;
@@ -46,7 +47,7 @@ export function GET() {
         if (ex) {
           ex.count++;
           if (!ex.lat && r.lat) {
-            ex.address = r.address;
+            ex.address = compactAddress(r.address);
             ex.lat = r.lat;
             ex.lng = r.lng;
           }
@@ -54,7 +55,7 @@ export function GET() {
           map.set(key, {
             name: r.name,
             phone: r.phone,
-            address: r.address,
+            address: compactAddress(r.address),
             lat: r.lat ?? null,
             lng: r.lng ?? null,
             count: 1,

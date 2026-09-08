@@ -99,10 +99,13 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         </a>
         <span>{order.weightKg} კგ</span>
         <span>
-          {order.paymentMethod === "CASH"
-            ? `ნაღდად ${GEL(order.codAmount)}`
+          {order.codAmount > 0
+            ? `ასაღები ნაღდი ${GEL(order.codAmount)}`
             : "გადახდილია"}
         </span>
+        {order.collectAmount > 0 && (
+          <span className="text-accent">მათ შორის ნივთში {GEL(order.collectAmount)}</span>
+        )}
       </div>
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">

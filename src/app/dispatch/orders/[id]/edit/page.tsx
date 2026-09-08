@@ -63,6 +63,9 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
   const [parcelValue, setParcelValue] = useState(
     order.parcelValue == null ? "" : String(order.parcelValue),
   );
+  const [collectAmount, setCollectAmount] = useState(
+    order.collectAmount ? String(order.collectAmount) : "",
+  );
   const payment = order.paymentMethod;
 
   const [busy, setBusy] = useState(false);
@@ -73,13 +76,14 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
   const addressesReady = pickup.lat != null && delivery.lat != null;
 
   useEffect(() => {
-    const addrChanged =
+    const changed =
       pickup.lat !== order.pickup.lat ||
       delivery.lat !== order.delivery.lat ||
       weightNum !== order.weightKg ||
-      payment !== order.paymentMethod;
-    setWarn(addrChanged ? "მისამართის/წონის/გადახდის ცვლილება ფასს და ვადას თავიდან გამოთვლის." : null);
-  }, [pickup.lat, delivery.lat, weightNum, payment, order]);
+      payment !== order.paymentMethod ||
+      (collectAmount.trim() ? parseFloat(collectAmount) : 0) !== order.collectAmount;
+    setWarn(changed ? "მისამართის, წონის, გადახდის ან ასაღები თანხის შეცვლა ფასსა და ვადას თავიდან გამოთვლის." : null);
+  }, [pickup.lat, delivery.lat, weightNum, payment, collectAmount, order]);
 
   async function save() {
     setError(null);
@@ -101,6 +105,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
         weightKg: weightNum,
         description: description.trim() || null,
         parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : null,
+        collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : 0,
         paymentMethod: payment,
       });
       onDone();
@@ -144,7 +149,8 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="წონა, კგ (მაგ. 0.5)" value={weight} onChange={setWeight} type="number" />
-          <Field label="ნივთის ღირებულება, ₾ (ასაღები მიმღებისგან)" value={parcelValue} onChange={setParcelValue} type="number" />
+          <Field label="ნივთის ღირებულება, ₾ (დაზღვევა)" value={parcelValue} onChange={setParcelValue} type="number" />
+          <Field label="მიმღებისგან ასაღები, ₾ (COD)" value={collectAmount} onChange={setCollectAmount} type="number" />
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />
           </div>

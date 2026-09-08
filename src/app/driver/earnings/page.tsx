@@ -28,7 +28,7 @@ export default function EarningsPage() {
     setMsg(null);
     try {
       await api("/api/driver/settlement", "POST", { amount: driver.cashOnHand });
-      setMsg("გამოცხადდა — დისპეჩერის დადასტურების მოლოდინში");
+      setMsg("დისპეჩერს ვაცნობეთ — ელოდება დადასტურებას");
       mutate();
       mutateSettlements();
     } catch (e) {
@@ -47,19 +47,31 @@ export default function EarningsPage() {
       ) : (
         <>
           <div className="mb-4 grid gap-4 sm:grid-cols-3">
-            <Stat label="კომპანია გმართებს" value={GEL(driver?.unpaidEarnings ?? 0)} sub="დარიცხული ანაზღაურება" />
-            <Stat label="შენ გმართებ კომპანიას" value={GEL(driver?.cashOnHand ?? 0)} sub="შეგროვილი ნაღდი, ჩასაბარებელი" />
-            <Stat label="სულ მიტანები" value={String(driver?.totalDeliveries ?? 0)} />
+            <Stat label="მისაღები ანაზღაურება" value={GEL(driver?.unpaidEarnings ?? 0)} sub="კომპანია გადმოგირიცხავს" />
+            <Stat label="ჩასაბარებელი ნაღდი" value={GEL(driver?.cashOnHand ?? 0)} sub="მიმღებებისგან აღებული, კომპანიას" />
+            <Stat label="სულ მიტანა" value={String(driver?.totalDeliveries ?? 0)} />
           </div>
-          <div className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-            წმინდა ბალანსი:{" "}
-            <span className="font-semibold tabular-nums">
-              {GEL((driver?.unpaidEarnings ?? 0) - (driver?.cashOnHand ?? 0))}
-            </span>{" "}
-            <span className="text-muted-foreground">
-              (ანაზღაურება − ჩასაბარებელი ნაღდი). დადებითი = კომპანია გიხდის, უარყოფითი = შენ აბარებ.
-            </span>
-          </div>
+          {(() => {
+            const net = (driver?.unpaidEarnings ?? 0) - (driver?.cashOnHand ?? 0);
+            return (
+              <div className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+                {net >= 0 ? (
+                  <>
+                    ანგარიშსწორებისას მიიღებ:{" "}
+                    <span className="font-semibold tabular-nums">{GEL(net)}</span>
+                  </>
+                ) : (
+                  <>
+                    ანგარიშსწორებისას ჩააბარებ:{" "}
+                    <span className="font-semibold tabular-nums">{GEL(-net)}</span>
+                  </>
+                )}
+                <span className="ml-1 text-muted-foreground">
+                  (მისაღები ანაზღაურება მინუს ჩასაბარებელი ნაღდი)
+                </span>
+              </div>
+            );
+          })()}
         </>
       )}
 
@@ -68,7 +80,7 @@ export default function EarningsPage() {
           <CardContent className="p-5">
             <div className="font-medium">ნაღდის ჩაბარება — {GEL(pendingSettlement.amount)}</div>
             <p className="text-sm text-muted-foreground">
-              დისპეჩერის დადასტურების მოლოდინში. როცა დაადასტურებს, „შენ გმართებ კომპანიას" ამ თანხით შემცირდება.
+              დისპეჩერს ვაცნობეთ. როგორც კი დაადასტურებს ფულის მიღებას, ეს თანხა „ჩასაბარებელი ნაღდიდან" ჩამოგეჭრება.
             </p>
             {msg && <p className="mt-1 text-xs text-muted-foreground">{msg}</p>}
           </CardContent>
@@ -79,14 +91,14 @@ export default function EarningsPage() {
           <Card className="mb-6 border-amber-200 bg-amber-50/50">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
               <div>
-                <div className="font-medium">ნაღდი ფულის ჩაბარება</div>
+                <div className="font-medium">ნაღდის ჩაბარება</div>
                 <p className="text-sm text-muted-foreground">
-                  შენთან დაგროვდა {GEL(driver.cashOnHand)}. ჩააბარე დისპეჩერს, შემდეგ მონიშნე აქ — დისპეჩერი დაადასტურებს.
+                  შენთან დაგროვდა {GEL(driver.cashOnHand)}. გადაეცი დისპეჩერს და დააჭირე ღილაკს — დისპეჩერი დაადასტურებს მიღებას.
                 </p>
                 {msg && <p className="mt-1 text-xs text-muted-foreground">{msg}</p>}
               </div>
               <Button size="sm" variant="outline" disabled={busy} onClick={settle}>
-                {busy ? "…" : "ჩაბარების გამოცხადება"}
+                {busy ? "…" : "ნაღდი ჩავაბარე"}
               </Button>
             </CardContent>
           </Card>

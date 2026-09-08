@@ -28,6 +28,12 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
       _sum: { driverAmount: true },
       _count: true,
     });
+    const earnings = await prisma.driverEarning.findMany({
+      where: { driverId: d.id },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: { order: { select: { trackingNumber: true, status: true } } },
+    });
     const reviews = await prisma.review.findMany({
       where: { driverId: d.id },
       orderBy: { createdAt: "desc" },
@@ -70,6 +76,15 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
           note: s.note,
           status: s.status,
           createdAt: s.createdAt.toISOString(),
+        })),
+        earnings: earnings.map((e) => ({
+          id: e.id,
+          trackingNumber: e.order?.trackingNumber ?? null,
+          orderStatus: e.order?.status ?? null,
+          driverAmount: Number(e.driverAmount),
+          collectedInCash: e.collectedInCash,
+          isSettled: e.isSettled,
+          createdAt: e.createdAt.toISOString(),
         })),
         reviews: reviews.map((r) => ({
           id: r.id,
