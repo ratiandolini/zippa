@@ -151,6 +151,9 @@ function Detail({ id }: { id: string }) {
               <div>
                 <div className="text-xs text-muted-foreground">მიტანა</div>
                 <div>{order.delivery.address}</div>
+                {order.delivery.note && (
+                  <div className="mt-1 text-xs text-muted-foreground">შენიშვნა: {order.delivery.note}</div>
+                )}
               </div>
               {order.driverName && (
                 <div>

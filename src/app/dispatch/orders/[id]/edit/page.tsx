@@ -60,6 +60,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
   });
   const [weight, setWeight] = useState(String(order.weightKg));
   const [description, setDescription] = useState(order.description ?? "");
+  const [courierNote, setCourierNote] = useState(order.delivery.note ?? "");
   const [parcelValue, setParcelValue] = useState(
     order.parcelValue == null ? "" : String(order.parcelValue),
   );
@@ -101,7 +102,12 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
         sender: { name: senderName, phone: senderPhone },
         recipient: { name: recipientName, phone: recipientPhone },
         pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
-        delivery: { address: delivery.address, lat: delivery.lat, lng: delivery.lng },
+        delivery: {
+          address: delivery.address,
+          lat: delivery.lat,
+          lng: delivery.lng,
+          note: courierNote.trim() || undefined,
+        },
         weightKg: weightNum,
         description: description.trim() || null,
         parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : null,
@@ -153,6 +159,9 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
           <Field label="მიმღებისგან ასაღები თანხა, ₾" value={collectAmount} onChange={setCollectAmount} type="number" />
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="შენიშვნა კურიერს" value={courierNote} onChange={setCourierNote} />
           </div>
           <div className="sm:col-span-2 text-sm text-muted-foreground">
             გადახდა: {PAYMENT_METHOD_LABEL[payment]}

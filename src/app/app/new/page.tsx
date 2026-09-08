@@ -39,6 +39,7 @@ export default function NewOrderPage() {
   const [delivery, setDelivery] = useState<AddressValue>(empty);
   const [weight, setWeight] = useState("");
   const [description, setDescription] = useState("");
+  const [courierNote, setCourierNote] = useState("");
   const [parcelValue, setParcelValue] = useState("");
   const [collectAmount, setCollectAmount] = useState("");
   const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("SENDER");
@@ -108,7 +109,7 @@ export default function NewOrderPage() {
           address: delivery.address,
           lat: delivery.lat,
           lng: delivery.lng,
-          note: undefined,
+          note: courierNote.trim() || undefined,
         },
         weightKg: weightNum,
         description: description || undefined,
@@ -204,6 +205,15 @@ export default function NewOrderPage() {
                 error={fe("weightKg")}
               />
               <Text label="აღწერა" value={description} onChange={setDescription} placeholder="მაგ. დოკუმენტები, ტანსაცმელი" />
+              <div className="sm:col-span-2">
+                <Text
+                  label="შენიშვნა კურიერს"
+                  value={courierNote}
+                  onChange={setCourierNote}
+                  placeholder="მაგ. სადარბაზოს კოდი 1234, მე-4 სართული, დარეკე ჩამოსვლამდე"
+                  hint="არასავალდებულო — მიტანის დეტალები"
+                />
+              </div>
               <Text
                 label="ნივთის ღირებულება, ₾ *"
                 value={parcelValue}

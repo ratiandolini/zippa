@@ -136,6 +136,12 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         />
       </div>
 
+      {order.delivery.note && (
+        <div className="mt-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs text-blue-900">
+          <span className="font-medium">შენიშვნა:</span> {order.delivery.note}
+        </div>
+      )}
+
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>მიმღები: {order.recipient.name}</span>
         <a href={`tel:${order.recipient.phone}`} className="inline-flex items-center gap-1 text-accent">

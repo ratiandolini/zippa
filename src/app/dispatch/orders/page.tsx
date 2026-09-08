@@ -287,6 +287,9 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
         <span className="truncate">{streetOf(order.delivery.address)}</span>
       </div>
+      {order.delivery.note && (
+        <div className="mt-1 text-[11px] text-blue-700">📝 {order.delivery.note}</div>
+      )}
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
         <span>{order.driverName ?? "კურიერი არ ჰყავს"}</span>
         <span>{GEL(order.price.total)}</span>
