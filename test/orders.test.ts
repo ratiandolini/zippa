@@ -648,3 +648,49 @@ describe("დაბრუნების მოთხოვნა", () => {
     expect((await call(reqReturn, { params: { id: o.id }, body: { reason: "hack" } })).status).toBe(403);
   });
 });
+
+describe("მარშრუტად მინიჭება (batch)", () => {
+  it("რამდენიმე PENDING → ერთ კურიერზე; კურიერი BUSY; ყველა ASSIGNED", async () => {
+    const { POST: assignBatch } = await import("@/app/api/orders/assign-batch/route");
+    const c = await makeUser("CUSTOMER");
+    const o1 = await newOrder(c.id);
+    const o2 = await newOrder(c.id);
+    const o3 = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+
+    const r = await call(assignBatch, { body: { orderIds: [o1.id, o2.id, o3.id], driverId: drv.profile.id } });
+    expect(r.status).toBe(200);
+    expect((r.body as { assigned: number }).assigned).toBe(3);
+
+    for (const o of [o1, o2, o3]) {
+      const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+      expect(db.status).toBe("ASSIGNED");
+      expect(db.driverId).toBe(drv.profile.id);
+      expect(db.assignedAt).toBeTruthy();
+    }
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.status).toBe("BUSY");
+  });
+
+  it("თუ ერთი შეკვეთა უკვე ჩაბარებულია → 409, არცერთი არ იცვლება", async () => {
+    const { POST: assignBatch } = await import("@/app/api/orders/assign-batch/route");
+    const c = await makeUser("CUSTOMER");
+    const o1 = await newOrder(c.id);
+    const o2 = await newOrder(c.id);
+    await prisma.order.update({ where: { id: o2.id }, data: { status: "DELIVERED" } });
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    expect((await call(assignBatch, { body: { orderIds: [o1.id, o2.id], driverId: drv.profile.id } })).status).toBe(409);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o1.id } })).status).toBe("PENDING");
+  });
+
+  it("არა-დისპეჩერი → 403", async () => {
+    const { POST: assignBatch } = await import("@/app/api/orders/assign-batch/route");
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(c));
+    expect((await call(assignBatch, { body: { orderIds: [o.id], driverId: drv.profile.id } })).status).toBe(403);
+  });
+});

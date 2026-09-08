@@ -42,14 +42,44 @@ export default function OrdersBoard() {
   const { orders, isLoading, mutate } = useOrders("", 10000);
   const [q, setQ] = useState("");
   const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const [routeMode, setRouteMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const filtered = orders.filter(
     (o) => matches(o, q) && (!unassignedOnly || !o.driverId),
   );
 
+  function togglePick(id: string) {
+    setPicked((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+  function exitRouteMode() {
+    setRouteMode(false);
+    setPicked(new Set());
+  }
+
   return (
     <>
-      <PageHeader title="შეკვეთები" description="სტატუსების დაფა · კურიერის მინიჭება" />
+      <PageHeader
+        title="შეკვეთები"
+        description="სტატუსების დაფა · კურიერის მინიჭება"
+        action={
+          <button
+            onClick={() => (routeMode ? exitRouteMode() : setRouteMode(true))}
+            className={
+              "rounded-lg border px-3 py-1.5 text-sm font-medium " +
+              (routeMode
+                ? "border-accent bg-accent/10 text-accent"
+                : "border-border text-muted-foreground")
+            }
+          >
+            {routeMode ? "მარშრუტის დახურვა" : "მარშრუტად მინიჭება"}
+          </button>
+        }
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
@@ -73,12 +103,18 @@ export default function OrdersBoard() {
         )}
       </div>
 
+      {routeMode && (
+        <p className="mb-4 rounded-lg bg-accent/[0.06] px-4 py-2 text-sm text-muted-foreground">
+          მონიშნე „მოლოდინში" სვეტში შეკვეთები რომლებიც ერთ კურიერს უნდა მიანიჭო — ერთად, ერთ მარშრუტად.
+        </p>
+      )}
+
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {columns.map((col) => {
           const all = filtered.filter((o) => col.key.includes(o.status));
-          // „დასრულებული" სვეტი დროთა განმავლობაში იზრდება — ვჭრით ბოლო 20-ზე (ძებნა ყველას ხედავს)
           const capped = col.done && !q ? all.slice(0, 20) : all;
+          const selectable = routeMode && col.key.includes("PENDING");
           return (
             <div key={col.title} className="rounded-xl bg-muted/50 p-3">
               <div className="mb-3 flex items-center justify-between px-1">
@@ -86,9 +122,34 @@ export default function OrdersBoard() {
                 <span className="text-xs text-muted-foreground">{all.length}</span>
               </div>
               <div className="max-h-[70vh] space-y-2 overflow-y-auto">
-                {capped.map((o) => (
-                  <OrderCard key={o.id} order={o} onChange={mutate} />
-                ))}
+                {capped.map((o) =>
+                  selectable ? (
+                    <label
+                      key={o.id}
+                      className={
+                        "flex cursor-pointer gap-2 rounded-lg border p-2 " +
+                        (picked.has(o.id) ? "border-accent bg-accent/5" : "border-border bg-card")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={picked.has(o.id)}
+                        onChange={() => togglePick(o.id)}
+                      />
+                      <div className="min-w-0 flex-1 text-xs">
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {o.trackingNumber}
+                        </div>
+                        <div className="truncate">
+                          {streetOf(o.pickup.address)} → {streetOf(o.delivery.address)}
+                        </div>
+                      </div>
+                    </label>
+                  ) : (
+                    <OrderCard key={o.id} order={o} onChange={mutate} />
+                  ),
+                )}
                 {capped.length < all.length && (
                   <p className="px-1 pt-1 text-[11px] text-muted-foreground">
                     +{all.length - capped.length} ძველი — მოძებნე ნომრით ან მისამართით
@@ -99,7 +160,82 @@ export default function OrdersBoard() {
           );
         })}
       </div>
+
+      {routeMode && picked.size > 0 && (
+        <RouteAssignBar
+          count={picked.size}
+          orderIds={[...picked]}
+          onDone={() => {
+            exitRouteMode();
+            mutate();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function RouteAssignBar({
+  count,
+  orderIds,
+  onDone,
+}: {
+  count: number;
+  orderIds: string[];
+  onDone: () => void;
+}) {
+  const [drivers, setDrivers] = useState<DriverListItem[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    jsonFetcher<{ drivers: DriverListItem[] }>("/api/drivers")
+      .then((d) => {
+        const rank = (s: string) => (s === "AVAILABLE" ? 0 : s === "BUSY" ? 1 : 2);
+        setDrivers([...d.drivers].sort((a, b) => rank(a.status) - rank(b.status) || a.activeOrders - b.activeOrders));
+      })
+      .catch(() => setDrivers([]));
+  }, []);
+
+  async function assign(driverId: string) {
+    setBusy(driverId);
+    setErr(null);
+    try {
+      await api("/api/orders/assign-batch", "POST", { orderIds, driverId });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 p-3 backdrop-blur">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3">
+        <span className="text-sm font-medium">{count} შეკვეთა არჩეული</span>
+        {!open ? (
+          <Button size="sm" onClick={() => setOpen(true)}>
+            მიანიჭე კურიერს
+          </Button>
+        ) : (
+          <div className="flex flex-1 flex-wrap gap-1.5">
+            {drivers === null && <span className="text-xs text-muted-foreground">იტვირთება…</span>}
+            {drivers?.map((d) => (
+              <button
+                key={d.id}
+                disabled={busy != null}
+                onClick={() => assign(d.id)}
+                className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                {busy === d.id ? "…" : `${d.name} · ${d.activeOrders} აქტ.`}
+              </button>
+            ))}
+          </div>
+        )}
+        {err && <span className="text-xs text-destructive">{err}</span>}
+      </div>
+    </div>
   );
 }
 
