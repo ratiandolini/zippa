@@ -308,11 +308,11 @@ export default function NewOrderPage() {
                       {quote.codCommission > 0 && (
                         <>
                           <div className="flex justify-between">
-                            <span>Zippa-ს COD საკომისიო</span>
+                            <span>ჩვენი საკომისიო (თანხის აღებაზე)</span>
                             <span className="tabular-nums">−{GEL(quote.codCommission)}</span>
                           </div>
                           <div className="flex justify-between font-medium text-foreground">
-                            <span>თქვენ მიიღებთ (COD)</span>
+                            <span>თქვენ დაგერიცხებათ</span>
                             <span className="tabular-nums">{GEL(quote.codNet)}</span>
                           </div>
                         </>

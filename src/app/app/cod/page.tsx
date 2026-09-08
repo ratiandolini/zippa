@@ -19,7 +19,10 @@ export default function CustomerCodPage() {
       >
         <ArrowLeft className="h-4 w-4" /> მთავარი
       </Link>
-      <PageHeader title="COD" description="მიმღებებისგან შეგროვილი თანხა, რომელიც გერგებათ" />
+      <PageHeader
+        title="მიღებული თანხები"
+        description="კურიერი მიმღებისგან იღებს ამანათის ფასს, ჩვენ კი გადმოგრიცხავთ — საკომისიოს გამოკლებით"
+      />
 
       {!cod ? (
         <p className="text-sm text-muted-foreground">იტვირთება…</p>
@@ -27,13 +30,13 @@ export default function CustomerCodPage() {
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
             <Stat
-              label={cod.outstandingNet >= 0 ? "მისაღები (წმინდა)" : "დავალიანება"}
+              label={cod.outstandingNet >= 0 ? "მოსალოდნელი ჩარიცხვა" : "თქვენი დავალიანება"}
               value={GEL(Math.abs(cod.outstandingNet))}
-              sub={`${cod.outstandingCount} შეკვეთა`}
+              sub={`${cod.outstandingCount} ჩაბარებული შეკვეთა`}
             />
-            <Stat label="დაბრუნება / გაუქმება" value={GEL(cod.chargesTotal)} sub="გამოიქვითება COD-იდან" />
+            <Stat label="დაბრუნება / გაუქმება" value={GEL(cod.chargesTotal)} sub="ჩარიცხვიდან გამოგაკლდებათ" />
             <Stat
-              label="სულ გადმორიცხული"
+              label="სულ ჩარიცხული"
               value={GEL(cod.history.reduce((s, h) => s + Math.max(0, h.net), 0))}
             />
           </div>
@@ -70,11 +73,11 @@ export default function CustomerCodPage() {
 
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>მისაღები — შეკვეთების ჩაშლა</CardTitle>
+              <CardTitle>ჩაბარებული შეკვეთები — თანხების ჩაშლა</CardTitle>
             </CardHeader>
             {cod.pending.length === 0 ? (
               <CardContent className="text-sm text-muted-foreground">
-                ამჟამად გადმოსარიცხი COD არ არის.
+                ამჟამად ჩასარიცხი თანხა არ არის.
               </CardContent>
             ) : (
               <div className="overflow-x-auto">
@@ -83,9 +86,9 @@ export default function CustomerCodPage() {
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="px-5 py-2 font-medium">ჩაბარდა</th>
                       <th className="px-5 py-2 font-medium">ტრეკინგი</th>
-                      <th className="px-5 py-2 font-medium">შეგროვილი</th>
+                      <th className="px-5 py-2 font-medium">კურიერმა აიღო</th>
                       <th className="px-5 py-2 font-medium">საკომისიო</th>
-                      <th className="px-5 py-2 font-medium">მიიღებთ</th>
+                      <th className="px-5 py-2 font-medium">დაგერიცხებათ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -108,7 +111,7 @@ export default function CustomerCodPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>გადმორიცხვების ისტორია</CardTitle>
+              <CardTitle>ჩარიცხვების ისტორია</CardTitle>
             </CardHeader>
             {cod.history.length === 0 ? (
               <CardContent className="text-sm text-muted-foreground">ჯერ არაფერი.</CardContent>
@@ -119,7 +122,7 @@ export default function CustomerCodPage() {
                     <tr className="border-b border-border text-left text-xs text-muted-foreground">
                       <th className="px-5 py-2 font-medium">თარიღი</th>
                       <th className="px-5 py-2 font-medium">შეკვეთა</th>
-                      <th className="px-5 py-2 font-medium">გადმორიცხული</th>
+                      <th className="px-5 py-2 font-medium">ჩაირიცხა</th>
                       <th className="px-5 py-2 font-medium">მეთოდი</th>
                     </tr>
                   </thead>

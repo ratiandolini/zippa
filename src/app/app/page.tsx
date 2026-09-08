@@ -49,11 +49,11 @@ export default function CustomerHome() {
               />
               <span className="font-medium">
                 {cod.outstandingNet >= 0
-                  ? `მისაღები COD: ${GEL(cod.outstandingNet)}`
+                  ? `მისაღები თანხა: ${GEL(cod.outstandingNet)}`
                   : `დავალიანება: ${GEL(-cod.outstandingNet)}`}
               </span>
               <span className="text-sm text-muted-foreground">
-                {cod.outstandingCount} შეკვეთა
+                კურიერმა მიმღებებისგან აიღო · {cod.outstandingCount} შეკვეთა
                 {cod.chargesTotal > 0 ? ` · დაბრუნება/გაუქმება −${GEL(cod.chargesTotal)}` : ""}
               </span>
             </div>

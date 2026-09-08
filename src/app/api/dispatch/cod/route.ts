@@ -159,7 +159,7 @@ export function POST(req: Request) {
 
     await notify(customerId, {
       type: "PAYMENT",
-      title: net >= 0 ? "COD გადმოგერიცხათ" : "ანგარიშსწორება",
+      title: net >= 0 ? "თანხა გადმოგერიცხათ" : "ანგარიშსწორება",
       body:
         net >= 0
           ? `${GEL(net)}${charges > 0 ? ` (დავალიანება −${GEL(charges)})` : ""}${method ? ` · ${method}` : ""}`

@@ -150,7 +150,7 @@ function EditForm({ order, onDone }: { order: OrderDTO; onDone: () => void }) {
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="წონა, კგ (მაგ. 0.5)" value={weight} onChange={setWeight} type="number" />
           <Field label="ნივთის ღირებულება, ₾ (დაზღვევა)" value={parcelValue} onChange={setParcelValue} type="number" />
-          <Field label="მიმღებისგან ასაღები, ₾ (COD)" value={collectAmount} onChange={setCollectAmount} type="number" />
+          <Field label="მიმღებისგან ასაღები თანხა, ₾" value={collectAmount} onChange={setCollectAmount} type="number" />
           <div className="sm:col-span-2">
             <Field label="აღწერა" value={description} onChange={setDescription} />
           </div>

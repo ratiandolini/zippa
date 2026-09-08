@@ -61,9 +61,9 @@ function CodCommissionCard() {
     <Card className="mb-4">
       <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
-          <div className="font-medium">COD საკომისიო</div>
+          <div className="font-medium">საკომისიო თანხის აღებაზე</div>
           <p className="text-sm text-muted-foreground">
-            იმ თანხის %, რომელსაც Zippa იტოვებს გამგზავნისთვის COD-ის გადარიცხვისას.
+            როცა კურიერი მიმღებისგან იღებს ამანათის ფასს და გამგზავნს ვურიცხავთ — ამ თანხის რამდენ %-ს ვიტოვებთ.
           </p>
         </div>
         {editing ? (

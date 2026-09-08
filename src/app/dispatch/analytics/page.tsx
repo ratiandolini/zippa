@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
         <Stat label="ჩაბარებული" value={String(totals.delivered)} sub={`${totals.completionRate}% ჩაბარების მაჩვენებელი`} />
         <Stat label="ბრუნვა (ჩაბარებული)" value={GEL(totals.revenue)} />
         <Stat label="საშ. მიტანა" value={`${totals.avgMinutes} წთ`} />
-        <Stat label="კომპანიის წილი" value={GEL(totals.companyEarnings)} sub="მიტანის მარჟა + COD საკომისიო" />
+        <Stat label="კომპანიის წილი" value={GEL(totals.companyEarnings)} sub="მიტანის მარჟა + აღების საკომისიო" />
         <Stat label="კურიერების ანაზღაურება" value={GEL(totals.driverPay)} sub="დარიცხული ამ პერიოდში" />
       </div>
 

@@ -251,7 +251,7 @@ export default function PayrollPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>COD — გამგზავნებთან ანგარიშსწორება</CardTitle>
+          <CardTitle>გამგზავნებზე თანხის ჩარიცხვა</CardTitle>
         </CardHeader>
         {cod.length === 0 ? (
           <CardContent className="text-sm text-muted-foreground">გასასწორებელი არაფერია.</CardContent>
@@ -262,10 +262,10 @@ export default function PayrollPage() {
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-4 py-2 font-medium">გამგზავნი</th>
                   <th className="px-4 py-2 font-medium">შეკვეთა</th>
-                  <th className="px-4 py-2 font-medium">შეგროვილი</th>
+                  <th className="px-4 py-2 font-medium">კურიერმა აიღო</th>
                   <th className="px-4 py-2 font-medium">საკომისიო</th>
                   <th className="px-4 py-2 font-medium">დავალიანება</th>
-                  <th className="px-4 py-2 font-medium">შედეგი</th>
+                  <th className="px-4 py-2 font-medium">ჩასარიცხი</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
@@ -316,7 +316,7 @@ export default function PayrollPage() {
       {codHistory.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>COD გადარიცხვების ისტორია</CardTitle>
+            <CardTitle>ჩარიცხვების ისტორია</CardTitle>
           </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
