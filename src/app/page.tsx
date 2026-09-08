@@ -53,7 +53,7 @@ function Photo({ src, alt, className }: { src: string; alt: string; className?: 
 const features = [
   { icon: Clock, title: "სწრაფი მიტანა", text: "თბილისში 16:00-მდე გაფორმებული შეკვეთა — იმავე დღეს. რეგიონებში — მეორე დღეს." },
   { icon: MapPin, title: "ცოცხალი რუკა", text: "ნახე რუკაზე სად არის ამანათი და კურიერი — რეალურ დროში." },
-  { icon: Wallet, title: "მოქნილი გადახდა", text: "მიტანის საფასური ნაღდით ბარდება კურიერს — გამგზავნისგან ან მიმღებისგან." },
+  { icon: Wallet, title: "მარტივი გადახდა", text: "მიტანის საფასურს ნაღდით იხდი კურიერთან. მაღაზიებს კურიერი ნივთის ფასსაც ჩააბარებინებს მიმღებს." },
   { icon: ShieldCheck, title: "საიმედოობა", text: "დადასტურებული კურიერები, მიტანის ფოტო-დადასტურება." },
 ];
 
@@ -136,7 +136,7 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 pb-16">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Photo src="/photos/parcels.jpg" alt="ამანათები" className="aspect-square" />
           <Photo src="/photos/courier-transport.jpg" alt="კურიერი ტრანსპორტით" className="aspect-square" />
           <Photo src="/photos/customer.jpg" alt="კმაყოფილი მომხმარებელი" className="aspect-square" />
