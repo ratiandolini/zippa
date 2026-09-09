@@ -12,8 +12,20 @@ import { usePricingRules, type PricingRule, type WeightBracket } from "@/lib/hoo
 import { api, jsonFetcher } from "@/lib/fetcher";
 import { GEL, DELIVERY_ZONE_LABEL } from "@/lib/domain";
 
+type DrvBracket = { maxKg: number; payout: number };
+
+/** კურიერის ანაზღაურება წონა-ცხრილიდან (client-safe, იგივე ლოგიკა რაც pricing.ts-ში) */
+function payoutForWeight(brackets: DrvBracket[] | null | undefined, kg: number): number | null {
+  if (!brackets || brackets.length === 0) return null;
+  const s = [...brackets].sort((a, b) => a.maxKg - b.maxKg);
+  for (const b of s) if (kg <= b.maxKg) return b.payout;
+  return s[s.length - 1]?.payout ?? null;
+}
+
 export default function PricingPage() {
   const { rules, isLoading, mutate } = usePricingRules();
+  // რეგიონ/სოფლის მარჟა ითვლება თბილისის ამღები კურიერის ანაზღაურებით
+  const tbPickupBrackets = rules.find((r) => r.zone === "TBILISI")?.driverWeightBrackets ?? null;
 
   return (
     <>
@@ -25,7 +37,7 @@ export default function PricingPage() {
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
       <div className="space-y-4">
         {rules.map((r) => (
-          <RuleCard key={r.id} rule={r} onSaved={mutate} />
+          <RuleCard key={r.id} rule={r} tbPickupBrackets={tbPickupBrackets} onSaved={mutate} />
         ))}
       </div>
       <p className="mt-6 text-xs text-muted-foreground">
@@ -97,7 +109,15 @@ function CodCommissionCard() {
   );
 }
 
-function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void }) {
+function RuleCard({
+  rule,
+  tbPickupBrackets,
+  onSaved,
+}: {
+  rule: PricingRule;
+  tbPickupBrackets: DrvBracket[] | null;
+  onSaved: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [brackets, setBrackets] = useState<WeightBracket[]>(rule.weightBrackets);
   const [dBrackets, setDBrackets] = useState<{ maxKg: number; payout: number }[] | null>(
@@ -169,6 +189,15 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
     return src?.[i]?.payout ?? null;
   };
 
+  const partnerCostNum = editing ? Number(partnerCost) || 0 : rule.partnerCost;
+  const isRegion = rule.zone !== "TBILISI";
+  const partnerKnown = partnerCostNum > 0;
+  // მარჟის ფორმულა: თბილისში — საკუთარი წონა-ცხრილი; რეგიონ/სოფელში — თბილისის ამღები კურიერის ანაზღაურება
+  const courierCostOf = (i: number): number | null =>
+    isRegion ? payoutForWeight(tbPickupBrackets, brackets[i]?.maxKg ?? 0) : dPayoutOf(i);
+  const showMarginCol = brackets.some((_, i) => courierCostOf(i) != null);
+  const marginIsEstimate = isRegion && !partnerKnown;
+
   const rangeLabel = (i: number) => {
     const lo = i === 0 ? 0 : brackets[i - 1].maxKg;
     return `${lo}–${brackets[i].maxKg} კგ`;
@@ -201,8 +230,16 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">წონა</th>
                 <th className="py-2 pr-4 font-medium">კლიენტი იხდის</th>
-                {(dBrackets ?? rule.driverWeightBrackets) && (
+                {!isRegion && (dBrackets ?? rule.driverWeightBrackets) && (
                   <th className="py-2 pr-4 font-medium">კურიერს ერიცხება</th>
+                )}
+                {isRegion && !editing && (
+                  <th className="py-2 pr-4 font-medium">თბ. ამღები კურიერი</th>
+                )}
+                {!editing && showMarginCol && (
+                  <th className="py-2 pr-4 font-medium">
+                    {marginIsEstimate ? "Zippa-ს სხვაობა ≈" : "Zippa-ს სხვაობა"}
+                  </th>
                 )}
                 {editing && <th className="py-2 font-medium">ზედა ზღვარი (კგ)</th>}
               </tr>
@@ -224,7 +261,7 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
                       <span className="font-medium tabular-nums">{GEL(b.price)}</span>
                     )}
                   </td>
-                  {(dBrackets ?? rule.driverWeightBrackets) && (
+                  {!isRegion && (dBrackets ?? rule.driverWeightBrackets) && (
                     <td className="py-2 pr-4">
                       {editing && dBrackets ? (
                         <Input
@@ -237,6 +274,31 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
                       ) : (
                         <span className="tabular-nums text-muted-foreground">
                           {dPayoutOf(i) == null ? "—" : GEL(dPayoutOf(i)!)}
+                        </span>
+                      )}
+                    </td>
+                  )}
+                  {isRegion && !editing && (
+                    <td className="py-2 pr-4">
+                      <span className="tabular-nums text-muted-foreground">
+                        {courierCostOf(i) == null ? "—" : GEL(courierCostOf(i)!)}
+                      </span>
+                    </td>
+                  )}
+                  {!editing && showMarginCol && (
+                    <td className="py-2 pr-4">
+                      {courierCostOf(i) == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span
+                          className={
+                            marginIsEstimate
+                              ? "tabular-nums text-muted-foreground"
+                              : "font-medium tabular-nums text-accent"
+                          }
+                        >
+                          {marginIsEstimate ? "≈ " : ""}
+                          {GEL(Math.round((b.price - courierCostOf(i)! - partnerCostNum) * 100) / 100)}
                         </span>
                       )}
                     </td>
@@ -262,18 +324,31 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
           <Field label="კურიერი — ბაზისი ₾" value={dBase} onChange={setDBase} edit={editing} display={GEL(rule.driverBaseFee)} />
           <Field label="კურიერი — ₾/კმ" value={dPerKm} onChange={setDPerKm} edit={editing} display={GEL(rule.driverPerKm)} />
           <Field label="უფასო კმ (ბაზისში)" value={dFreeKm} onChange={setDFreeKm} edit={editing} display={`${rule.driverFreeKm} კმ`} />
-          {rule.zone !== "TBILISI" && (
-            <Field label="პარტნიორის ხარჯი ₾" value={partnerCost} onChange={setPartnerCost} edit={editing} display={GEL(rule.partnerCost)} />
-          )}
+          <Field label="პარტნიორის ხარჯი ₾ (შიდა)" value={partnerCost} onChange={setPartnerCost} edit={editing} display={GEL(rule.partnerCost)} />
           {rule.zone === "TBILISI" && (
             <Field label="იმ-დღეს cut-off (საათი)" value={cutoff} onChange={setCutoff} edit={editing} display={rule.sameDayCutoffHour == null ? "—" : `${rule.sameDayCutoffHour}:00`} />
           )}
           <Field label="მინ. დღეები" value={days} onChange={setDays} edit={editing} display={String(rule.deliveryDays)} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {(dBrackets ?? rule.driverWeightBrackets)
-            ? "კურიერს ერიცხება წონა-ცხრილით (მანძილი არ ითვლება). ბაზისი+კმ გამოიყენება მხოლოდ თუ წონა-ცხრილი გამორთულია."
-            : "კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ"}
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          {isRegion
+            ? "კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ."
+            : (dBrackets ?? rule.driverWeightBrackets)
+              ? "კურიერს ერიცხება წონა-ცხრილით (მანძილი არ ითვლება). ბაზისი+კმ გამოიყენება მხოლოდ თუ წონა-ცხრილი გამორთულია."
+              : "კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ"}
+          <br />
+          {isRegion
+            ? "Zippa-ს სხვაობა = კლიენტის ფასი − თბილისის ამღები კურიერის ანაზღაურება − პარტნიორის ხარჯი."
+            : "Zippa-ს სხვაობა = კლიენტის ფასი − კურიერს ერიცხება − პარტნიორის ხარჯი."}
+          {" "}COD საკომისიო ცალკეა. პარტნიორის ხარჯი შიდა მაჩვენებელია — კლიენტის ფასს არ ცვლის.
+          {marginIsEstimate && (
+            <>
+              <br />
+              <span className="text-amber-700">
+                მარჟა სავარაუდოა — პარტნიორის ფასი მიუთითებელია. ჩაწერე „პარტნიორის ხარჯი" რეალური მოგებისთვის.
+              </span>
+            </>
+          )}
         </p>
 
         {editing && (

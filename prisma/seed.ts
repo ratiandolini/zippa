@@ -22,12 +22,13 @@ async function main() {
   // არსებულს არ ვშლით (დისპეჩერის რედაქტირება რომ არ დაიკარგოს) — ვამატებთ მხოლოდ ნაკლულ ზონას.
   const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));
   const DB = (rows: [number, number][]) => rows.map(([maxKg, payout]) => ({ maxKg, payout }));
-  const tbilisiDriverBrackets = DB([[6, 2.5], [10, 3], [15, 4], [20, 5], [30, 6.5], [40, 8], [50, 10]]);
+  // წონა-კალათები (ზედა ზღვარი ჩათვლით): 0–6, 6–11, 11–16, 16–21, 21–31, 31–41, 41–51 კგ
+  const tbilisiDriverBrackets = DB([[6, 2.5], [11, 3], [16, 4], [21, 5], [31, 6.5], [41, 8], [51, 10]]);
   const existingZones = new Set((await prisma.pricingRule.findMany({ select: { zone: true } })).map((r) => r.zone));
   const seedRules = [
       {
         zone: "TBILISI",
-        weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
+        weightBrackets: B([[6, 5], [11, 6], [16, 7], [21, 10], [31, 13], [41, 16], [51, 20]]),
         driverWeightBrackets: tbilisiDriverBrackets,
         codFee: "0",
         driverBaseFee: "2.50",
@@ -39,7 +40,7 @@ async function main() {
       },
       {
         zone: "REGIONAL_CITY",
-        weightBrackets: B([[6, 7], [10, 9], [15, 12], [20, 15], [30, 19], [40, 28], [50, 38]]),
+        weightBrackets: B([[6, 7], [11, 10], [16, 13], [21, 16], [31, 19], [41, 30], [51, 40]]),
         codFee: "0",
         driverBaseFee: "4.00",
         driverPerKm: "0.50",
@@ -49,7 +50,7 @@ async function main() {
       },
       {
         zone: "TOWN_VILLAGE",
-        weightBrackets: B([[6, 11], [10, 13], [15, 16], [20, 19], [30, 23], [40, 33], [50, 43]]),
+        weightBrackets: B([[6, 11], [11, 14], [16, 17], [21, 20], [31, 23], [41, 35], [51, 45]]),
         codFee: "0",
         driverBaseFee: "6.00",
         driverPerKm: "0.50",
@@ -189,7 +190,7 @@ async function main() {
     if (await prisma.order.findUnique({ where: { trackingNumber: o.tn } })) continue;
     const dist = haversine([o.pickup[1], o.pickup[2]], [o.delivery[1], o.delivery[2]]);
     // თბილისის ტარიფი: წონა-კალათა
-    const tbBrackets: [number, number][] = [[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]];
+    const tbBrackets: [number, number][] = [[6, 5], [11, 6], [16, 7], [21, 10], [31, 13], [41, 16], [51, 20]];
     const deliveryPrice = tbBrackets.find(([m]) => o.weightKg <= m)?.[1] ?? 20;
     const codFee = 0;
     const total = round2(deliveryPrice + codFee);

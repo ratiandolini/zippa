@@ -58,11 +58,14 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.driverFee).toBe(payout);
   });
 
-  it("20 კგ-ზე მეტი → needsManualReview true", async () => {
+  // MANUAL_REVIEW_WEIGHT_KG = 20 — ცალკე ბიზნეს-წესი, კალათის ზღვრებზე დამოკიდებული არაა
+  it.each([
+    [18, false], [20, false], [20.01, true], [21, true], [25, true],
+  ])("წონა %d კგ → needsManualReview %s", async (kg, expected) => {
     const p = await calculatePrice({
-      pickup: TB, delivery: TB2, weightKg: 25, paymentMethod: "CARD", deliveryCityId: await tbId(),
+      pickup: TB, delivery: TB2, weightKg: kg, paymentMethod: "CARD", deliveryCityId: await tbId(),
     });
-    expect(p.needsManualReview).toBe(true);
+    expect(p.needsManualReview).toBe(expected);
   });
 
   it("isActive = false → InactiveZoneError", async () => {
@@ -80,8 +83,11 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.totalPrice).toBe(5);
   });
 
+  // კალათები: 0–6=5, 6–11=6, 11–16=7, 16–21=10, 21–31=13, 31–41=16, 41–51=20
+  // ზედა ზღვარი ჩათვლით: 6 კგ → პირველი კალათა, 6.01 კგ → მეორე
   it.each([
-    [6, 5], [7, 6], [10, 6], [11, 8], [15, 8], [16, 10], [20, 10], [25, 13], [30, 13], [40, 16], [50, 20],
+    [6, 5], [6.01, 6], [11, 6], [11.01, 7], [16, 7], [16.01, 10], [21, 10], [21.01, 13],
+    [31, 13], [31.01, 16], [41, 16], [41.01, 20], [51, 20],
   ])("წონა %d კგ → მიტანა %d ₾", async (kg, expected) => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: kg, paymentMethod: "CARD", deliveryCityId: await tbId(),
@@ -89,7 +95,7 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.deliveryPrice).toBe(expected);
   });
 
-  it("50 კგ-ზე მეტი → overWeight true, ბოლო კალათის ფასი", async () => {
+  it("51 კგ-ზე მეტი → overWeight true, ბოლო კალათის ფასი", async () => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 80, paymentMethod: "CARD", deliveryCityId: await tbId(),
     });
@@ -156,6 +162,25 @@ describe("calculatePrice — რეგიონი / სოფელი", () => 
     expect(p.zone).toBe("TOWN_VILLAGE");
     expect(p.deliveryPrice).toBe(11);
     expect(p.driverFee).toBe(7);
+  });
+
+  it.each([
+    [6, 7], [6.01, 10], [16, 13], [16.01, 16], [21, 16], [31, 19], [31.01, 30], [51, 40],
+  ])("რეგიონი: %d კგ → %d ₾", async (kg, expected) => {
+    const ba = await prisma.city.findUniqueOrThrow({ where: { name: "ბათუმი" } });
+    const p = await calculatePrice({
+      pickup: TB, delivery: BATUMI, weightKg: kg, paymentMethod: "CARD", deliveryCityId: ba.id,
+    });
+    expect(p.deliveryPrice).toBe(expected);
+  });
+
+  it.each([
+    [6, 11], [6.01, 14], [16, 17], [21, 20], [21.01, 23], [41, 35], [41.01, 45], [51, 45],
+  ])("სოფელი: %d კგ → %d ₾", async (kg, expected) => {
+    const p = await calculatePrice({
+      pickup: TB, delivery: REMOTE, weightKg: kg, paymentMethod: "CARD", deliveryCityId: null,
+    });
+    expect(p.deliveryPrice).toBe(expected);
   });
 });
 
