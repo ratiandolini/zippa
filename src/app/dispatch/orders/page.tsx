@@ -257,37 +257,6 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canFixPrice = order.status === "PENDING" || order.status === "ASSIGNED";
   const [fixingPrice, setFixingPrice] = useState(false);
 
-  async function fixPrice() {
-    const dp = prompt(
-      `${order.trackingNumber} — კლიენტი იხდის მიტანაში (₾):`,
-      String(order.price.delivery),
-    );
-    if (dp === null) return;
-    const df = prompt("კურიერს ერიცხება (₾):", String(order.price.driverFee));
-    if (df === null) return;
-    const reasons = [
-      "არასწორად მითითებული წონა",
-      "დიდი გაბარიტი",
-      "შორეული/რთული მისამართი",
-      "განმეორებითი მიტანა",
-      "მომხმარებელთან შეთანხმებული ფასი",
-      "კურიერის დამატებითი სვლა",
-    ];
-    const reason = prompt(`მიზეზი — ჩაწერე ზუსტად ერთი:\n${reasons.join("\n")}`, reasons[0]);
-    if (!reason || !reasons.includes(reason)) return;
-    setFixingPrice(true);
-    try {
-      await api(`/api/orders/${order.id}/price`, "PATCH", {
-        deliveryPrice: parseFloat(dp),
-        driverFee: parseFloat(df),
-        reason,
-      });
-      onChange();
-    } finally {
-      setFixingPrice(false);
-    }
-  }
-
   async function adjust() {
     const amtStr = prompt(
       `${order.trackingNumber} — ანაზღაურება მომხმარებელს (₾).\nჩაირიცხება „მიღებულ თანხებში".`,
@@ -377,10 +346,21 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         )}
       </div>
 
-      {order.needsManualReview && (
+      {order.needsManualReview && !fixingPrice && (
         <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
           ⚠ ფასი ხელით უნდა დაადასტურო — მინიჭება დაბლოკილია
         </div>
+      )}
+
+      {fixingPrice && (
+        <PriceFixForm
+          order={order}
+          onClose={() => setFixingPrice(false)}
+          onDone={() => {
+            setFixingPrice(false);
+            onChange();
+          }}
+        />
       )}
 
       {order.returnRequestedAt && !order.returnResolvedAt && (
@@ -450,11 +430,10 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         )}
         {canFixPrice && (
           <button
-            onClick={fixPrice}
-            disabled={fixingPrice}
-            className="text-[11px] font-medium text-accent hover:underline disabled:opacity-50"
+            onClick={() => setFixingPrice((v) => !v)}
+            className="text-[11px] font-medium text-accent hover:underline"
           >
-            {fixingPrice ? "…" : "ფასის შესწორება"}
+            ფასის შესწორება
           </button>
         )}
         {canAdjust && (
@@ -568,6 +547,120 @@ function AssignList({ order, onDone }: { order: OrderDTO; onDone: () => void }) 
           </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+const PRICE_FIX_REASONS = [
+  "არასწორად მითითებული წონა",
+  "დიდი გაბარიტი",
+  "შორეული/რთული მისამართი",
+  "განმეორებითი მიტანა",
+  "მომხმარებელთან შეთანხმებული ფასი",
+  "კურიერის დამატებითი სვლა",
+];
+
+function PriceFixForm({
+  order,
+  onClose,
+  onDone,
+}: {
+  order: OrderDTO;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [delivery, setDelivery] = useState(String(order.price.delivery));
+  const [driverFee, setDriverFee] = useState(String(order.price.driverFee));
+  const [reason, setReason] = useState(PRICE_FIX_REASONS[0]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const dp = parseFloat(delivery);
+  const df = parseFloat(driverFee);
+  const codFee = order.price.codFee;
+  const total = Number.isFinite(dp) ? Math.round((dp + codFee) * 100) / 100 : null;
+  const margin =
+    total != null && Number.isFinite(df)
+      ? Math.round((total + order.codCommission - df - order.price.partnerCost) * 100) / 100
+      : null;
+
+  async function save() {
+    if (!Number.isFinite(dp) || !Number.isFinite(df)) {
+      setErr("შეავსე ორივე ფასი");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/api/orders/${order.id}/price`, "PATCH", {
+        deliveryPrice: dp,
+        driverFee: df,
+        reason,
+      });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+      setBusy(false);
+    }
+  }
+
+  const field =
+    "mt-0.5 h-8 w-full rounded-md border border-border bg-background px-2 text-xs tabular-nums";
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-accent/40 bg-accent/[0.05] p-2.5">
+      <div className="text-[11px] font-medium">ფასის შესწორება</div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-[11px] text-muted-foreground">
+          კლიენტი იხდის (მიტანა) ₾
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.5"
+            className={field}
+            value={delivery}
+            onChange={(e) => setDelivery(e.target.value)}
+          />
+        </label>
+        <label className="text-[11px] text-muted-foreground">
+          კურიერს ერიცხება ₾
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.5"
+            className={field}
+            value={driverFee}
+            onChange={(e) => setDriverFee(e.target.value)}
+          />
+        </label>
+      </div>
+      <label className="block text-[11px] text-muted-foreground">
+        მიზეზი
+        <select
+          className={field}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        >
+          {PRICE_FIX_REASONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex justify-between text-[11px] text-muted-foreground">
+        <span>სულ: {total != null ? GEL(total) : "—"}</span>
+        <span>Zippa მარჟა: {margin != null ? GEL(margin) : "—"}</span>
+      </div>
+      {err && <div className="text-[11px] text-destructive">{err}</div>}
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={save}>
+          {busy ? "ინახება…" : "შენახვა"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onClose}>
+          გაუქმება
+        </Button>
+      </div>
     </div>
   );
 }

@@ -45,6 +45,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const homeHref = nav[0]?.href ?? "/";
   const active = (href: string) =>
     pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
@@ -53,7 +54,9 @@ export function AppShell({
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border bg-background lg:flex">
         <div className="flex h-16 items-center px-5">
-          <Logo />
+          <Link href={homeHref} aria-label="მთავარი">
+            <Logo />
+          </Link>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {nav.map((item) => (
@@ -82,7 +85,9 @@ export function AppShell({
       <div className="lg:pl-60">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-background/80 px-5 backdrop-blur">
           <div className="lg:hidden">
-            <Logo />
+            <Link href={homeHref} aria-label="მთავარი">
+              <Logo />
+            </Link>
           </div>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-2">
