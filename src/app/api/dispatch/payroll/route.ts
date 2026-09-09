@@ -20,11 +20,16 @@ export function GET(req: Request) {
       orderBy: { user: { name: "asc" } },
     });
 
-    const [earnings, payouts, settlements] = await Promise.all([
+    const [earnings, deliveryCounts, payouts, settlements] = await Promise.all([
       prisma.driverEarning.groupBy({
         by: ["driverId"],
         where: { createdAt: inPeriod },
         _sum: { driverAmount: true, companyAmount: true },
+      }),
+      // „მიტანა" — მხოლოდ ჩაბარებული (ჩაშლის/გაუქმების ანაზღაურება არ ითვლება)
+      prisma.driverEarning.groupBy({
+        by: ["driverId"],
+        where: { createdAt: inPeriod, kind: "DELIVERY" },
         _count: true,
       }),
       prisma.payout.groupBy({
@@ -46,6 +51,7 @@ export function GET(req: Request) {
     });
 
     const eMap = new Map(earnings.map((e) => [e.driverId, e]));
+    const dcMap = new Map(deliveryCounts.map((e) => [e.driverId, e._count]));
     const pMap = new Map(payouts.map((p) => [p.driverId, Number(p._sum.amount ?? 0)]));
     const sMap = new Map(settlements.map((s) => [s.driverId, Number(s._sum.amount ?? 0)]));
     const lpMap = new Map(lastPayouts.map((p) => [p.driverId, p]));
@@ -57,7 +63,7 @@ export function GET(req: Request) {
         driverId: d.id,
         name: d.user.name,
         phone: d.user.phone,
-        deliveries: e?._count ?? 0,
+        deliveries: dcMap.get(d.id) ?? 0,
         earnedInPeriod: Math.round(Number(e?._sum.driverAmount ?? 0) * 100) / 100,
         companyInPeriod: Math.round(Number(e?._sum.companyAmount ?? 0) * 100) / 100,
         paidInPeriod: Math.round((pMap.get(d.id) ?? 0) * 100) / 100,

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Stat } from "@/components/stat";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate, SETTLEMENT_STATUS_LABEL } from "@/lib/domain";
+import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate, SETTLEMENT_STATUS_LABEL, EARNING_KIND_LABEL } from "@/lib/domain";
 import type { SettlementStatus } from "@prisma/client";
 import type { VehicleType } from "@prisma/client";
 import { ArrowLeft } from "lucide-react";
@@ -41,6 +41,7 @@ interface DriverDetail {
     settlements: { id: string; amount: number; note: string | null; status: SettlementStatus; createdAt: string }[];
     earnings: {
       id: string;
+      kind: string;
       trackingNumber: string | null;
       orderStatus: string | null;
       driverAmount: number;
@@ -293,6 +294,11 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
                     <td className="px-5 py-2.5">{fmtDate(e.createdAt)}</td>
                     <td className="px-5 py-2.5 font-mono text-xs text-muted-foreground">
                       {e.trackingNumber ?? "—"}
+                      {EARNING_KIND_LABEL[e.kind] && (
+                        <span className="ml-1.5 rounded bg-muted px-1 py-0.5 font-sans text-[10px] text-foreground">
+                          {EARNING_KIND_LABEL[e.kind]}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-2.5 font-medium tabular-nums">{GEL(e.driverAmount)}</td>
                     <td className="px-5 py-2.5">

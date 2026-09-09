@@ -82,6 +82,7 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
         })),
         earnings: earnings.map((e) => ({
           id: e.id,
+          kind: e.kind,
           trackingNumber: e.order?.trackingNumber ?? null,
           orderStatus: e.order?.status ?? null,
           driverAmount: Number(e.driverAmount),

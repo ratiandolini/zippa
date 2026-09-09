@@ -5,9 +5,11 @@ import {
   DRIVER_NEXT_STATUS,
   FREE_CANCEL_STATUSES,
   PAID_CANCEL_STATUSES,
+  POST_PICKUP_STATUSES,
   CANCEL_FEE_GEL,
   FAILED_TRIP_DRIVER_GEL,
   CANCEL_EN_ROUTE_DRIVER_GEL,
+  CANCEL_AFTER_PICKUP_DRIVER_GEL,
   RETURN_FEE_PCT,
   DRIVER_FAULT_FAILURE,
   FAILURE_REASON_LABEL,
@@ -58,9 +60,18 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (!isDispatcher && !isOwnerDriver && !isCustomerCancel)
       return fail(403, "წვდომა აკრძალულია");
 
-    // მომხმარებლის გაუქმების საფასური — მხოლოდ თუ კურიერი უკვე გზაშია ასაღებად
-    const cancelFee =
-      isCustomerCancel && PAID_CANCEL_STATUSES.includes(order.status) ? CANCEL_FEE_GEL : 0;
+    // ამანათი უკვე კურიერთანაა და შეკვეთა უქმდება (დისპეჩერი) — მიტანის ფასი აღარ ბრუნდება
+    const isPostPickupCancel =
+      body.status === "CANCELLED" && POST_PICKUP_STATUSES.includes(order.status as OrderStatus);
+
+    // გაუქმების საფასური:
+    //  - PICKED_UP / IN_TRANSIT (ამანათი აღებულია) → მთელი მიტანის ფასი რჩება ასაკრები
+    //  - EN_ROUTE_PICKUP + მომხმარებლის გაუქმება → ფიქს. 2 ₾
+    const cancelFee = isPostPickupCancel
+      ? Number(order.deliveryPrice)
+      : isCustomerCancel && PAID_CANCEL_STATUSES.includes(order.status)
+        ? CANCEL_FEE_GEL
+        : 0;
 
     // კურიერისთვის — გადასვლების შემოწმება
     if (isOwnerDriver && !isDispatcher) {
@@ -83,8 +94,12 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       body.status === "CANCELLED" && order.driverId && order.status === "EN_ROUTE_PICKUP"
         ? CANCEL_EN_ROUTE_DRIVER_GEL
         : 0;
+    // ამანათის აღების შემდეგ გაუქმებაზე კურიერს ერიცხება დაბრუნების სვლა
+    const cancelAfterPickupComp =
+      isPostPickupCancel && order.driverId ? CANCEL_AFTER_PICKUP_DRIVER_GEL : 0;
+    // დაბრუნების საფასური — ჩაშლაზე ან ამანათის აღების შემდეგ გაუქმებაზე (deliveryPrice-ის წილი)
     const returnFee =
-      body.status === "FAILED" && !driverFault
+      (body.status === "FAILED" && !driverFault) || isPostPickupCancel
         ? Math.round(Number(order.deliveryPrice) * RETURN_FEE_PCT * 100) / 100
         : 0;
 
@@ -94,6 +109,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         data: {
           status: body.status,
           ...(body.status === "CANCELLED" && cancelFee > 0 ? { cancelFee } : {}),
+          ...(isPostPickupCancel ? { returnFee } : {}),
           ...(body.status === "FAILED"
             ? { failureReason: body.failureReason, returnFee }
             : {}),
@@ -185,6 +201,25 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: { unpaidEarnings: { increment: cancelEnRouteComp } },
         });
       }
+      // ამანათის აღების შემდეგ გაუქმება — კურიერს ერიცხება დაბრუნების სვლა
+      if (cancelAfterPickupComp > 0 && order.driverId) {
+        await tx.driverEarning.create({
+          data: {
+            driverId: order.driverId,
+            orderId: order.id,
+            kind: "CANCELLED_AFTER_PICKUP",
+            grossPrice: Math.round((Number(cancelFee) + returnFee) * 100) / 100,
+            driverAmount: cancelAfterPickupComp,
+            companyAmount:
+              Math.round((Number(cancelFee) + returnFee - cancelAfterPickupComp) * 100) / 100,
+            collectedInCash: false,
+          },
+        });
+        await tx.driverProfile.update({
+          where: { id: order.driverId },
+          data: { unpaidEarnings: { increment: cancelAfterPickupComp } },
+        });
+      }
       if (body.status === "CANCELLED" && order.assignedAt) {
         await tx.order.update({ where: { id: order.id }, data: { assignedAt: null } });
       }
@@ -203,11 +238,13 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         body:
           st === "ACCEPTED" && driverName
             ? `${driverName} · შეკვეთა ${order.trackingNumber}`
-            : cancelFee > 0
-              ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
-              : st === "FAILED" && returnFee > 0
-                ? `შეკვეთა ${order.trackingNumber} · ამანათი ბრუნდება · დაბრუნების საფასური ${returnFee} ₾`
-                : `შეკვეთა ${order.trackingNumber}`,
+            : isPostPickupCancel
+              ? `შეკვეთა ${order.trackingNumber} · ამანათი უკვე აღებული იყო — მიტანის ფასი ${cancelFee} ₾ რჩება, დაბრუნების საფასური ${returnFee} ₾`
+              : cancelFee > 0
+                ? `შეკვეთა ${order.trackingNumber} · გაუქმების საფასური ${cancelFee} ₾`
+                : st === "FAILED" && returnFee > 0
+                  ? `შეკვეთა ${order.trackingNumber} · ამანათი ბრუნდება · დაბრუნების საფასური ${returnFee} ₾`
+                  : `შეკვეთა ${order.trackingNumber}`,
         data: { orderId: order.id },
       });
     }
@@ -223,7 +260,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         data: { orderId: order.id },
       });
     }
-    if (cancelFee > 0) {
+    if (cancelFee > 0 && !isPostPickupCancel) {
       await notifyDispatchers({
         title: "გაუქმება საფასურით",
         body: `${order.trackingNumber} — მომხმარებელმა გააუქმა კურიერის გზაში-ყოფნისას, ${cancelFee} ₾ ასაკრები`,
@@ -254,6 +291,20 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       await notifyDriver(order.driverId, {
         title: "შეკვეთა გაუქმდა",
         body: `${order.trackingNumber} — დაკარგული სვლის კომპენსაცია ${cancelEnRouteComp} ₾`,
+        data: { orderId: order.id },
+      });
+    }
+    if (st === "CANCELLED" && cancelAfterPickupComp > 0 && order.driverId) {
+      await notifyDriver(order.driverId, {
+        title: "შეკვეთა გაუქმდა",
+        body: `${order.trackingNumber} — ამანათი დააბრუნე. დაბრუნების სვლის ანაზღაურება ${cancelAfterPickupComp} ₾`,
+        data: { orderId: order.id },
+      });
+    }
+    if (st === "CANCELLED" && isPostPickupCancel) {
+      await notifyDispatchers({
+        title: "გაუქმება ამანათის აღების შემდეგ",
+        body: `${order.trackingNumber} — მიტანის ფასი ${cancelFee} ₾ + დაბრუნება ${returnFee} ₾ ასაკრები; ამანათი ბრუნდება`,
         data: { orderId: order.id },
       });
     }

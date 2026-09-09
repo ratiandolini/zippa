@@ -346,6 +346,17 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         {order.pricingSource === "MANUAL" && (
           <div className="text-amber-700">✎ ხელით შესწორდა{order.priceAdjustmentReason ? ` · ${order.priceAdjustmentReason}` : ""}</div>
         )}
+        {(order.cancelFee > 0 || order.returnFee > 0) && (
+          <div className="mt-0.5 border-t border-border pt-0.5 text-destructive">
+            გამგზავნს ასაკრები:{" "}
+            {[
+              order.cancelFee > 0 ? `გაუქმება ${GEL(order.cancelFee)}` : null,
+              order.returnFee > 0 ? `დაბრუნება ${GEL(order.returnFee)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" + ")}
+          </div>
+        )}
       </div>
 
       {order.needsManualReview && !fixingPrice && (
