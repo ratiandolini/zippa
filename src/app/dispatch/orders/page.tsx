@@ -294,14 +294,16 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
     }
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   async function remove() {
-    if (!confirm("წავშალო ეს გაუქმებული შეკვეთა სამუდამოდ?")) return;
     setDeleting(true);
     try {
       await api(`/api/orders/${order.id}`, "DELETE");
       onChange();
     } finally {
       setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -454,14 +456,31 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
             {cancelling ? "…" : "გაუქმება"}
           </button>
         )}
-        {canDelete && (
+        {canDelete && !confirmDelete && (
           <button
-            onClick={remove}
-            disabled={deleting}
-            className="text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+            onClick={() => setConfirmDelete(true)}
+            className="text-[11px] text-muted-foreground hover:text-destructive"
           >
-            {deleting ? "…" : "წაშლა"}
+            წაშლა
           </button>
+        )}
+        {canDelete && confirmDelete && (
+          <span className="inline-flex items-center gap-2 text-[11px]">
+            <span className="text-muted-foreground">სამუდამოდ წავშალო?</span>
+            <button
+              onClick={remove}
+              disabled={deleting}
+              className="font-medium text-destructive hover:underline disabled:opacity-50"
+            >
+              {deleting ? "…" : "დიახ, წაშალე"}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-muted-foreground hover:underline"
+            >
+              არა
+            </button>
+          </span>
         )}
       </div>
     </div>
