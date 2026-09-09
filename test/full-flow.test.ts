@@ -86,14 +86,14 @@ describe("სრული ნაკადი — შეკვეთიდან 
 
     // — კურიერის ფინანსები —
     let dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.unpaidEarnings)).toBe(3); // driverFee
+    expect(Number(dp.unpaidEarnings)).toBe(2.5); // driverFee (წონა-ცხრილი)
     expect(Number(dp.cashOnHand)).toBe(155); // მთელი codAmount
     expect(dp.totalDeliveries).toBe(1);
     expect(dp.status).toBe("AVAILABLE");
 
     const earn = await prisma.driverEarning.findFirstOrThrow({ where: { orderId: oid } });
-    expect(Number(earn.driverAmount)).toBe(3);
-    expect(Number(earn.companyAmount)).toBe(2); // 5 − 3
+    expect(Number(earn.driverAmount)).toBe(2.5);
+    expect(Number(earn.companyAmount)).toBe(2.5); // 5 − 2.5
     expect(earn.collectedInCash).toBe(true);
 
     // — კურიერი აბარებს ნაღდს, დისპეჩერი ადასტურებს —
@@ -109,7 +109,7 @@ describe("სრული ნაკადი — შეკვეთიდან 
     expect(Number(dp.cashOnHand)).toBe(0);
 
     // — დისპეჩერი უხდის კურიერს ანაზღაურებას —
-    await call(payout, { params: { id: drv.profile.id }, body: { amount: 3 } });
+    await call(payout, { params: { id: drv.profile.id }, body: { amount: 2.5 } });
     dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.unpaidEarnings)).toBe(0);
 
@@ -147,8 +147,8 @@ describe("სრული ნაკადი — შეკვეთიდან 
     actAs(session(disp));
     const an = await call(analytics, {});
     expect((an.body.totals as { delivered: number }).delivered).toBe(1);
-    expect((an.body.totals as { companyEarnings: number }).companyEarnings).toBe(5); // 2 მარჟა + 3 COD საკომ.
-    expect((an.body.totals as { driverPay: number }).driverPay).toBe(3);
+    expect((an.body.totals as { companyEarnings: number }).companyEarnings).toBe(5.5); // 2.5 მარჟა + 3 COD საკომ.
+    expect((an.body.totals as { driverPay: number }).driverPay).toBe(2.5);
 
     // — payroll —
     const pr = await call(payroll, { query: { period: "month" } });
@@ -156,8 +156,8 @@ describe("სრული ნაკადი — შეკვეთიდან 
       (r) => (r.driverId as never) === drv.profile.id,
     );
     expect(prow!.deliveries).toBe(1);
-    expect(prow!.earnedInPeriod).toBe(3);
-    expect(prow!.paidInPeriod).toBe(3);
+    expect(prow!.earnedInPeriod).toBe(2.5);
+    expect(prow!.paidInPeriod).toBe(2.5);
     expect(prow!.remittedInPeriod).toBe(155);
     expect(prow!.unpaidEarnings).toBe(0);
   });

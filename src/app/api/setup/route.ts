@@ -5,6 +5,7 @@ import { handle, ok, fail } from "@/lib/api";
 export const dynamic = "force-dynamic";
 
 const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));
+const DB = (rows: [number, number][]) => rows.map(([maxKg, payout]) => ({ maxKg, payout }));
 
 const CITIES = [
   { name: "თბილისი", centerLat: 41.7151, centerLng: 44.8271 },
@@ -17,7 +18,8 @@ const RULES = [
   {
     zone: "TBILISI" as const,
     weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
-    codFee: "0", driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5",
+    driverWeightBrackets: DB([[6, 2.5], [10, 3], [15, 4], [20, 5], [30, 6.5], [40, 8], [50, 10]]),
+    codFee: "0", driverBaseFee: "2.50", driverPerKm: "0", driverFreeKm: "0",
     driverFlatFee: "3.00", sameDayCutoffHour: 16, deliveryDays: 0,
   },
   {

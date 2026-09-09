@@ -25,10 +25,16 @@ export function POST(req: Request) {
 
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },
-      select: { id: true, status: true, trackingNumber: true, customerId: true, pickupAddress: true },
+      select: {
+        id: true, status: true, trackingNumber: true, customerId: true,
+        pickupAddress: true, needsManualReview: true,
+      },
     });
     const bad = orders.filter((o) => !ASSIGNABLE.includes(o.status));
     if (bad.length) throw new ApiError(409, `${bad.length} შეკვეთას კურიერს ვეღარ მიანიჭებ`);
+    const review = orders.filter((o) => o.needsManualReview);
+    if (review.length)
+      throw new ApiError(409, `${review.length} შეკვეთას ჯერ ფასი უნდა დაუდასტურდეს`);
     if (orders.length !== orderIds.length) throw new ApiError(404, "ზოგი შეკვეთა ვერ მოიძებნა");
 
     const now = new Date();

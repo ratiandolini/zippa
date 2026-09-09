@@ -177,6 +177,13 @@ model PricingRule {
   // [{ "maxKg": 6, "price": 5 }, { "maxKg": 11, "price": 5 }, ...] — ზრდადი
   weightBrackets Json
 
+  // კურიერის ანაზღაურება წონა-კალათებით: [{ "maxKg": 6, "payout": 2.5 }, ...] — ზრდადი.
+  // თუ მითითებულია, თბილისის STANDARD მიტანაზე driverFee აქედან იანგარიშება (არა კმ-ით).
+  driverWeightBrackets Json?
+
+  // რეგიონული პარტნიორის ხარჯი თითო ამანათზე (საქ. ფოსტა / რეგიონული კურიერი)
+  partnerCost Decimal @default(0) @db.Decimal(10, 2)
+
   codFee Decimal @default(0) @db.Decimal(10, 2) // ნაღდით გადახდის საკომისიო
 
   // კურიერის ანაზღაურება ამ ზონის მიტანაზე — ბაზისი + კმ-თარიფი მანძილის ზღვრის მერე
@@ -288,6 +295,17 @@ model Order {
   codFee        Decimal @default(0) @db.Decimal(10, 2)
   totalPrice    Decimal @default(0) @db.Decimal(10, 2)
   driverFee     Decimal @default(0) @db.Decimal(10, 2) // კურიერს ერგება ამ მიტანაზე (სნეპშოტი)
+  partnerCost   Decimal @default(0) @db.Decimal(10, 2) // რეგიონული პარტნიორის ხარჯი (სნეპშოტი)
+  companyMargin Decimal @default(0) @db.Decimal(10, 2) // Zippa-ს მარჟა = totalPrice + codCommission − driverFee − partnerCost
+
+  // ფასის წყარო და ხელით შესწორება
+  pricingSource         String    @default("RULE") // RULE | MANUAL
+  priceAdjustmentReason String?
+  priceAdjustedById     String?
+  priceAdjustedAt       DateTime?
+
+  // 20 კგ+ ან რთული შემთხვევა — დისპეჩერმა ხელით უნდა დაადასტუროს ფასი, ავტო-მინიჭება იბლოკება
+  needsManualReview Boolean @default(false)
 
   // გადახდა
   paymentMethod PaymentMethod @default(CASH)

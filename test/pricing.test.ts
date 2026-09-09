@@ -35,7 +35,7 @@ describe("resolveZone / resolveCityId", () => {
 describe("calculatePrice — თბილისი", () => {
   const tbId = () => prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } }).then((c) => c.id);
 
-  it("3 კგ ნაღდი → 5, კურიერს 3", async () => {
+  it("3 კგ ნაღდი → 5, კურიერს 2.5, მარჟა 2.5", async () => {
     const p = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: await tbId(),
     });
@@ -43,8 +43,33 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.deliveryPrice).toBe(5);
     expect(p.codFee).toBe(0);
     expect(p.totalPrice).toBe(5);
-    expect(p.driverFee).toBe(3);
+    expect(p.driverFee).toBe(2.5);
+    expect(p.companyMargin).toBe(2.5);
     expect(p.overWeight).toBe(false);
+    expect(p.needsManualReview).toBe(false);
+  });
+
+  it.each([
+    [3, 2.5], [8, 3], [12, 4], [18, 5], [25, 6.5], [35, 8], [45, 10],
+  ])("წონა %d კგ → კურიერს %d ₾ (წონა-ცხრილი, მანძილი არ ითვლება)", async (kg, payout) => {
+    const p = await calculatePrice({
+      pickup: TB, delivery: { lat: 41.62, lng: 44.9 }, weightKg: kg, paymentMethod: "CARD", deliveryCityId: await tbId(),
+    });
+    expect(p.driverFee).toBe(payout);
+  });
+
+  it("20 კგ-ზე მეტი → needsManualReview true", async () => {
+    const p = await calculatePrice({
+      pickup: TB, delivery: TB2, weightKg: 25, paymentMethod: "CARD", deliveryCityId: await tbId(),
+    });
+    expect(p.needsManualReview).toBe(true);
+  });
+
+  it("isActive = false → InactiveZoneError", async () => {
+    await prisma.pricingRule.update({ where: { zone: "TBILISI" }, data: { isActive: false } });
+    await expect(
+      calculatePrice({ pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: await tbId() }),
+    ).rejects.toThrow("დროებით მიუწვდომელია");
   });
 
   it("ბარათი → codFee 0", async () => {
@@ -93,11 +118,12 @@ describe("calculatePrice — თბილისი", () => {
     expect(p.distanceKm).toBeLessThan(13);
   });
 
-  it("ბაზისი+კმ: შორ მიტანაზე კურიერს მეტი ერგება", async () => {
+  it("წონა-ცხრილი გამორთვისას fallback ბაზისი+კმ-ზე", async () => {
     await prisma.pricingRule.update({
       where: { zone: "TBILISI" },
-      data: { driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5" },
+      data: { driverWeightBrackets: undefined as never, driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5" },
     });
+    await prisma.$executeRawUnsafe(`UPDATE "PricingRule" SET "driverWeightBrackets" = NULL WHERE zone = 'TBILISI'`);
     const cityId = await tbId();
     const near = await calculatePrice({ pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CARD", deliveryCityId: cityId });
     const far = await calculatePrice({
@@ -149,6 +175,7 @@ describe("driverFeeFor — ბაზისი + კმ", () => {
       where: { zone: "TBILISI" },
       data: { driverBaseFee: "2.50", driverPerKm: "0.50", driverFreeKm: "5" },
     });
+    await prisma.$executeRawUnsafe(`UPDATE "PricingRule" SET "driverWeightBrackets" = NULL WHERE zone = 'TBILISI'`);
     const tb = await prisma.city.findUniqueOrThrow({ where: { name: "თბილისი" } });
     const near = await calculatePrice({
       pickup: TB, delivery: TB2, weightKg: 3, paymentMethod: "CASH", deliveryCityId: tb.id,

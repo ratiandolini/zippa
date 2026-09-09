@@ -150,6 +150,15 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         <span>{order.weightKg} კგ</span>
       </div>
 
+      {order.price.driverFee > 0 && (
+        <div className="mt-2 flex items-center justify-between rounded-md bg-accent/10 px-2.5 py-1.5 text-sm">
+          <span className="font-medium text-accent">
+            {order.status === "ASSIGNED" ? "მიღების შემთხვევაში მიიღებ" : "შენ ერიცხება"}
+          </span>
+          <span className="font-semibold tabular-nums text-accent">{GEL(order.price.driverFee)}</span>
+        </div>
+      )}
+
       {order.codAmount > 0 ? (
         <div className="mt-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-[11px]">
           {order.payerSide === "SENDER" && order.price.total > 0 && (

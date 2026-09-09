@@ -6,7 +6,8 @@ import {
   FREE_CANCEL_STATUSES,
   PAID_CANCEL_STATUSES,
   CANCEL_FEE_GEL,
-  FAILED_TRIP_DRIVER_PCT,
+  FAILED_TRIP_DRIVER_GEL,
+  CANCEL_EN_ROUTE_DRIVER_GEL,
   RETURN_FEE_PCT,
   DRIVER_FAULT_FAILURE,
   FAILURE_REASON_LABEL,
@@ -76,8 +77,11 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       ? DRIVER_FAULT_FAILURE.includes(body.failureReason)
       : false;
     const failedTripComp =
-      body.status === "FAILED" && order.driverId && !driverFault
-        ? Math.round(Number(order.driverFee) * FAILED_TRIP_DRIVER_PCT * 100) / 100
+      body.status === "FAILED" && order.driverId && !driverFault ? FAILED_TRIP_DRIVER_GEL : 0;
+    // გზაში-ყოფნისას გაუქმება — კურიერს ერიცხება ფიქს. კომპენსაცია (გაუქმების საფასურიდან)
+    const cancelEnRouteComp =
+      body.status === "CANCELLED" && order.driverId && order.status === "EN_ROUTE_PICKUP"
+        ? CANCEL_EN_ROUTE_DRIVER_GEL
         : 0;
     const returnFee =
       body.status === "FAILED" && !driverFault
@@ -163,6 +167,24 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           data: { unpaidEarnings: { increment: failedTripComp } },
         });
       }
+      // გზაში-ყოფნისას გაუქმება — კურიერს ერიცხება დაკარგული სვლა
+      if (cancelEnRouteComp > 0 && order.driverId) {
+        await tx.driverEarning.create({
+          data: {
+            driverId: order.driverId,
+            orderId: order.id,
+            kind: "CANCELLED_EN_ROUTE",
+            grossPrice: cancelFee,
+            driverAmount: cancelEnRouteComp,
+            companyAmount: Math.round((Number(cancelFee) - cancelEnRouteComp) * 100) / 100,
+            collectedInCash: false,
+          },
+        });
+        await tx.driverProfile.update({
+          where: { id: order.driverId },
+          data: { unpaidEarnings: { increment: cancelEnRouteComp } },
+        });
+      }
       if (body.status === "CANCELLED" && order.assignedAt) {
         await tx.order.update({ where: { id: order.id }, data: { assignedAt: null } });
       }
@@ -224,6 +246,14 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           failedTripComp > 0
             ? `${order.trackingNumber} — დაკარგული სვლის კომპენსაცია ${failedTripComp} ₾. ამანათი დააბრუნე.`
             : `${order.trackingNumber} — ამანათი დააბრუნე.`,
+        data: { orderId: order.id },
+      });
+    }
+
+    if (st === "CANCELLED" && cancelEnRouteComp > 0 && order.driverId) {
+      await notifyDriver(order.driverId, {
+        title: "შეკვეთა გაუქმდა",
+        body: `${order.trackingNumber} — დაკარგული სვლის კომპენსაცია ${cancelEnRouteComp} ₾`,
         data: { orderId: order.id },
       });
     }

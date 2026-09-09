@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, ApiError } from "@/lib/api";
 import { pricingRuleSchema } from "@/lib/validation";
-import type { WeightBracket } from "@/lib/pricing";
+import type { WeightBracket, DriverWeightBracket } from "@/lib/pricing";
 
 const num = (v: unknown) => Number(v);
 
@@ -11,6 +11,8 @@ function dto(r: Awaited<ReturnType<typeof prisma.pricingRule.findFirstOrThrow>>)
     zone: r.zone,
     isActive: r.isActive,
     weightBrackets: (r.weightBrackets as unknown as WeightBracket[]) ?? [],
+    driverWeightBrackets: (r.driverWeightBrackets as unknown as DriverWeightBracket[] | null) ?? null,
+    partnerCost: num(r.partnerCost),
     codFee: num(r.codFee),
     driverBaseFee: num(r.driverBaseFee),
     driverPerKm: num(r.driverPerKm),
@@ -45,6 +47,8 @@ export function POST(req: Request) {
         zone: data.zone,
         isActive: data.isActive,
         weightBrackets: data.weightBrackets,
+        driverWeightBrackets: data.driverWeightBrackets ?? undefined,
+        partnerCost: data.partnerCost,
         codFee: data.codFee,
         driverBaseFee: data.driverBaseFee,
         driverPerKm: data.driverPerKm,

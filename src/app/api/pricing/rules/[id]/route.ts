@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail } from "@/lib/api";
 import { pricingRuleSchema } from "@/lib/validation";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export function PATCH(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
@@ -13,6 +13,9 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     const patch: Prisma.PricingRuleUpdateInput = {};
     if (data.isActive !== undefined) patch.isActive = data.isActive;
     if (data.weightBrackets !== undefined) patch.weightBrackets = data.weightBrackets;
+    if (data.driverWeightBrackets !== undefined)
+      patch.driverWeightBrackets = data.driverWeightBrackets ?? Prisma.DbNull;
+    if (data.partnerCost !== undefined) patch.partnerCost = data.partnerCost;
     if (data.codFee !== undefined) patch.codFee = data.codFee;
     if (data.driverBaseFee !== undefined) patch.driverBaseFee = data.driverBaseFee;
     if (data.driverPerKm !== undefined) patch.driverPerKm = data.driverPerKm;

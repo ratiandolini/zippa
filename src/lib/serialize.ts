@@ -88,7 +88,13 @@ export function serializeOrder(o: OrderWith) {
       codFee: num(o.codFee),
       total: num(o.totalPrice),
       driverFee: num(o.driverFee),
+      partnerCost: num(o.partnerCost),
+      companyMargin: num(o.companyMargin),
     },
+    pricingSource: o.pricingSource,
+    priceAdjustmentReason: o.priceAdjustmentReason,
+    priceAdjustedAt: o.priceAdjustedAt?.toISOString() ?? null,
+    needsManualReview: o.needsManualReview,
 
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,

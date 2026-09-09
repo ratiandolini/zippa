@@ -26,6 +26,7 @@ export function handle(fn: () => Promise<Response>) {
     if (err?.digest?.startsWith?.("DYNAMIC_SERVER_USAGE") || err?.digest === "NEXT_REDIRECT")
       throw err;
     if (err instanceof ApiError) return fail(err.status, err.message);
+    if (err?.name === "InactiveZoneError") return fail(409, err.message);
     if (err instanceof ZodError) {
       // dotted-path fieldErrors (მაგ. "sender.phone") — რომ კლიენტმა კონკრეტულ ველთან აჩვენოს
       const fieldErrors: Record<string, string[]> = {};

@@ -29,8 +29,9 @@ export default function PricingPage() {
         ))}
       </div>
       <p className="mt-6 text-xs text-muted-foreground">
-        კურიერი თითო მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ. ეს არის მთელი
-        ანაზღაურება ამ მიტანისთვის — ცალკე ხელფასი არ ერიცხება.
+        თბილისში კურიერი თითო მიტანაზე იღებს წონა-ცხრილით (მანძილი არ ითვლება). ეს არის მთელი
+        ანაზღაურება ამ მიტანისთვის — ცალკე ხელფასი არ ერიცხება. 20 კგ-ზე მეტი და რთული შემთხვევები
+        ავტომატურად არ მუშავდება — დისპეჩერი ხელით ადასტურებს ფასს.
       </p>
     </>
   );
@@ -99,6 +100,10 @@ function CodCommissionCard() {
 function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
   const [brackets, setBrackets] = useState<WeightBracket[]>(rule.weightBrackets);
+  const [dBrackets, setDBrackets] = useState<{ maxKg: number; payout: number }[] | null>(
+    rule.driverWeightBrackets,
+  );
+  const [partnerCost, setPartnerCost] = useState(String(rule.partnerCost));
   const [codFee, setCodFee] = useState(String(rule.codFee));
   const [dBase, setDBase] = useState(String(rule.driverBaseFee));
   const [dPerKm, setDPerKm] = useState(String(rule.driverPerKm));
@@ -110,6 +115,8 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
 
   function reset() {
     setBrackets(rule.weightBrackets);
+    setDBrackets(rule.driverWeightBrackets);
+    setPartnerCost(String(rule.partnerCost));
     setCodFee(String(rule.codFee));
     setDBase(String(rule.driverBaseFee));
     setDPerKm(String(rule.driverPerKm));
@@ -126,6 +133,10 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
     try {
       await api(`/api/pricing/rules/${rule.id}`, "PATCH", {
         weightBrackets: brackets.map((b) => ({ maxKg: Number(b.maxKg), price: Number(b.price) })),
+        driverWeightBrackets: dBrackets
+          ? dBrackets.map((b) => ({ maxKg: Number(b.maxKg), payout: Number(b.payout) }))
+          : null,
+        partnerCost: Number(partnerCost),
         codFee: Number(codFee),
         driverBaseFee: Number(dBase),
         driverPerKm: Number(dPerKm),
@@ -144,6 +155,19 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
 
   const setBracket = (i: number, key: "maxKg" | "price", v: string) =>
     setBrackets((bs) => bs.map((b, j) => (j === i ? { ...b, [key]: Number(v) } : b)));
+
+  const setDPayout = (i: number, v: string) =>
+    setDBrackets((bs) =>
+      (bs ?? []).map((b, j) => (j === i ? { ...b, payout: Number(v) } : b)),
+    );
+
+  const enableDriverBrackets = () =>
+    setDBrackets(brackets.map((b) => ({ maxKg: b.maxKg, payout: Math.round(b.price * 0.5 * 2) / 2 })));
+
+  const dPayoutOf = (i: number) => {
+    const src = dBrackets ?? rule.driverWeightBrackets;
+    return src?.[i]?.payout ?? null;
+  };
 
   const rangeLabel = (i: number) => {
     const lo = i === 0 ? 0 : brackets[i - 1].maxKg;
@@ -177,6 +201,9 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">წონა</th>
                 <th className="py-2 pr-4 font-medium">კლიენტი იხდის</th>
+                {(dBrackets ?? rule.driverWeightBrackets) && (
+                  <th className="py-2 pr-4 font-medium">კურიერს ერიცხება</th>
+                )}
                 {editing && <th className="py-2 font-medium">ზედა ზღვარი (კგ)</th>}
               </tr>
             </thead>
@@ -197,6 +224,23 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
                       <span className="font-medium tabular-nums">{GEL(b.price)}</span>
                     )}
                   </td>
+                  {(dBrackets ?? rule.driverWeightBrackets) && (
+                    <td className="py-2 pr-4">
+                      {editing && dBrackets ? (
+                        <Input
+                          type="number"
+                          step="0.5"
+                          className="h-8 w-24"
+                          value={String(dPayoutOf(i) ?? 0)}
+                          onChange={(e) => setDPayout(i, e.target.value)}
+                        />
+                      ) : (
+                        <span className="tabular-nums text-muted-foreground">
+                          {dPayoutOf(i) == null ? "—" : GEL(dPayoutOf(i)!)}
+                        </span>
+                      )}
+                    </td>
+                  )}
                   {editing && (
                     <td className="py-2">
                       <Input
@@ -218,14 +262,33 @@ function RuleCard({ rule, onSaved }: { rule: PricingRule; onSaved: () => void })
           <Field label="კურიერი — ბაზისი ₾" value={dBase} onChange={setDBase} edit={editing} display={GEL(rule.driverBaseFee)} />
           <Field label="კურიერი — ₾/კმ" value={dPerKm} onChange={setDPerKm} edit={editing} display={GEL(rule.driverPerKm)} />
           <Field label="უფასო კმ (ბაზისში)" value={dFreeKm} onChange={setDFreeKm} edit={editing} display={`${rule.driverFreeKm} კმ`} />
+          {rule.zone !== "TBILISI" && (
+            <Field label="პარტნიორის ხარჯი ₾" value={partnerCost} onChange={setPartnerCost} edit={editing} display={GEL(rule.partnerCost)} />
+          )}
           {rule.zone === "TBILISI" && (
             <Field label="იმ-დღეს cut-off (საათი)" value={cutoff} onChange={setCutoff} edit={editing} display={rule.sameDayCutoffHour == null ? "—" : `${rule.sameDayCutoffHour}:00`} />
           )}
           <Field label="მინ. დღეები" value={days} onChange={setDays} edit={editing} display={String(rule.deliveryDays)} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ
+          {(dBrackets ?? rule.driverWeightBrackets)
+            ? "კურიერს ერიცხება წონა-ცხრილით (მანძილი არ ითვლება). ბაზისი+კმ გამოიყენება მხოლოდ თუ წონა-ცხრილი გამორთულია."
+            : "კურიერი მიტანაზე იღებს: ბაზისი + (მანძილი − უფასო კმ) × ₾/კმ"}
         </p>
+
+        {editing && (
+          <div className="mt-3">
+            {dBrackets ? (
+              <Button size="sm" variant="ghost" onClick={() => setDBrackets(null)}>
+                წონით ანაზღაურების გამორთვა
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={enableDriverBrackets}>
+                წონით ანაზღაურების ჩართვა
+              </Button>
+            )}
+          </div>
+        )}
 
         {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
 

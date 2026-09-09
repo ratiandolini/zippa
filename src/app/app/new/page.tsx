@@ -26,6 +26,8 @@ interface Quote {
   codCommission: number;
   codNet: number;
   overWeight: boolean;
+  needsManualReview: boolean;
+  manualReviewNote: string | null;
   estimatedDeliveryAt: string;
 }
 
@@ -333,6 +335,9 @@ export default function NewOrderPage() {
                     <p className="text-xs text-destructive">
                       წონა კალათებს სცდება — დაუკავშირდით დისპეჩერს ზუსტი ფასისთვის
                     </p>
+                  )}
+                  {quote.needsManualReview && !quote.overWeight && (
+                    <p className="text-xs text-amber-700">ფასს დისპეჩერი დაადასტურებს</p>
                   )}
                   {payment === "CASH" && (
                     <div className="space-y-1 border-t border-border pt-2 text-xs text-muted-foreground">

@@ -21,15 +21,18 @@ async function main() {
   // ტარიფის წესები — ზონა + წონა-კალათები.
   // არსებულს არ ვშლით (დისპეჩერის რედაქტირება რომ არ დაიკარგოს) — ვამატებთ მხოლოდ ნაკლულ ზონას.
   const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));
+  const DB = (rows: [number, number][]) => rows.map(([maxKg, payout]) => ({ maxKg, payout }));
+  const tbilisiDriverBrackets = DB([[6, 2.5], [10, 3], [15, 4], [20, 5], [30, 6.5], [40, 8], [50, 10]]);
   const existingZones = new Set((await prisma.pricingRule.findMany({ select: { zone: true } })).map((r) => r.zone));
   const seedRules = [
       {
         zone: "TBILISI",
         weightBrackets: B([[6, 5], [10, 6], [15, 8], [20, 10], [30, 13], [40, 16], [50, 20]]),
+        driverWeightBrackets: tbilisiDriverBrackets,
         codFee: "0",
         driverBaseFee: "2.50",
-        driverPerKm: "0.50",
-        driverFreeKm: "5",
+        driverPerKm: "0",
+        driverFreeKm: "0",
         driverFlatFee: "3.00",
         sameDayCutoffHour: 16,
         deliveryDays: 0,
@@ -190,7 +193,7 @@ async function main() {
     const deliveryPrice = tbBrackets.find(([m]) => o.weightKg <= m)?.[1] ?? 20;
     const codFee = 0;
     const total = round2(deliveryPrice + codFee);
-    const driverFee = 3;
+    const driverFee = tbilisiDriverBrackets.find((b) => o.weightKg <= b.maxKg)?.payout ?? 10;
     const createdAt = new Date(Date.now() - o.minutesAgo * 60000);
     const assigned = o.status !== "PENDING";
     const delivered = o.status === "DELIVERED";

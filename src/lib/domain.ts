@@ -62,7 +62,9 @@ export const CANCEL_FEE_GEL = 2;
 // მიტანის ჩაშლა (RTO) — სტანდარტული წესი
 // კურიერი იღებს დაკარგული სვლის კომპენსაციას; გამგზავნს ერიცხება დაბრუნების საფასური.
 // ორივე კონფიგურირებადია — შეცვლა აქ.
-export const FAILED_TRIP_DRIVER_PCT = 0.5; // driverFee-ის წილი, რასაც კურიერი მაინც იღებს
+export const FAILED_TRIP_DRIVER_PCT = 0.5; // (ძველი) driverFee-ის წილი — ჩანაცვლდა ფიქსირებულით
+export const FAILED_TRIP_DRIVER_GEL = 1; // ჩაშლილ მიტანაზე კურიერს ერიცხება ფიქს. კომპენსაცია
+export const CANCEL_EN_ROUTE_DRIVER_GEL = 1; // გზაში-ყოფნისას გაუქმებაზე კურიერს ერიცხება
 export const RETURN_FEE_PCT = 0.5; // deliveryPrice-ის წილი, რასაც გამგზავნი იხდის დაბრუნებაზე
 
 // კურიერის ბრალით ჩაშლა — არც კომპენსაცია, არც დაბრუნების საფასური

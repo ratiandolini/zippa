@@ -122,6 +122,12 @@ export const pricingRuleSchema = z.object({
     .array(z.object({ maxKg: z.number().positive().max(1000), price: money }))
     .min(1, "მინიმუმ ერთი წონა-კალათა"),
   codFee: money,
+  driverWeightBrackets: z
+    .array(z.object({ maxKg: z.number().positive().max(1000), payout: money }))
+    .min(1)
+    .nullable()
+    .optional(),
+  partnerCost: money.default(0),
   driverBaseFee: money.default(0),
   driverPerKm: money.default(0),
   driverFreeKm: money.default(0),
@@ -184,6 +190,22 @@ export const updateStatusSchema = z.object({
     .optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+});
+
+// დისპეჩერის ხელით ფასის შესწორება (PENDING / ASSIGNED შეკვეთაზე)
+export const PRICE_ADJUST_REASONS = [
+  "არასწორად მითითებული წონა",
+  "დიდი გაბარიტი",
+  "შორეული/რთული მისამართი",
+  "განმეორებითი მიტანა",
+  "მომხმარებელთან შეთანხმებული ფასი",
+  "კურიერის დამატებითი სვლა",
+] as const;
+
+export const adjustPriceSchema = z.object({
+  deliveryPrice: z.number().nonnegative().max(100000),
+  driverFee: z.number().nonnegative().max(100000),
+  reason: z.enum(PRICE_ADJUST_REASONS),
 });
 
 // ნაღდის ჩაბარება — კურიერი აცხადებს

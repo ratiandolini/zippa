@@ -30,6 +30,8 @@ export function POST(req: Request) {
       codFee: price.codFee,
       totalPrice: price.totalPrice,
       overWeight: price.overWeight,
+      needsManualReview: price.needsManualReview,
+      manualReviewNote: price.needsManualReview ? "ფასს დისპეჩერი დაადასტურებს" : null,
       codAmount,
       codCommission,
       codNet: Math.round((collectAmount - codCommission) * 100) / 100,

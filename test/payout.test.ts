@@ -42,17 +42,17 @@ async function deliverN(n: number, payment: "CASH" | "CARD") {
 beforeEach(resetDb);
 
 describe("payout (დისპეჩერი)", () => {
-  it("2 ნაღდი მიტანა → unpaidEarnings 6, cashOnHand 10", async () => {
-    const { drv } = await deliverN(2, "CASH"); // total 5 თითო, driverFee 3 თითო
+  it("2 ნაღდი მიტანა → unpaidEarnings 5, cashOnHand 10", async () => {
+    const { drv } = await deliverN(2, "CASH"); // total 5 თითო, driverFee 2.5 თითო (წონა-ცხრილი)
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.unpaidEarnings)).toBe(6);
+    expect(Number(dp.unpaidEarnings)).toBe(5);
     expect(Number(dp.cashOnHand)).toBe(10);
   });
 
   it("გადახდა → unpaidEarnings მცირდება, Payout ჩანაწერი, earnings settled", async () => {
     const { drv, disp } = await deliverN(3, "CARD");
     actAs(session(disp));
-    const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 9 } });
+    const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 7.5 } });
     expect(r.status).toBe(200);
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(Number(dp.unpaidEarnings)).toBe(0);
@@ -78,14 +78,14 @@ describe("payout (დისპეჩერი)", () => {
     const { drv, disp } = await deliverN(2, "CARD");
     actAs(session(disp));
     const r = await call(driverDetail, { params: { id: drv.profile.id } });
-    expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(6);
+    expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(5);
     expect((r.body.driver as { unsettledEarningsCount: number }).unsettledEarningsCount).toBe(2);
   });
 });
 
 describe("ანგარიშსწორების ცხრილი (payroll)", () => {
   it("აჯამებს ანაზღაურებას, კომპანიის წილს და გადახდას პერიოდში", async () => {
-    const { drv, disp } = await deliverN(2, "CARD"); // 2 მიტანა, თითო driverFee 3, total 5
+    const { drv, disp } = await deliverN(2, "CARD"); // 2 მიტანა, თითო driverFee 2.5, total 5
     actAs(session(disp));
     await call(payout, { params: { id: drv.profile.id }, body: { amount: 4 } });
 
@@ -95,11 +95,11 @@ describe("ანგარიშსწორების ცხრილი (payr
     const row = b.rows.find((x) => x.driverId === (drv.profile.id as never));
     expect(row).toBeTruthy();
     expect(row!.deliveries).toBe(2);
-    expect(row!.earnedInPeriod).toBe(6); // 2 × 3
-    expect(row!.companyInPeriod).toBe(4); // 2 × (5 − 3)
+    expect(row!.earnedInPeriod).toBe(5); // 2 × 2.5
+    expect(row!.companyInPeriod).toBe(5); // 2 × (5 − 2.5)
     expect(row!.paidInPeriod).toBe(4);
-    expect(row!.unpaidEarnings).toBe(2); // 6 − 4
-    expect(b.totals.earned).toBe(6);
+    expect(row!.unpaidEarnings).toBe(1); // 5 − 4
+    expect(b.totals.earned).toBe(5);
   });
 
   it("არა-დისპეჩერი → 403", async () => {
@@ -154,7 +154,7 @@ describe("ნაღდის ჩაბარება (კურიერი →
 
 describe("კურიერის დეაქტივაცია", () => {
   it("ხელზე ნაღდით → 409; ანაზღაურებით უ-payout → 409; payout=1 → იხდის და თიშავს", async () => {
-    const { drv, disp } = await deliverN(2, "CASH"); // unpaid 6, cash 10
+    const { drv, disp } = await deliverN(2, "CASH"); // unpaid 5, cash 10
     actAs(session(disp));
 
     // ხელზე ნაღდი — ვერ დეაქტივდება
@@ -172,7 +172,7 @@ describe("კურიერის დეაქტივაცია", () => {
     // payout=1 → იხდის და თიშავს
     const r = await call(deactivateDriver, { params: { id: drv.profile.id }, query: { payout: "1" } });
     expect(r.status).toBe(200);
-    expect((r.body as { paidOut: number }).paidOut).toBe(6);
+    expect((r.body as { paidOut: number }).paidOut).toBe(5);
 
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(dp.status).toBe("OFFLINE");

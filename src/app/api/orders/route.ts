@@ -61,6 +61,8 @@ export function POST(req: Request) {
       (data.paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
     const codPct = collectAmount > 0 ? await getSetting("cod_commission_percent") : 0;
     const codCommission = Math.round(collectAmount * (codPct / 100) * 100) / 100;
+    const companyMargin =
+      Math.round((price.companyMargin + codCommission) * 100) / 100;
     const eta = await estimateDelivery(price.zone);
 
     const order = await prisma.order.create({
@@ -99,6 +101,9 @@ export function POST(req: Request) {
         codFee: price.codFee,
         totalPrice: price.totalPrice,
         driverFee: price.driverFee,
+        partnerCost: price.partnerCost,
+        companyMargin,
+        needsManualReview: price.needsManualReview,
 
         paymentMethod: data.paymentMethod,
         paymentStatus: "UNPAID",

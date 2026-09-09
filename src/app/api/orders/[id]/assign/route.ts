@@ -14,6 +14,8 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (!order) return fail(404, "შეკვეთა ვერ მოიძებნა");
     if (!["PENDING", "ASSIGNED", "FAILED"].includes(order.status))
       throw new ApiError(409, "ამ შეკვეთას კურიერს ვეღარ მიანიჭებ");
+    if (order.needsManualReview)
+      throw new ApiError(409, "ჯერ დისპეჩერმა ფასი უნდა დაადასტუროს („ფასის შესწორება“)");
 
     const driver = await prisma.driverProfile.findUnique({
       where: { id: driverId },

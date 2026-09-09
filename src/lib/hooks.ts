@@ -93,6 +93,8 @@ export interface PricingRule {
   zone: "TBILISI" | "REGIONAL_CITY" | "TOWN_VILLAGE";
   isActive: boolean;
   weightBrackets: WeightBracket[];
+  driverWeightBrackets: { maxKg: number; payout: number }[] | null;
+  partnerCost: number;
   codFee: number;
   driverBaseFee: number;
   driverPerKm: number;

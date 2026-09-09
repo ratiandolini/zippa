@@ -134,9 +134,16 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       upd.codFee = price.codFee;
       upd.totalPrice = price.totalPrice;
       upd.driverFee = price.driverFee;
+      upd.partnerCost = price.partnerCost;
       upd.codAmount = (paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
       const codPct = collectAmount > 0 ? await getSetting("cod_commission_percent") : 0;
-      upd.codCommission = Math.round(collectAmount * (codPct / 100) * 100) / 100;
+      const codCommission = Math.round(collectAmount * (codPct / 100) * 100) / 100;
+      upd.codCommission = codCommission;
+      upd.companyMargin = Math.round((price.companyMargin + codCommission) * 100) / 100;
+      upd.needsManualReview = price.needsManualReview;
+      upd.pricingSource = "RULE";
+      upd.priceAdjustmentReason = null;
+      upd.priceAdjustedAt = null;
       upd.estimatedDeliveryAt = eta;
     }
 

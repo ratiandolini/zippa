@@ -254,6 +254,39 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
   const canAdjust =
     order.status === "FAILED" || order.status === "CANCELLED" || !!order.returnRequestedAt;
+  const canFixPrice = order.status === "PENDING" || order.status === "ASSIGNED";
+  const [fixingPrice, setFixingPrice] = useState(false);
+
+  async function fixPrice() {
+    const dp = prompt(
+      `${order.trackingNumber} — კლიენტი იხდის მიტანაში (₾):`,
+      String(order.price.delivery),
+    );
+    if (dp === null) return;
+    const df = prompt("კურიერს ერიცხება (₾):", String(order.price.driverFee));
+    if (df === null) return;
+    const reasons = [
+      "არასწორად მითითებული წონა",
+      "დიდი გაბარიტი",
+      "შორეული/რთული მისამართი",
+      "განმეორებითი მიტანა",
+      "მომხმარებელთან შეთანხმებული ფასი",
+      "კურიერის დამატებითი სვლა",
+    ];
+    const reason = prompt(`მიზეზი — ჩაწერე ზუსტად ერთი:\n${reasons.join("\n")}`, reasons[0]);
+    if (!reason || !reasons.includes(reason)) return;
+    setFixingPrice(true);
+    try {
+      await api(`/api/orders/${order.id}/price`, "PATCH", {
+        deliveryPrice: parseFloat(dp),
+        driverFee: parseFloat(df),
+        reason,
+      });
+      onChange();
+    } finally {
+      setFixingPrice(false);
+    }
+  }
 
   async function adjust() {
     const amtStr = prompt(
@@ -317,10 +350,38 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
       {order.delivery.note && (
         <div className="mt-1 text-[11px] text-blue-700">📝 {order.delivery.note}</div>
       )}
-      <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{order.driverName ?? "კურიერი არ ჰყავს"}</span>
-        <span>{GEL(order.price.total)}</span>
+      <div className="mt-1.5 text-[11px] text-muted-foreground">
+        {order.driverName ?? "კურიერი არ ჰყავს"}
       </div>
+      <div className="mt-1 space-y-0.5 rounded-md bg-muted/40 px-2 py-1.5 text-[11px] tabular-nums">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">კლიენტი იხდის</span>
+          <span>{GEL(order.price.total)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">კურიერს ერიცხება</span>
+          <span>{GEL(order.price.driverFee)}</span>
+        </div>
+        {order.price.partnerCost > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">პარტნიორი</span>
+            <span>−{GEL(order.price.partnerCost)}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-medium">
+          <span className="text-muted-foreground">Zippa-ს მარჟა</span>
+          <span>{GEL(order.price.companyMargin)}</span>
+        </div>
+        {order.pricingSource === "MANUAL" && (
+          <div className="text-amber-700">✎ ხელით შესწორდა{order.priceAdjustmentReason ? ` · ${order.priceAdjustmentReason}` : ""}</div>
+        )}
+      </div>
+
+      {order.needsManualReview && (
+        <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
+          ⚠ ფასი ხელით უნდა დაადასტურო — მინიჭება დაბლოკილია
+        </div>
+      )}
 
       {order.returnRequestedAt && !order.returnResolvedAt && (
         <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900">
@@ -386,6 +447,15 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
           >
             რედაქტირება
           </Link>
+        )}
+        {canFixPrice && (
+          <button
+            onClick={fixPrice}
+            disabled={fixingPrice}
+            className="text-[11px] font-medium text-accent hover:underline disabled:opacity-50"
+          >
+            {fixingPrice ? "…" : "ფასის შესწორება"}
+          </button>
         )}
         {canAdjust && (
           <button

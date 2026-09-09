@@ -7,6 +7,22 @@ export interface WeightBracket {
   price: number;
 }
 
+export interface DriverWeightBracket {
+  maxKg: number;
+  payout: number;
+}
+
+/** ზონა გამორთულია — quote/შეკვეთა უნდა უარყოს */
+export class InactiveZoneError extends Error {
+  constructor() {
+    super("ამ მიმართულებით მომსახურება დროებით მიუწვდომელია.");
+    this.name = "InactiveZoneError";
+  }
+}
+
+/** ამ წონაზე ავტომატური დამუშავება არ ხდება — დისპეჩერი ხელით ადასტურებს */
+export const MANUAL_REVIEW_WEIGHT_KG = 20;
+
 export interface PriceInput {
   pickup: { lat: number; lng: number };
   delivery: { lat: number; lng: number };
@@ -22,7 +38,10 @@ export interface PriceBreakdown {
   codFee: number;
   totalPrice: number;
   driverFee: number; // კურიერს ერგება ამ მიტანაზე
+  partnerCost: number; // რეგიონული პარტნიორის ხარჯი
+  companyMargin: number; // Zippa-ს მარჟა (COD საკომისიოს გარეშე)
   overWeight: boolean; // წონა ბოლო კალათას სცდება
+  needsManualReview: boolean; // 20 კგ+ ან რთული — ავტო-მინიჭება იბლოკება
 }
 
 const n = (v: unknown) => Number(v);
@@ -57,10 +76,22 @@ function bracketPrice(brackets: WeightBracket[], weightKg: number): { price: num
   return { price: last?.price ?? 0, over: true };
 }
 
+/** კურიერის ანაზღაურება წონა-კალათიდან. null თუ ცხრილი არ არის განსაზღვრული. */
+export function driverBracketPayout(
+  brackets: DriverWeightBracket[] | null | undefined,
+  weightKg: number,
+): number | null {
+  if (!Array.isArray(brackets) || brackets.length === 0) return null;
+  const sorted = [...brackets].sort((a, b) => a.maxKg - b.maxKg);
+  for (const b of sorted) if (weightKg <= b.maxKg) return b.payout;
+  return sorted[sorted.length - 1]?.payout ?? null;
+}
+
 export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown> {
   const zone = await resolveZone(input.deliveryCityId);
   const rule = await prisma.pricingRule.findUnique({ where: { zone } });
   if (!rule) throw new Error(`ტარიფის წესი ვერ მოიძებნა ზონისთვის ${zone}`);
+  if (!rule.isActive) throw new InactiveZoneError();
 
   const brackets = (rule.weightBrackets as unknown as WeightBracket[]) ?? [];
   const { price: deliveryPrice, over } = bracketPrice(brackets, input.weightKg);
@@ -72,9 +103,31 @@ export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown>
   // საკურიერო ინდუსტრიის სტანდარტული მიახლოება — ამცირებს კურიერთან დავებს კმ-ანაზღაურებაზე.
   const straightKm = haversineKm(input.pickup, input.delivery);
   const distanceKm = Math.round(straightKm * ROAD_FACTOR * 100) / 100;
-  const driverFee = driverFeeFor(rule, distanceKm, deliveryPrice);
 
-  return { zone, distanceKm, deliveryPrice, codFee, totalPrice, driverFee, overWeight: over };
+  // კურიერის თანხა: ჯერ წონა-ცხრილი (თბილისის STANDARD), თორემ ბაზისი+კმ / fallback
+  const bracketPayout = driverBracketPayout(
+    rule.driverWeightBrackets as unknown as DriverWeightBracket[] | null,
+    input.weightKg,
+  );
+  const driverFee =
+    bracketPayout != null ? bracketPayout : driverFeeFor(rule, distanceKm, deliveryPrice);
+
+  const partnerCost = n(rule.partnerCost);
+  const companyMargin = Math.round((totalPrice - driverFee - partnerCost) * 100) / 100;
+  const needsManualReview = over || input.weightKg > MANUAL_REVIEW_WEIGHT_KG;
+
+  return {
+    zone,
+    distanceKm,
+    deliveryPrice,
+    codFee,
+    totalPrice,
+    driverFee,
+    partnerCost,
+    companyMargin,
+    overWeight: over,
+    needsManualReview,
+  };
 }
 
 /** სწორი ხაზი → ფაქტობრივი მარშრუტი (ქალაქის ქუჩების გამო) */
