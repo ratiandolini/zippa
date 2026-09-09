@@ -185,6 +185,17 @@ function Detail({ id }: { id: string }) {
                 <span className="text-muted-foreground">წონა</span>
                 <span>{order.weightKg} კგ</span>
               </div>
+              {order.needsManualReview && order.status === "PENDING" && (
+                <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                  ფასს დისპეჩერი დაადასტურებს — საბოლოო თანხა შესაძლოა შეიცვალოს.
+                </div>
+              )}
+              {order.pricingSource === "MANUAL" && (
+                <div className="rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                  ფასი დისპეჩერმა დააზუსტა
+                  {order.priceAdjustmentReason ? ` — ${order.priceAdjustmentReason}` : ""}.
+                </div>
+              )}
               {[...FREE_CANCEL_STATUSES, ...PAID_CANCEL_STATUSES].includes(order.status) && (
                 <div className="pt-2">
                   <CancelOrderButton
