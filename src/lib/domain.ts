@@ -59,16 +59,23 @@ export const FREE_CANCEL_STATUSES: OrderStatus[] = ["PENDING", "ASSIGNED", "ACCE
 export const PAID_CANCEL_STATUSES: OrderStatus[] = ["EN_ROUTE_PICKUP"];
 export const CANCEL_FEE_GEL = 2;
 
-// ამანათი უკვე კურიერთანაა — გაუქმებისას მიტანის ფასი აღარ ბრუნდება და ემატება დაბრუნების საფასური
+// ამანათი უკვე კურიერთანაა — გაუქმებისას მიტანის ფასი აღარ ბრუნდება და ემატება დაბრუნების საფასური.
+// კურიერს ერიცხება საწყისად გამოთვლილი სრული driverFee (ამანათი აღებული და დასაბრუნებელია).
 export const POST_PICKUP_STATUSES: OrderStatus[] = ["PICKED_UP", "IN_TRANSIT"];
-// ამანათის აღების შემდეგ გაუქმებაზე კურიერს ერიცხება დაბრუნების სვლის ფიქს. ანაზღაურება
-export const CANCEL_AFTER_PICKUP_DRIVER_GEL = 1;
 
 // DriverEarning.kind — ჩვენებადი წარწერა (DELIVERY წარწერას არ ჭირდება)
 export const EARNING_KIND_LABEL: Record<string, string> = {
   FAILED_TRIP: "ჩაშლილი სვლა",
   CANCELLED_EN_ROUTE: "გაუქმება — გზაში",
   CANCELLED_AFTER_PICKUP: "გაუქმება — აღების შემდეგ",
+};
+
+// შეკვეთის ფინანსური სტატუსი (გამოთვლილი — არა DB ველი)
+export type FinanceStatus = "OWED" | "RECEIVED" | "DRIVER_PAYABLE";
+export const FINANCE_STATUS_LABEL: Record<FinanceStatus, string> = {
+  OWED: "გადასახდელი",
+  RECEIVED: "მიღებული",
+  DRIVER_PAYABLE: "კურიერისთვის გადასახდელი",
 };
 
 // მიტანის ჩაშლა (RTO) — სტანდარტული წესი

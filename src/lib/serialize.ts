@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { ACTIVE_ORDER_STATUSES } from "@/lib/domain";
+import { ACTIVE_ORDER_STATUSES, type FinanceStatus } from "@/lib/domain";
 
 const num = (v: Prisma.Decimal | number | null | undefined) =>
   v == null ? 0 : Number(v);
@@ -23,11 +23,32 @@ export const orderInclude = {
   },
   events: { orderBy: { createdAt: "asc" } },
   review: { select: { rating: true, comment: true } },
+  earnings: { select: { kind: true, driverAmount: true, companyAmount: true, isSettled: true } },
 } satisfies Prisma.OrderInclude;
 
 type OrderWith = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
 export function serializeOrder(o: OrderWith) {
+  // ── ფინანსური სტატუსი ──
+  // კლიენტის ვალდებულება Zippa-სთან (გაუქმება/დაბრუნება), ჯერ არ მიღებული
+  const chargeTotal = Math.round((num(o.cancelFee) + num(o.returnFee)) * 100) / 100;
+  const chargeReceived = o.chargeSettledAt != null;
+  const customerOwed = chargeTotal > 0 && !chargeReceived ? chargeTotal : 0;
+  // ამ შეკვეთაზე კურიერისთვის გადასახდელი (დარიცხული, ჯერ არ ჩართული payout-ში)
+  const driverPayable =
+    Math.round(
+      o.earnings.filter((e) => !e.isSettled).reduce((s, e) => s + Number(e.driverAmount), 0) * 100,
+    ) / 100;
+  // ფინანსური სტატუსი მხოლოდ გაუქმება/დაბრუნების საფასურის მქონე შეკვეთებზე
+  const financeStatus: FinanceStatus | null =
+    chargeTotal <= 0
+      ? null
+      : customerOwed > 0
+        ? "OWED"
+        : driverPayable > 0
+          ? "DRIVER_PAYABLE"
+          : "RECEIVED";
+
   return {
     id: o.id,
     trackingNumber: o.trackingNumber,
@@ -102,6 +123,13 @@ export function serializeOrder(o: OrderWith) {
     codAmount: num(o.codAmount),
     cancelFee: num(o.cancelFee),
     returnFee: num(o.returnFee),
+    chargeSettledAt: o.chargeSettledAt?.toISOString() ?? null,
+    finance: {
+      status: financeStatus, // OWED | RECEIVED | DRIVER_PAYABLE | null
+      customerOwed, // კლიენტს გადასახდელი (მიღებამდე)
+      chargeReceived, // Zippa-მ მიიღო კლიენტისგან
+      driverPayable, // ამ შეკვეთაზე კურიერისთვის გადასახდელი
+    },
     failureReason: o.failureReason,
     returnRequestedAt: o.returnRequestedAt?.toISOString() ?? null,
     returnReason: o.returnReason,

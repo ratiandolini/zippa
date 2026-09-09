@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { useOrders, type DriverListItem } from "@/lib/hooks";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, streetOf } from "@/lib/domain";
+import { GEL, streetOf, FINANCE_STATUS_LABEL } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -355,6 +355,28 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
             ]
               .filter(Boolean)
               .join(" + ")}
+          </div>
+        )}
+        {order.finance.status && (
+          <div className="mt-0.5 flex justify-between">
+            <span
+              className={
+                order.finance.status === "OWED"
+                  ? "font-medium text-destructive"
+                  : order.finance.status === "DRIVER_PAYABLE"
+                    ? "font-medium text-amber-700"
+                    : "text-muted-foreground"
+              }
+            >
+              {FINANCE_STATUS_LABEL[order.finance.status]}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {order.finance.status === "OWED"
+                ? GEL(order.finance.customerOwed)
+                : order.finance.status === "DRIVER_PAYABLE"
+                  ? GEL(order.finance.driverPayable)
+                  : ""}
+            </span>
           </div>
         )}
       </div>

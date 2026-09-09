@@ -9,7 +9,6 @@ import {
   CANCEL_FEE_GEL,
   FAILED_TRIP_DRIVER_GEL,
   CANCEL_EN_ROUTE_DRIVER_GEL,
-  CANCEL_AFTER_PICKUP_DRIVER_GEL,
   RETURN_FEE_PCT,
   DRIVER_FAULT_FAILURE,
   FAILURE_REASON_LABEL,
@@ -94,9 +93,10 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       body.status === "CANCELLED" && order.driverId && order.status === "EN_ROUTE_PICKUP"
         ? CANCEL_EN_ROUTE_DRIVER_GEL
         : 0;
-    // ამანათის აღების შემდეგ გაუქმებაზე კურიერს ერიცხება დაბრუნების სვლა
+    // ამანათის აღების შემდეგ გაუქმება — კურიერს ერიცხება საწყისად გამოთვლილი სრული driverFee
+    // (ამანათი აღებულია და დასაბრუნებელია — სვლა შესრულებულია)
     const cancelAfterPickupComp =
-      isPostPickupCancel && order.driverId ? CANCEL_AFTER_PICKUP_DRIVER_GEL : 0;
+      isPostPickupCancel && order.driverId ? Number(order.driverFee) : 0;
     // დაბრუნების საფასური — ჩაშლაზე ან ამანათის აღების შემდეგ გაუქმებაზე (deliveryPrice-ის წილი)
     const returnFee =
       (body.status === "FAILED" && !driverFault) || isPostPickupCancel
@@ -297,7 +297,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (st === "CANCELLED" && cancelAfterPickupComp > 0 && order.driverId) {
       await notifyDriver(order.driverId, {
         title: "შეკვეთა გაუქმდა",
-        body: `${order.trackingNumber} — ამანათი დააბრუნე. დაბრუნების სვლის ანაზღაურება ${cancelAfterPickupComp} ₾`,
+        body: `${order.trackingNumber} — ამანათი დააბრუნე. სრული ანაზღაურება ${cancelAfterPickupComp} ₾ დაგერიცხა`,
         data: { orderId: order.id },
       });
     }

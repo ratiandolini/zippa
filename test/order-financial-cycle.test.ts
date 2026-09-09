@@ -4,8 +4,15 @@ import { POST as createOrder } from "@/app/api/orders/route";
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { GET as listOrders } from "@/app/api/orders/route";
+import { GET as getOrder } from "@/app/api/orders/[id]/route";
 import { GET as payroll } from "@/app/api/dispatch/payroll/route";
-import { GET as codView } from "@/app/api/dispatch/cod/route";
+import { GET as codView, POST as codSettle } from "@/app/api/dispatch/cod/route";
+
+async function finance(id: string) {
+  const r = await call(getOrder, { params: { id } });
+  return (r.body.order as { finance: { status: string | null; customerOwed: number; chargeReceived: boolean; driverPayable: number } })
+    .finance;
+}
 
 beforeEach(resetDb);
 
@@ -108,7 +115,14 @@ describe("3. კურიერი „გზაშია ასაღება�
     expect(Number(dp.unpaidEarnings)).toBe(1);
     expect(dp.status).toBe("AVAILABLE");
 
+    // ფინანსური სტატუსი — კლიენტს გადასახდელი, ჯერ არ მიღებული
     actAs(session(disp));
+    const f = await finance(order.id);
+    expect(f.status).toBe("OWED");
+    expect(f.customerOwed).toBe(2);
+    expect(f.chargeReceived).toBe(false);
+    expect(f.driverPayable).toBe(1);
+
     const pr = await call(payroll, { query: { period: "all" } });
     const row = (pr.body.rows as Record<string, number>[]).find(
       (x) => (x.driverId as never) === drv.profile.id,
@@ -129,8 +143,8 @@ describe("3. კურიერი „გზაშია ასაღება�
 
 // ── 5. ამანათის აღების შემდეგ გაუქმება: მიტანის ფასი არ ბრუნდება + დაბრუნების ტარიფი ──
 describe("5. კურიერმა უკვე აიღო ამანათი — გაუქმება", () => {
-  it("PICKED_UP: cancelFee = მიტანის ფასი, returnFee = 50%, კურიერს 1 ₾, მიტანის ანაზღაურება არ ერიცხება", async () => {
-    const { order, disp, drv } = await setup();
+  it("PICKED_UP: cancelFee = მიტანის ფასი, returnFee = 50%, კურიერს სრული driverFee, მიტანის ანაზღაურება ცალკე არ ერიცხება", async () => {
+    const { order, customer, disp, drv } = await setup();
     actAs(session(disp));
     await call(assign, { params: { id: order.id }, body: { driverId: drv.profile.id } });
     await advance(order.id, drv, ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP"]);
@@ -143,20 +157,36 @@ describe("5. კურიერმა უკვე აიღო ამანა�
     expect(Number(db.cancelFee)).toBe(5); // მთელი მიტანის ფასი რჩება
     expect(Number(db.returnFee)).toBe(2.5); // 5 × 0.5
     expect(db.status).toBe("CANCELLED");
+    expect(db.chargeSettledAt).toBeNull(); // ჯერ არ მიგვიღია
 
-    // მიტანის ანაზღაურება არ შექმნილა
+    // მიტანის ანაზღაურება (DELIVERY) არ შექმნილა — მხოლოდ CANCELLED_AFTER_PICKUP
     expect(await prisma.driverEarning.count({ where: { orderId: order.id, kind: "DELIVERY" } })).toBe(0);
-
     const e = await prisma.driverEarning.findFirstOrThrow({
       where: { orderId: order.id, kind: "CANCELLED_AFTER_PICKUP" },
     });
-    expect(Number(e.driverAmount)).toBe(1);
-    expect(Number(e.companyAmount)).toBe(6.5); // (5 + 2.5) − 1
+    expect(Number(e.driverAmount)).toBe(2.5); // საწყისი სრული driverFee
+    expect(Number(e.companyAmount)).toBe(5); // (5 + 2.5) − 2.5
 
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
-    expect(Number(dp.unpaidEarnings)).toBe(1);
+    expect(Number(dp.unpaidEarnings)).toBe(2.5);
     expect(Number(dp.cashOnHand)).toBe(0);
     expect(dp.status).toBe("AVAILABLE");
+
+    // ── ფინანსური სტატუსი: „გადასახდელი“ → მიღების შემდეგ „კურიერისთვის გადასახდელი“ ──
+    let f = await finance(order.id);
+    expect(f.status).toBe("OWED");
+    expect(f.customerOwed).toBe(7.5); // 5 + 2.5
+    expect(f.driverPayable).toBe(2.5);
+
+    // დისპეჩერი აღრიცხავს, რომ თანხა მიღებულია (COD/charge გასწორება)
+    const paid = await call(codSettle, { body: { customerId: customer.id, method: "ნაღდი" } });
+    expect(paid.status).toBe(200);
+
+    f = await finance(order.id);
+    expect(f.status).toBe("DRIVER_PAYABLE"); // კლიენტისგან მიღებულია, კურიერს ჯერ არ გადახდილა
+    expect(f.customerOwed).toBe(0);
+    expect(f.chargeReceived).toBe(true);
+    expect(f.driverPayable).toBe(2.5);
   });
 
   it("IN_TRANSIT-ზეც იგივე ლოგიკა", async () => {
@@ -174,7 +204,7 @@ describe("5. კურიერმა უკვე აიღო ამანა�
     const e = await prisma.driverEarning.findFirstOrThrow({
       where: { orderId: order.id, kind: "CANCELLED_AFTER_PICKUP" },
     });
-    expect(Number(e.driverAmount)).toBe(1);
+    expect(Number(e.driverAmount)).toBe(2.5); // სრული driverFee
   });
 
   it("ACCEPTED-ზე გაუქმება უფასოა (ამანათი ჯერ არ აღებულა)", async () => {
