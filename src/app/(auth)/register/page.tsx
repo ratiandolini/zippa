@@ -27,7 +27,14 @@ export default function RegisterPage() {
 function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [role, setRole] = useState(params.get("role") === "DRIVER" ? "DRIVER" : "CUSTOMER");
+  const roleParam = params.get("role");
+  // როლის პარამეტრით შესვლა → პირდაპირ ამ როლის ფორმა, არჩევის ღილაკების გარეშე
+  const roleLocked = roleParam === "CUSTOMER" || roleParam === "DRIVER";
+  const [manualRole, setManualRole] = useState<"CUSTOMER" | "DRIVER">("CUSTOMER");
+  const role: "CUSTOMER" | "DRIVER" = roleLocked
+    ? (roleParam as "CUSTOMER" | "DRIVER")
+    : manualRole;
+  const setRole = setManualRole;
   const [accountType, setAccountType] = useState<"INDIVIDUAL" | "COMPANY">("INDIVIDUAL");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,26 +83,34 @@ function RegisterForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">რეგისტრაცია</CardTitle>
+        <CardTitle className="text-lg">
+          {roleLocked
+            ? role === "DRIVER"
+              ? "კურიერის რეგისტრაცია"
+              : "მომხმარებლის რეგისტრაცია"
+            : "რეგისტრაცია"}
+        </CardTitle>
         <p className="text-sm text-muted-foreground">შექმენი ანგარიში 1 წუთში</p>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          {roles.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => setRole(r.key)}
-              className={cn(
-                "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                role === r.key ? "border-accent bg-accent/10" : "border-border hover:bg-muted",
-              )}
-            >
-              <div className="font-medium">{r.label}</div>
-              <div className="text-xs text-muted-foreground">{r.hint}</div>
-            </button>
-          ))}
-        </div>
+        {!roleLocked && (
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            {roles.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                onClick={() => setRole(r.key as "CUSTOMER" | "DRIVER")}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                  role === r.key ? "border-accent bg-accent/10" : "border-border hover:bg-muted",
+                )}
+              >
+                <div className="font-medium">{r.label}</div>
+                <div className="text-xs text-muted-foreground">{r.hint}</div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {role === "CUSTOMER" && (
           <div className="mb-4 grid grid-cols-2 gap-2">
@@ -176,6 +191,19 @@ function RegisterForm() {
             {loading ? "მუშავდება…" : "ანგარიშის შექმნა"}
           </Button>
         </form>
+        {roleLocked && (
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            {role === "DRIVER" ? (
+              <Link href="/register?role=CUSTOMER" className="text-accent hover:underline">
+                ამანათის გაგზავნა გინდა? დარეგისტრირდი მომხმარებლად
+              </Link>
+            ) : (
+              <Link href="/register?role=DRIVER" className="text-accent hover:underline">
+                კურიერი ხარ? დარეგისტრირდი კურიერად
+              </Link>
+            )}
+          </p>
+        )}
         <p className="mt-4 text-center text-sm text-muted-foreground">
           უკვე გაქვს ანგარიში?{" "}
           <Link href="/login" className="font-medium text-accent hover:underline">

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalDoc, Sec, P, L } from "@/components/legal";
+import { COMPANY, COMPANY_MAILTO } from "@/lib/company";
 
 export const metadata: Metadata = { title: "კონფიდენციალურობის პოლიტიკა" };
 
@@ -8,12 +9,12 @@ export default function PrivacyPage() {
     <LegalDoc title="კონფიდენციალურობის პოლიტიკა" updated="5 სექტემბერი, 2026">
       <Sec n="1" title="მონაცემთა დამუშავებისთვის პასუხისმგებელი პირი">
         <P>
-          მონაცემთა დამუშავებისთვის პასუხისმგებელი პირია ინდივიდუალური მეწარმე რატი კურტანიძე
-          (ს/კ 01008043044; მისამართი: თბილისი, მინდელის ქ. 3; შემდგომში — „Zippa").
+          მონაცემთა დამუშავებისთვის პასუხისმგებელი პირია {COMPANY.name}
+          {" "}(ს/კ {COMPANY.taxId}; მისამართი: {COMPANY.address}; შემდგომში — „Zippa").
         </P>
         <P>
           პერსონალურ მონაცემებთან დაკავშირებულ საკითხზე მოგვწერეთ:{" "}
-          <a href="mailto:support@zippa.ge" className="text-accent underline">support@zippa.ge</a>.
+          <a href={COMPANY_MAILTO} className="text-accent underline">{COMPANY.email}</a>.
         </P>
       </Sec>
 
@@ -57,7 +58,7 @@ export default function PrivacyPage() {
         <P>
           პირდაპირი მარკეტინგი ხორციელდება მხოლოდ მომხმარებლის თანხმობით. თანხმობის გამოთხოვა
           შესაძლებელია უსასყიდლოდ და მარტივად იმავე არხით, რომლითაც შეტყობინება მიიღო
-          მომხმარებელმა, ან support@zippa.ge-ზე წერილობით. მოთხოვნა შესრულდება გონივრულ ვადაში,
+          მომხმარებელმა, ან {COMPANY.email}-ზე წერილობით. მოთხოვნა შესრულდება გონივრულ ვადაში,
           არაუგვიანეს 7 სამუშაო დღისა.
         </P>
       </Sec>
@@ -117,7 +118,7 @@ export default function PrivacyPage() {
         </P>
         <P>
           მოთხოვნისთვის მოგვწერეთ:{" "}
-          <a href="mailto:support@zippa.ge" className="text-accent underline">support@zippa.ge</a>.
+          <a href={COMPANY_MAILTO} className="text-accent underline">{COMPANY.email}</a>.
           ასევე შეგიძლიათ მიმართოთ სახელმწიფო აუდიტის სამსახურს ან სასამართლოს.
         </P>
       </Sec>
@@ -150,11 +151,11 @@ export default function PrivacyPage() {
           შესაძლებელია.
         </P>
         <L>
-          <li>ინდივიდუალური მეწარმე რატი კურტანიძე</li>
-          <li>ს/კ: 01008043044</li>
-          <li>მისამართი: თბილისი, მინდელის ქ. 3</li>
-          <li>ელფოსტა: support@zippa.ge</li>
-          <li>ტელეფონი: +995 598 42 32 34</li>
+          <li>{COMPANY.name}</li>
+          <li>ს/კ: {COMPANY.taxId}</li>
+          <li>მისამართი: {COMPANY.address}</li>
+          <li>ელფოსტა: {COMPANY.email}</li>
+          <li>ტელეფონი: {COMPANY.phone}</li>
         </L>
       </Sec>
     </LegalDoc>

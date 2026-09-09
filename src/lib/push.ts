@@ -1,11 +1,12 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
+import { COMPANY_MAILTO } from "@/lib/company";
 
 // Web Push — VAPID. თუ გასაღებები არ არის, ფუნქცია უბრალოდ არაფერს აკეთებს (არაფერს აზიანებს).
 
 const PUB = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const PRIV = process.env.VAPID_PRIVATE_KEY;
-const SUBJECT = process.env.VAPID_SUBJECT || "mailto:support@zippa.ge";
+const SUBJECT = process.env.VAPID_SUBJECT || COMPANY_MAILTO;
 
 let configured = false;
 if (PUB && PRIV) {

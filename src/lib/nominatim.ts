@@ -1,11 +1,14 @@
 // მხოლოდ სერვერიდან — იმპორტდება route handler-ებში (/api/geo/*)
 import { shortAddress, type GeoResult, type NominatimAddress } from "@/lib/geo";
+import { COMPANY } from "@/lib/company";
 
 // Nominatim-ის საჯარო პოლიტიკა: მაქს. 1 მოთხოვნა/წამში, ვალიდური User-Agent.
 // ამიტომ ყველა გამოძახება სერვერზე გადის — გლობალური რიგი + ქეში.
 
 const BASE = process.env.NOMINATIM_URL || "https://nominatim.openstreetmap.org";
-const UA = process.env.NOMINATIM_UA || "Zippa/1.0 (https://zippa-eosin.vercel.app; support@zippa.ge)";
+const UA =
+  process.env.NOMINATIM_UA ||
+  `Zippa/1.0 (https://zippa-eosin.vercel.app; ${COMPANY.email})`;
 const MIN_INTERVAL_MS = 1100;
 
 let queue: Promise<unknown> = Promise.resolve();

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalDoc, Sec, P, L } from "@/components/legal";
+import { COMPANY, COMPANY_MAILTO } from "@/lib/company";
 
 export const metadata: Metadata = { title: "წესები და პირობები" };
 
@@ -7,8 +8,8 @@ export default function TermsPage() {
   return (
     <LegalDoc title="წესები და პირობები" updated="5 სექტემბერი, 2026">
       <P>
-        ეს წესები და პირობები („წესები") არეგულირებს ურთიერთობას ინდივიდუალურ მეწარმე რატი
-        კურტანიძეს (ს/კ 01008043044; მისამართი: თბილისი, მინდელის ქ. 3; შემდგომში — „Zippa" ან
+        ეს წესები და პირობები („წესები") არეგულირებს ურთიერთობას {COMPANY.name}-ს
+        {" "}(ს/კ {COMPANY.taxId}; მისამართი: {COMPANY.address}; შემდგომში — „Zippa" ან
         „კომპანია") და Zippa-ს ვებ- ან მობილური პლატფორმის მომხმარებელს („მომხმარებელი") შორის.
       </P>
       <P>
@@ -152,7 +153,8 @@ export default function TermsPage() {
         </P>
         <P>
           გზავნილის კურიერისთვის გადაცემის შემდეგ შეკვეთის გაუქმებისას მიტანის საფასური არ
-          ბრუნდება. გამგზავნთან გზავნილის დაბრუნება ექვემდებარება მოქმედ დაბრუნების ტარიფს.
+          ბრუნდება. ამანათის კურიერისთვის გადაცემის შემდეგ გაუქმებისას დაბრუნების ტარიფი შეადგენს
+          შესაბამისი მიტანის ფასის 50%-ს.
         </P>
         <P>
           გაუქმების საფასური არ დაეკისრება მომხმარებელს, თუ გაუქმება გამოწვეულია Zippa-ს ან
@@ -194,7 +196,7 @@ export default function TermsPage() {
         <P>
           ხილული დაზიანება სასურველია დაფიქსირდეს ჩაბარებისას. სხვა პრეტენზია მომხმარებელმა უნდა
           წარადგინოს მიტანიდან გონივრულ ვადაში, სასურველია არაუგვიანეს 14 დღისა, ელფოსტაზე{" "}
-          <a href="mailto:support@zippa.ge" className="text-accent underline">support@zippa.ge</a>{" "}
+          <a href={COMPANY_MAILTO} className="text-accent underline">{COMPANY.email}</a>{" "}
           ან პლატფორმის support-ის საშუალებით. ეს ვადა არ ზღუდავს მომხმარებლის კანონით
           გათვალისწინებულ უფლებებს.
         </P>
@@ -233,11 +235,11 @@ export default function TermsPage() {
 
       <Sec n="13" title="საკონტაქტო ინფორმაცია">
         <L>
-          <li>ინდივიდუალური მეწარმე რატი კურტანიძე</li>
-          <li>ს/კ: 01008043044</li>
-          <li>მისამართი: თბილისი, მინდელის ქ. 3</li>
-          <li>ელფოსტა: support@zippa.ge</li>
-          <li>ტელეფონი: +995 598 42 32 34</li>
+          <li>{COMPANY.name}</li>
+          <li>ს/კ: {COMPANY.taxId}</li>
+          <li>მისამართი: {COMPANY.address}</li>
+          <li>ელფოსტა: {COMPANY.email}</li>
+          <li>ტელეფონი: {COMPANY.phone}</li>
         </L>
       </Sec>
     </LegalDoc>
