@@ -5,6 +5,8 @@ import { Camera } from "lucide-react";
 import type { OrderDTO } from "@/lib/serialize";
 
 const CAN_UPLOAD_STATUS = ["PICKED_UP", "IN_TRANSIT"];
+const MAX_MB = 4;
+const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 export function ProofPhoto({
   order,
@@ -22,8 +24,13 @@ export function ProofPhoto({
   const showUpload = canUpload && CAN_UPLOAD_STATUS.includes(order.status);
 
   async function upload(file: File) {
-    setBusy(true);
     setErr(null);
+    // ── ატვირთვამდე ვამოწმებთ ზომას ──
+    if (file.size > MAX_BYTES) {
+      setErr(`ფოტო ${MAX_MB} MB-ზე დიდია — გადაიღე ხელახლა ან აირჩიე პატარა ფაილი`);
+      return;
+    }
+    setBusy(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -76,6 +83,7 @@ export function ProofPhoto({
             <Camera className="h-4 w-4" />
             {busy ? "იტვირთება…" : order.proofPhotoUrl ? "ფოტოს შეცვლა" : "მიტანის ფოტოს ატვირთვა"}
           </button>
+          <p className="text-xs text-muted-foreground">მაქს. {MAX_MB} MB</p>
         </>
       )}
       {err && <p className="text-xs text-destructive">{err}</p>}
