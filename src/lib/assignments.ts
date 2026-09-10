@@ -2,8 +2,8 @@ import { prisma } from "@/lib/db";
 import { notifyDispatchers } from "@/lib/notify";
 import { streetOf } from "@/lib/domain";
 
-// რამდენ წამში ითვლება მიბმა უპასუხოდ
-export const ASSIGN_TIMEOUT_SEC = 90;
+// რამდენ წამში ითვლება მიბმა უპასუხოდ — 5 წუთი (კურიერს ტელეფონი ჯიბეშია / მართავს)
+export const ASSIGN_TIMEOUT_SEC = 300;
 
 /**
  * აბრუნებს „მოლოდინში" იმ შეკვეთებს, რომლებზეც კურიერმა ASSIGN_TIMEOUT_SEC წამში არ უპასუხა.

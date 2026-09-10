@@ -7,7 +7,7 @@ import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { POST as rejectOrder } from "@/app/api/orders/[id]/reject/route";
 import { GET as codGet, POST as codPay } from "@/app/api/dispatch/cod/route";
 import { GET as myCod } from "@/app/api/orders/cod/route";
-import { expireStaleAssignments } from "@/lib/assignments";
+import { expireStaleAssignments, ASSIGN_TIMEOUT_SEC } from "@/lib/assignments";
 
 async function deliver(oid: string, drvProfileId: string) {
   actAs(session(await makeUser("DISPATCHER")));
@@ -216,17 +216,21 @@ describe("კურიერის უარი (reject)", () => {
 });
 
 describe("უპასუხო მიბმის ტაიმაუტი", () => {
-  it("90 წამზე ძველი ASSIGNED → PENDING, კურიერი გათავისუფლდა", async () => {
+  it("ტაიმაუტი 300 წამია (5 წუთი)", () => {
+    expect(ASSIGN_TIMEOUT_SEC).toBe(300);
+  });
+
+  it("300 წამზე ძველი ASSIGNED → PENDING, კურიერი გათავისუფლდა", async () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
     const drv = await makeDriver({ approved: true });
     actAs(session(await makeUser("DISPATCHER")));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
 
-    // ხელოვნურად ვაძველებთ მიბმას
+    // ხელოვნურად ვაძველებთ მიბმას — ტაიმაუტს 1 წამით სცდება
     await prisma.order.update({
       where: { id: o.id },
-      data: { assignedAt: new Date(Date.now() - 120_000) },
+      data: { assignedAt: new Date(Date.now() - (ASSIGN_TIMEOUT_SEC + 1) * 1000) },
     });
 
     const n = await expireStaleAssignments();
@@ -237,6 +241,29 @@ describe("უპასუხო მიბმის ტაიმაუტი", ()
     expect(db.assignedAt).toBeNull();
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(dp.status).toBe("AVAILABLE");
+  });
+
+  it("300 წამამდე მიბმა აქტიურია — არ ითიშება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    const drv = await makeDriver({ approved: true });
+    actAs(session(await makeUser("DISPATCHER")));
+    await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
+
+    // 90 წამის წინ მიბმა (ძველი ტაიმაუტი) — ახლა ჯერ კიდევ აქტიურია
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { assignedAt: new Date(Date.now() - 90_000) },
+    });
+    expect(await expireStaleAssignments()).toBe(0);
+
+    // ზუსტად ზღვართან — 1 წამით ნაკლები ტაიმაუტზე — კვლავ აქტიური
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { assignedAt: new Date(Date.now() - (ASSIGN_TIMEOUT_SEC - 1) * 1000) },
+    });
+    expect(await expireStaleAssignments()).toBe(0);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe("ASSIGNED");
   });
 
   it("ახალი მიბმა არ ითიშება", async () => {
