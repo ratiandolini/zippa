@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 };
 import { buttonVariants } from "@/components/ui/button";
 import { TrackSearch } from "@/components/track-search";
+import { MobileStickyCta } from "@/components/mobile-sticky-cta";
 import Image from "next/image";
 import { MapPin, Clock, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
 import { FAQ } from "@/lib/faq";
@@ -123,6 +124,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
+              id="hero-cta"
               href="/register?role=CUSTOMER"
               className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}
             >
@@ -226,16 +228,8 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* მობილურის sticky CTA */}
-      <div className="h-16 sm:hidden" aria-hidden />
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:hidden">
-        <Link
-          href="/register?role=CUSTOMER"
-          className={buttonVariants({ size: "lg", className: "w-full" })}
-        >
-          ამანათის გაგზავნა <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
+      {/* მობილურის sticky CTA — ჩნდება მხოლოდ Hero CTA-ს viewport-ს გასვლის შემდეგ */}
+      <MobileStickyCta />
     </div>
   );
 }
