@@ -25,6 +25,7 @@ const TABLES = [
   "PasswordReset", "Review", "DriverEarning", "CashSettlement", "Payout",
   "CustomerAdjustment", "CodRemittance", "Payment", "OrderEvent", "Order", "Notification",
   "PushSubscription", "DriverProfile", "PricingRule", "Zone", "City", "User", "Setting",
+  "RateLimit",
 ];
 
 const B = (rows: [number, number][]) => rows.map(([maxKg, price]) => ({ maxKg, price }));

@@ -162,7 +162,9 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
     returnReason: o.returnReason,
     returnResolvedAt: o.returnResolvedAt?.toISOString() ?? null,
 
-    proofPhotoUrl: o.proofPhotoUrl,
+    // მიტანის ფოტო — არასდროს ვაბრუნებთ ნედლ (public) blob URL-ს.
+    // მხოლოდ ავტ. endpoint-ის მისამართს, რომელიც წვდომას ამოწმებს.
+    proofPhotoUrl: o.proofPhotoUrl ? `/api/orders/${o.id}/photo` : null,
 
     review: o.review ? { rating: o.review.rating, comment: o.review.comment } : null,
 

@@ -5,7 +5,7 @@ import { nominatimSearch } from "@/lib/nominatim";
 export function GET(req: Request) {
   return handle(async () => {
     await requireUser();
-    throttle(req, "geo", 40, 60); // 40 ძებნა/წუთში თითო IP-ზე
+    await throttle(req, "geo", 40, 60); // 40 ძებნა/წუთში თითო IP-ზე
     const q = new URL(req.url).searchParams.get("q") ?? "";
     return ok({ results: await nominatimSearch(q) });
   });

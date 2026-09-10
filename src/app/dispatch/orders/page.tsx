@@ -253,7 +253,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const isReturn = POST_PICKUP_STATUSES.includes(order.status);
   const canCancel = !TERMINAL.includes(order.status);
   const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
-  const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
+  const canDelete = order.status === "DRAFT";
   const canAdjust =
     order.status === "FAILED" || order.status === "CANCELLED" || !!order.returnRequestedAt;
   const canFixPrice = order.status === "PENDING" || order.status === "ASSIGNED";

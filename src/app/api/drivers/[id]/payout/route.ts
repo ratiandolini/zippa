@@ -14,15 +14,26 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     if (amount > Number(dp.unpaidEarnings) + 0.01)
       throw new ApiError(400, "თანხა აღემატება გადასახდელ ანაზღაურებას");
 
-    const earnings = await prisma.driverEarning.findMany({
-      where: { driverId: dp.id, isSettled: false },
-      orderBy: { createdAt: "asc" },
-    });
-    const from = earnings[0]?.createdAt ?? new Date();
-    const to = earnings[earnings.length - 1]?.createdAt ?? new Date();
+    await prisma.$transaction(async (tx) => {
+      // ── ატომურად ჩამოვჭრათ ბალანსი — მხოლოდ თუ საკმარისია.
+      //    პარალელური/განმეორებითი გადახდა მეორედ ვერ გაივლის (count = 0),
+      //    unpaidEarnings ვერ გახდება უარყოფითი. ──
+      const dec = await tx.driverProfile.updateMany({
+        where: { id: dp.id, unpaidEarnings: { gte: amount - 0.01 } },
+        data: { unpaidEarnings: { decrement: amount } },
+      });
+      if (dec.count === 0)
+        throw new ApiError(409, "ანაზღაურება უკვე გადახდილია ან შეიცვალა — განაახლე გვერდი");
 
-    await prisma.$transaction([
-      prisma.payout.create({
+      const earnings = await tx.driverEarning.findMany({
+        where: { driverId: dp.id, isSettled: false },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, createdAt: true },
+      });
+      const from = earnings[0]?.createdAt ?? new Date();
+      const to = earnings[earnings.length - 1]?.createdAt ?? new Date();
+
+      await tx.payout.create({
         data: {
           driverId: dp.id,
           amount,
@@ -31,16 +42,13 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
           periodTo: to,
           createdById: session.sub,
         },
-      }),
-      prisma.driverEarning.updateMany({
-        where: { driverId: dp.id, isSettled: false },
-        data: { isSettled: true },
-      }),
-      prisma.driverProfile.update({
-        where: { id: dp.id },
-        data: { unpaidEarnings: { decrement: amount } },
-      }),
-    ]);
+      });
+      if (earnings.length)
+        await tx.driverEarning.updateMany({
+          where: { id: { in: earnings.map((e) => e.id) } },
+          data: { isSettled: true },
+        });
+    });
 
     await notifyDriver(dp.id, {
       type: "PAYMENT",

@@ -125,6 +125,17 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         : 0;
 
     const updated = await prisma.$transaction(async (tx) => {
+      // ── ატომური compare-and-swap: სტატუსი გადავა მხოლოდ იმ მდგომარეობიდან,
+      //    რომელიც ტრანზაქციის დაწყებამდე წავიკითხეთ. პარალელური/განმეორებითი
+      //    request-ი მეორედ ვერ გაატარებს (count = 0) → ვერ შეიქმნება ორმაგი
+      //    earning/event/charge. ──
+      const claimed = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
+        data: { status: body.status },
+      });
+      if (claimed.count === 0)
+        throw new ApiError(409, "შეკვეთის სტატუსი უკვე შეიცვალა — განაახლე გვერდი");
+
       const o = await tx.order.update({
         where: { id: order.id },
         data: {

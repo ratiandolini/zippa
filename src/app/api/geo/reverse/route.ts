@@ -5,7 +5,7 @@ import { nominatimReverse } from "@/lib/nominatim";
 export function GET(req: Request) {
   return handle(async () => {
     await requireUser();
-    throttle(req, "geo", 40, 60);
+    await throttle(req, "geo", 40, 60);
     const url = new URL(req.url);
     const lat = parseFloat(url.searchParams.get("lat") ?? "");
     const lng = parseFloat(url.searchParams.get("lng") ?? "");

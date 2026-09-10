@@ -41,8 +41,14 @@ async function sendViaResend(to: string, subject: string, text: string): Promise
 
 export async function sendEmail(to: string, subject: string, text: string): Promise<EmailResult> {
   if (PROVIDER === "RESEND") return sendViaResend(to, subject, text);
-  // LOG (ნაგულისხმევი)
-  if (process.env.NODE_ENV !== "test") console.log(`[EMAIL→${to}] ${subject}: ${text}`);
+  // LOG (ნაგულისხმევი) — შიგთავსი (პაროლის აღდგენის კოდის ჩათვლით) მხოლოდ explicit
+  // debug რეჟიმში და არასდროს production-ში
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.AUTH_DEBUG_RESET_CODES === "true"
+  ) {
+    console.log(`[EMAIL→${to}] ${subject}: ${text}`);
+  }
   return { ok: true, provider: "LOG" };
 }
 

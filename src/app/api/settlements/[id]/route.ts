@@ -15,29 +15,32 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (s.status !== "PENDING") throw new ApiError(409, "ჩანაწერი უკვე დამუშავებულია");
 
     if (action === "CONFIRM") {
-      await prisma.$transaction([
-        prisma.cashSettlement.update({
-          where: { id: s.id },
+      await prisma.$transaction(async (tx) => {
+        // ატომური CAS — მხოლოდ PENDING → CONFIRMED. განმეორებითი დადასტურება
+        // ვერ ჩამოჭრის ბალანსს ორჯერ.
+        const claim = await tx.cashSettlement.updateMany({
+          where: { id: s.id, status: "PENDING" },
           data: {
             status: "CONFIRMED",
             confirmedById: session.sub,
             confirmedAt: new Date(),
             note: note ?? s.note,
           },
-        }),
-        prisma.driverProfile.update({
+        });
+        if (claim.count === 0) throw new ApiError(409, "ჩანაწერი უკვე დამუშავებულია");
+        await tx.driverProfile.update({
           where: { id: s.driverId },
           data: { cashOnHand: { decrement: Number(s.amount) } },
-        }),
-      ]);
+        });
+      });
       await notifyDriver(s.driverId, {
         type: "PAYMENT",
         title: "ნაღდის ჩაბარება დადასტურდა",
         body: `${Number(s.amount)} ₾ ჩაითვალა`,
       });
     } else {
-      await prisma.cashSettlement.update({
-        where: { id: s.id },
+      const claim = await prisma.cashSettlement.updateMany({
+        where: { id: s.id, status: "PENDING" },
         data: {
           status: "REJECTED",
           confirmedById: session.sub,
@@ -45,6 +48,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
           note: note ?? s.note,
         },
       });
+      if (claim.count === 0) throw new ApiError(409, "ჩანაწერი უკვე დამუშავებულია");
       await notifyDriver(s.driverId, {
         type: "PAYMENT",
         title: "ნაღდის ჩაბარება უარყოფილია",

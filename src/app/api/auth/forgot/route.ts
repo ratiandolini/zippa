@@ -10,7 +10,7 @@ const WINDOW_MS = 15 * 60 * 1000;
 
 export function POST(req: Request) {
   return handle(async () => {
-    throttle(req, "forgot", 5, 3600);
+    await throttle(req, "forgot", 5, 3600);
     const { emailOrPhone } = forgotSchema.parse(await req.json());
     const user = await findUserByEmailOrPhone(emailOrPhone);
 

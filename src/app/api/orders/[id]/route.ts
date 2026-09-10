@@ -11,17 +11,33 @@ import type { Prisma } from "@prisma/client";
 const EDITABLE_DISPATCHER = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"];
 const EDITABLE_CUSTOMER = ["PENDING"];
 
-// დისპეჩერს შეუძლია წაშალოს მხოლოდ გაუქმებული/მონახაზი შეკვეთა (შეცდომით შექმნილი ან სატესტო)
+// დისპეჩერს შეუძლია წაშალოს მხოლოდ DRAFT შეკვეთა, რომელსაც არანაირი ფინანსური/
+// ისტორიული ჩანაწერი არ უკავშირდება. ყველა სხვა (CANCELLED-ის ჩათვლით) რჩება —
+// წაშლა cascade-ით შლიდა DriverEarning/Payment-ს და აფუჭებდა აღრიცხვას.
 export function DELETE(_req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     await requireUser().then((s) => {
       if (s.role !== "DISPATCHER") throw new ApiError(403, "წვდომა აკრძალულია");
     });
-    const order = await prisma.order.findUnique({ where: { id: params.id } });
+    const order = await prisma.order.findUnique({
+      where: { id: params.id },
+      include: {
+        _count: { select: { earnings: true, adjustments: true, events: true } },
+        payment: { select: { id: true } },
+      },
+    });
     if (!order) return fail(404, "შეკვეთა ვერ მოიძებნა");
-    if (!["CANCELLED", "DRAFT"].includes(order.status)) {
-      throw new ApiError(409, "მხოლოდ გაუქმებული შეკვეთის წაშლა შეიძლება");
-    }
+    if (order.status !== "DRAFT")
+      throw new ApiError(409, "წაშლა შესაძლებელია მხოლოდ მონახაზი (DRAFT) შეკვეთისთვის");
+    if (
+      order._count.earnings > 0 ||
+      order._count.adjustments > 0 ||
+      order.payment ||
+      order.codRemittanceId ||
+      Number(order.cancelFee) > 0 ||
+      Number(order.returnFee) > 0
+    )
+      throw new ApiError(409, "შეკვეთას ფინანსური ჩანაწერი უკავშირდება — წაშლა აკრძალულია");
     await prisma.order.delete({ where: { id: order.id } });
     return ok({ deleted: true });
   });

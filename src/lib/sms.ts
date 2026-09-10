@@ -34,10 +34,19 @@ async function sendViaSmsOffice(to: string, text: string): Promise<SmsResult> {
   }
 }
 
+/** SMS-ის შიგთავსი ლოგში მხოლოდ explicit debug რეჟიმში და არასდროს production-ში
+ *  (შეიცავს პაროლის აღდგენის კოდს — არ უნდა მოხვდეს Vercel-ის ლოგებში). */
+function debugLogEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.AUTH_DEBUG_RESET_CODES === "true"
+  );
+}
+
 export async function sendSms(to: string, text: string): Promise<SmsResult> {
   if (PROVIDER === "SMSOFFICE") return sendViaSmsOffice(to, text);
-  // LOG (ნაგულისხმევი)
-  if (process.env.NODE_ENV !== "test") console.log(`[SMS→${to}] ${text}`);
+  // LOG (ნაგულისხმევი) — შიგთავსი მხოლოდ debug რეჟიმში
+  if (debugLogEnabled()) console.log(`[SMS→${to}] ${text}`);
   return { ok: true, provider: "LOG" };
 }
 

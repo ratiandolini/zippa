@@ -18,11 +18,16 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       throw new ApiError(409, "დაბრუნების მოთხოვნა შესაძლებელია მხოლოდ ამანათის აღების შემდეგ");
     if (order.returnRequestedAt) throw new ApiError(409, "დაბრუნება უკვე მოთხოვნილია");
 
+    // ატომური CAS — მხოლოდ პირველი მოთხოვნა გაივლის; განმეორებითი დაჭერა → 409
+    const claim = await prisma.order.updateMany({
+      where: { id: order.id, returnRequestedAt: null },
+      data: { returnRequestedAt: new Date(), returnReason: reason },
+    });
+    if (claim.count === 0) throw new ApiError(409, "დაბრუნება უკვე მოთხოვნილია");
+
     await prisma.order.update({
       where: { id: order.id },
       data: {
-        returnRequestedAt: new Date(),
-        returnReason: reason,
         events: {
           create: { status: order.status, note: `დაბრუნების მოთხოვნა: ${reason}`, actorId: session.sub },
         },

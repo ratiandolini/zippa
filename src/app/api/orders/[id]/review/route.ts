@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, ApiError } from "@/lib/api";
 import { reviewSchema } from "@/lib/validation";
@@ -15,29 +16,36 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     if (order.review) throw new ApiError(409, "შეფასება უკვე დატოვე");
     if (!order.driverId) throw new ApiError(409, "შეკვეთას კურიერი არ ჰყავდა");
 
-    await prisma.$transaction(async (tx) => {
-      await tx.review.create({
-        data: {
-          orderId: order.id,
-          authorId: session.sub,
-          driverId: order.driverId!,
-          rating,
-          comment,
-        },
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.review.create({
+          data: {
+            orderId: order.id,
+            authorId: session.sub,
+            driverId: order.driverId!,
+            rating,
+            comment,
+          },
+        });
+        const agg = await tx.review.aggregate({
+          where: { driverId: order.driverId! },
+          _avg: { rating: true },
+          _count: true,
+        });
+        await tx.driverProfile.update({
+          where: { id: order.driverId! },
+          data: {
+            ratingAvg: Math.round((agg._avg.rating ?? 5) * 100) / 100,
+            ratingCount: agg._count,
+          },
+        });
       });
-      const agg = await tx.review.aggregate({
-        where: { driverId: order.driverId! },
-        _avg: { rating: true },
-        _count: true,
-      });
-      await tx.driverProfile.update({
-        where: { id: order.driverId! },
-        data: {
-          ratingAvg: Math.round((agg._avg.rating ?? 5) * 100) / 100,
-          ratingCount: agg._count,
-        },
-      });
-    });
+    } catch (e) {
+      // პარალელური მეორე გაგზავნა — unique(orderId) დარღვევა → 409, არა 500
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")
+        throw new ApiError(409, "შეფასება უკვე დატოვე");
+      throw e;
+    }
 
     await notifyDriver(order.driverId, {
       type: "SYSTEM",

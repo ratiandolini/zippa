@@ -1,15 +1,49 @@
 import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { requireUser, handle, ok, fail, ApiError } from "@/lib/api";
-import { putFile } from "@/lib/storage";
+import { putProofFile, getProofFile } from "@/lib/storage";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { notify } from "@/lib/notify";
+import type { Order } from "@prisma/client";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const OK_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 // ფოტოს ატვირთვა/შეცვლა მხოლოდ ამანათის აღების შემდეგ და ჩაბარებამდე.
 // DELIVERED/CANCELLED/FAILED-ის შემდეგ ფოტო უცვლელი მტკიცებულებაა.
 const PHOTO_STATUSES = ["PICKED_UP", "IN_TRANSIT"];
+
+/** ვის აქვს ამ შეკვეთის ფოტოსთან წვდომა — დისპეჩერი, მფლობელი კლიენტი ან მიბმული კურიერი. */
+async function canAccess(order: Order, sub: string, role: string): Promise<boolean> {
+  if (role === "DISPATCHER") return true;
+  if (role === "CUSTOMER") return order.customerId === sub;
+  if (role === "DRIVER") {
+    const dp = await prisma.driverProfile.findUnique({ where: { userId: sub } });
+    return !!dp && order.driverId === dp.id;
+  }
+  return false;
+}
+
+// ── დაცული ფოტო-view: ავტ. + მფლობელობის შემოწმება, შემდეგ private blob-იდან proxy ──
+export function GET(_req: Request, { params }: { params: { id: string } }) {
+  return handle(async () => {
+    const session = await requireUser();
+    const order = await prisma.order.findUnique({ where: { id: params.id } });
+    if (!order) return fail(404, "შეკვეთა ვერ მოიძებნა");
+    if (!(await canAccess(order, session.sub, session.role)))
+      return fail(403, "წვდომა აკრძალულია");
+    if (!order.proofPhotoUrl) return fail(404, "ფოტო არ არის");
+
+    const proof = await getProofFile(order.proofPhotoUrl);
+    if (!proof) return fail(404, "ფოტო არ არის");
+
+    return new Response(proof.body as BodyInit, {
+      headers: {
+        "content-type": proof.contentType,
+        "cache-control": "private, max-age=60",
+      },
+    });
+  });
+}
 
 export function POST(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
@@ -53,7 +87,13 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     }
 
     const key = `proofs/${order.id}-${Date.now()}.jpg`;
-    const { url } = await putFile(key, jpeg, "image/jpeg");
+    let url: string;
+    try {
+      ({ url } = await putProofFile(key, jpeg, "image/jpeg"));
+    } catch {
+      // საცავი არ არის კონფიგურირებული / ჩავარდა — public-ზე fallback აკრძალულია
+      throw new ApiError(503, "ფოტო-საცავი მიუწვდომელია — სცადე მოგვიანებით ან დაუკავშირდი დისპეჩერს");
+    }
 
     const updated = await prisma.order.update({
       where: { id: order.id },
