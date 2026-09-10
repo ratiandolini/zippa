@@ -12,20 +12,52 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install PostgreSQL 16 client
+      - name: Install PostgreSQL client 17
         run: |
+          set -euo pipefail
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-16
+          # უახლესი client — pg_dump backward-თავსებადი არაა (ძველი client ვერ dump-ავს ახალ server-ს)
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
 
       - name: Dump database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          test -n "$DATABASE_URL" || { echo "DATABASE_URL secret არ არის დაყენებული"; exit 1; }
+          set -euo pipefail
+
+          test -n "${DATABASE_URL:-}" || { echo "::error::DATABASE_URL secret არ არის დაყენებული"; exit 1; }
+
           STAMP=$(date -u +%Y-%m-%d_%H%M)
-          pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip > "zippa-$STAMP.sql.gz"
+          RAW="zippa-$STAMP.sql"
+          OUT="$RAW.gz"
+
+          # pg_dump ცალკე ფაილში — მისი exit code პირდაპირ მოწმდება (set -e),
+          # არ იკარგება gzip-ის pipe-ში (pipefail-იც ჩართულია).
+          pg_dump --no-owner --no-privileges --format=plain "$DATABASE_URL" > "$RAW"
+
+          # ── dump-ის ვალიდაცია ──
+          BYTES=$(wc -c < "$RAW")
+          echo "raw dump: $BYTES bytes"
+          if [ "$BYTES" -lt 2048 ]; then
+            echo "::error::dump ძალიან პატარაა ($BYTES bytes) — სავარაუდოდ pg_dump ჩავარდა ან ბაზა ცარიელია"
+            echo "--- dump-ის დასაწყისი ---"
+            head -c 2000 "$RAW" || true
+            exit 1
+          fi
+          grep -q "PostgreSQL database dump" "$RAW" \
+            || { echo "::error::dump-ში არ არის 'PostgreSQL database dump' მარკერი — არასრული/გატეხილი dump"; exit 1; }
+          grep -qE '^CREATE TABLE |^COPY |INSERT INTO ' "$RAW" \
+            || { echo "::error::dump-ში არ ჩანს არც ერთი ცხრილი/მონაცემი"; exit 1; }
+
+          gzip -9 "$RAW"
+          test -s "$OUT" || { echo "::error::gzip შედეგი ცარიელია"; exit 1; }
+          # gzip-ის მთლიანობა
+          gzip -t "$OUT" || { echo "::error::gzip დაზიანებულია"; exit 1; }
+
+          echo "backup OK — $(ls -lh "$OUT" | awk '{print $5}') ($(wc -c < "$OUT") bytes)"
           ls -lh zippa-*.sql.gz
 
       - name: Upload artifact
