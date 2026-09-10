@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import type { OrderDTO } from "@/lib/serialize";
 
-const CAN_UPLOAD_STATUS = ["PICKED_UP", "IN_TRANSIT", "DELIVERED"];
+const CAN_UPLOAD_STATUS = ["PICKED_UP", "IN_TRANSIT"];
 
 export function ProofPhoto({
   order,

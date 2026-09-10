@@ -157,13 +157,26 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>მიმღები: {order.recipient.name}</span>
-        <a href={`tel:${order.recipient.phone}`} className="inline-flex items-center gap-1 text-accent">
-          <Phone className="h-3 w-3" /> {order.recipient.phone}
-        </a>
-        <span>{order.weightKg} კგ</span>
-      </div>
+      {/* საკონტაქტო პირი — ეტაპის მიხედვით: აღებამდე გამგზავნი, აღების შემდეგ მიმღები */}
+      {(() => {
+        const beforePickup = ["ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
+        const person = beforePickup ? order.sender : order.recipient;
+        const label = beforePickup ? "გამგზავნი" : "მიმღები";
+        return (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {label}: {person.name}
+            </span>
+            <a
+              href={`tel:${person.phone}`}
+              className="inline-flex items-center gap-1 text-accent"
+            >
+              <Phone className="h-3 w-3" /> {person.phone}
+            </a>
+            <span>{order.weightKg} კგ</span>
+          </div>
+        );
+      })()}
 
       {order.price.driverFee > 0 && (
         <div className="mt-2 flex items-center justify-between rounded-md bg-accent/10 px-2.5 py-1.5 text-sm">

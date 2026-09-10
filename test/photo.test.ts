@@ -79,10 +79,10 @@ describe("მიტანის ფოტო", () => {
     expect(r.status).toBe(409);
   });
 
-  it("ფაილის გარეშე → 422", async () => {
+  it("ფაილის გარეშე (IN_TRANSIT) → 422", async () => {
     const c = await makeUser("CUSTOMER");
     const { user: dUser, profile } = await makeDriver({ approved: true });
-    const o = await makeOrder(c.id, profile.id, "DELIVERED");
+    const o = await makeOrder(c.id, profile.id, "IN_TRANSIT");
 
     actAs(session(dUser));
     const req = new Request("http://test.local/api", {
@@ -92,5 +92,56 @@ describe("მიტანის ფოტო", () => {
     });
     const res = await uploadPhoto(req, { params: { id: o.id } });
     expect(res.status).toBe(422);
+  });
+
+  it("კურიერი საკუთარ IN_TRANSIT შეკვეთაზე ტვირთავს → 200", async () => {
+    const c = await makeUser("CUSTOMER");
+    const { user: dUser, profile } = await makeDriver({ approved: true });
+    const o = await makeOrder(c.id, profile.id, "IN_TRANSIT");
+    actAs(session(dUser));
+    const r = await callUpload(o.id, await pngBuffer());
+    expect(r.status).toBe(200);
+  });
+
+  it("DELIVERED-ზე კურიერი ვეღარ ცვლის ფოტოს → 409, არსებული უცვლელი", async () => {
+    const c = await makeUser("CUSTOMER");
+    const { user: dUser, profile } = await makeDriver({ approved: true });
+    const o = await prisma.order.create({
+      data: {
+        trackingNumber: `ZP-TEST-${Math.random().toString(36).slice(2, 8)}`,
+        customerId: c.id, driverId: profile.id, status: "DELIVERED",
+        senderName: "ა", senderPhone: "+995599000001",
+        pickupAddress: "თბ", pickupLat: 41.7, pickupLng: 44.8,
+        recipientName: "ბ", recipientPhone: "+995599000002",
+        deliveryAddress: "თბ 2", deliveryLat: 41.71, deliveryLng: 44.79,
+        weightKg: 2, proofPhotoUrl: "/uploads/proofs/original.jpg",
+      },
+    });
+    actAs(session(dUser));
+    const r = await callUpload(o.id, await pngBuffer());
+    expect(r.status).toBe(409);
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: o.id } });
+    expect(db.proofPhotoUrl).toBe("/uploads/proofs/original.jpg");
+  });
+
+  it("DELIVERED-ზე დისპეჩერიც ვეღარ ცვლის ფოტოს → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const { profile } = await makeDriver({ approved: true });
+    const disp = await makeUser("DISPATCHER");
+    const o = await makeOrder(c.id, profile.id, "DELIVERED");
+    actAs(session(disp));
+    const r = await callUpload(o.id, await pngBuffer());
+    expect(r.status).toBe(409);
+  });
+
+  it("CANCELLED / FAILED-ზეც → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const { user: dUser, profile } = await makeDriver({ approved: true });
+    for (const st of ["CANCELLED", "FAILED"]) {
+      const o = await makeOrder(c.id, profile.id, st);
+      actAs(session(dUser));
+      const r = await callUpload(o.id, await pngBuffer());
+      expect(r.status, st).toBe(409);
+    }
   });
 });

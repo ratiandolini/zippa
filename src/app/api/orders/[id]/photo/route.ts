@@ -7,7 +7,9 @@ import { notify } from "@/lib/notify";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const OK_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-const PHOTO_STATUSES = ["PICKED_UP", "IN_TRANSIT", "DELIVERED"];
+// ფოტოს ატვირთვა/შეცვლა მხოლოდ ამანათის აღების შემდეგ და ჩაბარებამდე.
+// DELIVERED/CANCELLED/FAILED-ის შემდეგ ფოტო უცვლელი მტკიცებულებაა.
+const PHOTO_STATUSES = ["PICKED_UP", "IN_TRANSIT"];
 
 export function POST(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
@@ -25,7 +27,10 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     if (!isDispatcher && !isOwnerDriver) return fail(403, "წვდომა აკრძალულია");
 
     if (!PHOTO_STATUSES.includes(order.status)) {
-      throw new ApiError(409, "ფოტოს დამატება მხოლოდ აღების შემდეგაა შესაძლებელი");
+      throw new ApiError(
+        409,
+        "ფოტოს ატვირთვა/შეცვლა მხოლოდ ამანათის აღების შემდეგ, ჩაბარებამდეა შესაძლებელი",
+      );
     }
 
     const form = await req.formData();
