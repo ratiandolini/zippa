@@ -63,8 +63,21 @@ export function POST(req: Request) {
         select: { id: true },
       });
       const dpIds = dp.map((d) => d.id);
+
+      // production-ში არასდროს წავშალოთ DELIVERED ან ფინანსური ჩანაწერის მქონე შეკვეთა
+      const orderWhere: Record<string, unknown> = {
+        OR: [{ customerId: { in: ids } }, { driverId: { in: dpIds } }],
+      };
+      if (process.env.NODE_ENV === "production") {
+        orderWhere.status = { not: "DELIVERED" };
+        orderWhere.earnings = { none: {} };
+        orderWhere.payment = { is: null };
+        orderWhere.codRemittanceId = null;
+        orderWhere.cancelFee = 0;
+        orderWhere.returnFee = 0;
+      }
       const delOrders = await prisma.order.deleteMany({
-        where: { OR: [{ customerId: { in: ids } }, { driverId: { in: dpIds } }] },
+        where: orderWhere as never,
       });
       const delUsers = await prisma.user.deleteMany({
         where: { email: { endsWith: "@zippa.test" } },

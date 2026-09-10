@@ -6,7 +6,7 @@ import { handle, ok, ApiError, throttle } from "@/lib/api";
 
 export function POST(req: Request) {
   return handle(async () => {
-    throttle(req, "login", 10, 300);
+    await throttle(req, "login", 10, 300);
     const { emailOrPhone, password } = loginSchema.parse(await req.json());
 
     const user = await findUserByEmailOrPhone(emailOrPhone);

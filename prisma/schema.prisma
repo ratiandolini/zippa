@@ -562,3 +562,13 @@ model Setting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+// განაწილებული rate-limit — საერთო Vercel-ის ყველა serverless ინსტანსისთვის
+// (in-memory Map ვერ მუშაობდა მრავალინსტანსიან გარემოში)
+model RateLimit {
+  key     String   @id // მაგ. "login:1.2.3.4"
+  count   Int      @default(1)
+  resetAt DateTime // ამ დროის მერე ფანჯარა ნულდება
+
+  @@index([resetAt])
+}

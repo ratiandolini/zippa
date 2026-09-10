@@ -3,7 +3,8 @@ import sharp from "sharp";
 import { resetDb, prisma, makeUser, makeDriver, actAs, session } from "./helpers";
 
 vi.mock("@/lib/storage", () => ({
-  putFile: vi.fn(async (key: string) => ({ url: `/uploads/${key}` })),
+  putProofFile: vi.fn(async (key: string) => ({ url: `/uploads/${key}` })),
+  getProofFile: vi.fn(async () => ({ body: new Uint8Array([255, 216, 255, 217]), contentType: "image/jpeg" })),
 }));
 
 import { POST as uploadPhoto } from "@/app/api/orders/[id]/photo/route";

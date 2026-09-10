@@ -7,7 +7,7 @@ import { handle, ok, ApiError, throttle } from "@/lib/api";
 
 export function POST(req: Request) {
   return handle(async () => {
-    throttle(req, "register", 5, 3600);
+    await throttle(req, "register", 5, 3600);
     const body = await req.json();
     const data = registerSchema.parse(body);
 

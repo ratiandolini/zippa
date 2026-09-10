@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 
 export function POST(req: Request) {
   return handle(async () => {
-    throttle(req, "reset", 10, 900);
+    await throttle(req, "reset", 10, 900);
     const { emailOrPhone, code, newPassword } = resetSchema.parse(await req.json());
     const user = await findUserByEmailOrPhone(emailOrPhone);
     if (!user) throw new ApiError(400, "კოდი არასწორია ან ვადაგასულია");

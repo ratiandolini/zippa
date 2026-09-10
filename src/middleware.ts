@@ -17,9 +17,6 @@ const PROTECTED = [
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // დროებითი: ვიზუალის გადახედვის რეჟიმი (ავტორიზაციის ჩართვამდე)
-  if (process.env.NEXT_PUBLIC_DEV_PREVIEW === "1") return NextResponse.next();
-
   const cookieName = process.env.AUTH_COOKIE_NAME || "skr_session";
   const token = req.cookies.get(cookieName)?.value;
   const session = token ? await verifySession(token) : null;

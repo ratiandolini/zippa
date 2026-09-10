@@ -290,15 +290,37 @@ describe("უპასუხო მიბმის ტაიმაუტი", ()
   });
 });
 
-describe("გაუქმებული შეკვეთის წაშლა", () => {
-  it("დისპეჩერი შლის CANCELLED შეკვეთას", async () => {
+describe("შეკვეთის წაშლა — მხოლოდ DRAFT, ფინანსური ჩანაწერის გარეშე", () => {
+  it("დისპეჩერი შლის სუფთა DRAFT შეკვეთას", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    await prisma.order.update({ where: { id: o.id }, data: { status: "DRAFT" } });
+    actAs(session(await makeUser("DISPATCHER")));
+    const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
+    expect(r.status).toBe(200);
+    expect(await prisma.order.findUnique({ where: { id: o.id } })).toBeNull();
+  });
+
+  it("CANCELLED შეკვეთა ვეღარ იშლება → 409", async () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
     await prisma.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
     actAs(session(await makeUser("DISPATCHER")));
     const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
-    expect(r.status).toBe(200);
-    expect(await prisma.order.findUnique({ where: { id: o.id } })).toBeNull();
+    expect(r.status).toBe(409);
+    expect(await prisma.order.findUnique({ where: { id: o.id } })).not.toBeNull();
+  });
+
+  it("DRAFT, მაგრამ ფინანსური ჩანაწერით (cancelFee) → 409", async () => {
+    const c = await makeUser("CUSTOMER");
+    const o = await newOrder(c.id);
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { status: "DRAFT", cancelFee: 2 },
+    });
+    actAs(session(await makeUser("DISPATCHER")));
+    const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
+    expect(r.status).toBe(409);
   });
 
   it("აქტიური შეკვეთის წაშლა → 409", async () => {
@@ -312,7 +334,7 @@ describe("გაუქმებული შეკვეთის წაშლ�
   it("მომხმარებელი ვერ შლის → 403", async () => {
     const c = await makeUser("CUSTOMER");
     const o = await newOrder(c.id);
-    await prisma.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
+    await prisma.order.update({ where: { id: o.id }, data: { status: "DRAFT" } });
     actAs(session(c));
     const r = await call(deleteOrder, { method: "DELETE", params: { id: o.id } });
     expect(r.status).toBe(403);

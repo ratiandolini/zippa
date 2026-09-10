@@ -48,8 +48,8 @@ export function handle(fn: () => Promise<Response>) {
 }
 
 /** rate limit helper — throws ApiError(429) როცა ლიმიტი გადაცილებულია */
-export function throttle(req: Request, name: string, limit: number, windowSec: number) {
-  const r = rateLimit(`${name}:${clientIp(req)}`, limit, windowSec);
+export async function throttle(req: Request, name: string, limit: number, windowSec: number) {
+  const r = await rateLimit(`${name}:${clientIp(req)}`, limit, windowSec);
   if (!r.ok) throw new ApiError(429, `ბევრი მცდელობა. სცადე ${r.retryAfterSec} წამში.`);
 }
 

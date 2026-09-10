@@ -122,33 +122,39 @@ export function POST(req: Request) {
     const session = await requireRole("DISPATCHER");
     const { customerId, method, note } = paySchema.parse(await req.json());
 
-    const codOrders = await prisma.order.findMany({
-      where: { customerId, status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
-      select: { id: true, collectAmount: true, codCommission: true },
-    });
-    const chargeOrders = await prisma.order.findMany({
-      where: {
-        customerId,
-        chargeSettledAt: null,
-        OR: [{ returnFee: { gt: 0 } }, { cancelFee: { gt: 0 } }],
-      },
-      select: { id: true, returnFee: true, cancelFee: true },
-    });
-    const creditRows = await prisma.customerAdjustment.findMany({
-      where: { customerId, settledAt: null },
-      select: { id: true, amount: true },
-    });
-    if (codOrders.length === 0 && chargeOrders.length === 0 && creditRows.length === 0)
-      throw new ApiError(400, "ამ გამგზავნთან გასასწორებელი არაფერია");
-
-    const gross = Math.round(codOrders.reduce((s, o) => s + n(o.collectAmount), 0) * 100) / 100;
-    const commission = Math.round(codOrders.reduce((s, o) => s + n(o.codCommission), 0) * 100) / 100;
-    const charges =
-      Math.round(chargeOrders.reduce((s, o) => s + n(o.returnFee) + n(o.cancelFee), 0) * 100) / 100;
-    const creditsTotal = Math.round(creditRows.reduce((s, a) => s + n(a.amount), 0) * 100) / 100;
-    const net = Math.round((gross - commission - charges + creditsTotal) * 100) / 100;
-
+    // ── მთელი ანგარიშსწორება ერთ ტრანზაქციაში: მონაცემებს ვკითხულობთ და ვნიშნავთ
+    //    ატომურად. თუ პარალელურმა request-მა ისინი უკვე „დაიჭირა", updateMany-ს
+    //    count აღარ დაემთხვევა და მთელი ტრანზაქცია გაუქმდება (409) —
+    //    ორმაგი remittance / ორმაგი chargeSettled ვერ შეიქმნება. ──
     const rem = await prisma.$transaction(async (tx) => {
+      const codOrders = await tx.order.findMany({
+        where: { customerId, status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
+        select: { id: true, collectAmount: true, codCommission: true },
+      });
+      const chargeOrders = await tx.order.findMany({
+        where: {
+          customerId,
+          chargeSettledAt: null,
+          OR: [{ returnFee: { gt: 0 } }, { cancelFee: { gt: 0 } }],
+        },
+        select: { id: true, returnFee: true, cancelFee: true },
+      });
+      const creditRows = await tx.customerAdjustment.findMany({
+        where: { customerId, settledAt: null },
+        select: { id: true, amount: true },
+      });
+      if (codOrders.length === 0 && chargeOrders.length === 0 && creditRows.length === 0)
+        throw new ApiError(400, "ამ გამგზავნთან გასასწორებელი არაფერია");
+
+      const gross = Math.round(codOrders.reduce((s, o) => s + n(o.collectAmount), 0) * 100) / 100;
+      const commission =
+        Math.round(codOrders.reduce((s, o) => s + n(o.codCommission), 0) * 100) / 100;
+      const charges =
+        Math.round(chargeOrders.reduce((s, o) => s + n(o.returnFee) + n(o.cancelFee), 0) * 100) /
+        100;
+      const creditsTotal = Math.round(creditRows.reduce((s, a) => s + n(a.amount), 0) * 100) / 100;
+      const net = Math.round((gross - commission - charges + creditsTotal) * 100) / 100;
+
       const r = await tx.codRemittance.create({
         data: {
           customerId,
@@ -163,23 +169,33 @@ export function POST(req: Request) {
           createdById: session.sub,
         },
       });
-      if (codOrders.length)
-        await tx.order.updateMany({
-          where: { id: { in: codOrders.map((o) => o.id) } },
+      if (codOrders.length) {
+        const u = await tx.order.updateMany({
+          where: { id: { in: codOrders.map((o) => o.id) }, codRemittanceId: null },
           data: { codRemittanceId: r.id },
         });
-      if (chargeOrders.length)
-        await tx.order.updateMany({
-          where: { id: { in: chargeOrders.map((o) => o.id) } },
+        if (u.count !== codOrders.length)
+          throw new ApiError(409, "მონაცემები პარალელურად შეიცვალა — სცადე თავიდან");
+      }
+      if (chargeOrders.length) {
+        const u = await tx.order.updateMany({
+          where: { id: { in: chargeOrders.map((o) => o.id) }, chargeSettledAt: null },
           data: { chargeSettledAt: new Date() },
         });
-      if (creditRows.length)
-        await tx.customerAdjustment.updateMany({
-          where: { id: { in: creditRows.map((a) => a.id) } },
+        if (u.count !== chargeOrders.length)
+          throw new ApiError(409, "მონაცემები პარალელურად შეიცვალა — სცადე თავიდან");
+      }
+      if (creditRows.length) {
+        const u = await tx.customerAdjustment.updateMany({
+          where: { id: { in: creditRows.map((a) => a.id) }, settledAt: null },
           data: { settledAt: new Date() },
         });
-      return r;
+        if (u.count !== creditRows.length)
+          throw new ApiError(409, "მონაცემები პარალელურად შეიცვალა — სცადე თავიდან");
+      }
+      return { ...r, net, charges };
     });
+    const { net, charges } = rem;
 
     await notify(customerId, {
       type: "PAYMENT",

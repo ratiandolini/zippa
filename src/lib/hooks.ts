@@ -274,12 +274,10 @@ export interface TrackingDTO {
   trackingNumber: string;
   status: OrderDTO["status"];
   kind: OrderDTO["kind"];
+  area: string;
   createdAt: string;
+  updatedAt: string;
   estimatedDeliveryAt: string | null;
   deliveredAt: string | null;
-  pickup: { address: string; lat: number; lng: number };
-  delivery: { address: string; lat: number; lng: number };
-  driverName: string | null;
-  driverLocation: { lat: number; lng: number } | null;
-  events: OrderDTO["events"];
+  steps: { status: OrderDTO["status"]; at: string }[];
 }
