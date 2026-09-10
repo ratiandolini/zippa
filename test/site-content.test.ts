@@ -74,14 +74,62 @@ describe("მთავარი გვერდი — მობილური 
     expect(home).toContain("FAQ.slice(0, 4)");
   });
 
-  it("sticky CTA მიდის მომხმარებლის რეგისტრაციაზე, safe-area padding-ით", () => {
-    expect(home).toContain("/register?role=CUSTOMER");
-    expect(home).toContain("env(safe-area-inset-bottom)");
+  it("Hero CTA-ს აქვს id=\"hero-cta\" (sticky CTA-ს observer-ის სამიზნე)", () => {
+    expect(home).toContain('id="hero-cta"');
+  });
+
+  it("sticky CTA ცალკე კლიენტ-კომპონენტშია, არა inline მუდმივად ხილული", () => {
+    expect(home).toContain("<MobileStickyCta />");
+    // page.tsx-ში „ამანათის გაგზავნა“ ზუსტად ერთხელ — მხოლოდ Hero CTA
+    // (sticky CTA-ს ტექსტი კომპონენტშია; საწყის ეკრანზე დუბლიკატი არ ჩანს)
+    expect(home.match(/ამანათის გაგზავნა/g)).toHaveLength(1);
+    expect(home).not.toContain("fixed inset-x-0 bottom-0");
   });
 
   it("ზედმეტად ფართო დაპირება მოხსნილია", () => {
     expect(home).not.toContain("მთელი საქართველოს მასშტაბით");
     expect(home).toContain("თბილისი და საქართველოს რეგიონები");
+  });
+});
+
+describe("მობილურის sticky CTA — დუბლირება საწყის ეკრანზე არ ჩანს", () => {
+  const cta = read("src/components/mobile-sticky-cta.tsx");
+
+  it("კლიენტ-კომპონენტია და IntersectionObserver-ს იყენებს", () => {
+    expect(cta).toContain('"use client"');
+    expect(cta).toContain("IntersectionObserver");
+  });
+
+  it("საწყისი მდგომარეობა — დამალული (useState(false))", () => {
+    expect(cta).toMatch(/useState\(\s*false\s*\)/);
+  });
+
+  it("Hero CTA-ს (id=\"hero-cta\") აკვირდება და მისი გამოჩენისას იმალება", () => {
+    expect(cta).toContain('getElementById("hero-cta")');
+    expect(cta).toContain("!entry.isIntersecting");
+  });
+
+  it("დამალულ მდგომარეობაში — pointer-events-none + opacity-0 (ვიზუალურად და ინტერაქციულად გამორთული)", () => {
+    expect(cta).toContain("pointer-events-none opacity-0");
+    expect(cta).toContain('tabIndex={show ? 0 : -1}');
+  });
+
+  it("desktop-ზე საერთოდ არ ჩანს (sm:hidden), safe-area padding შენარჩუნებულია", () => {
+    expect(cta).toContain("sm:hidden");
+    expect(cta).toContain("env(safe-area-inset-bottom)");
+  });
+});
+
+describe("კურიერის ბარათი — ანაზღაურების ტექსტი გამართული", () => {
+  const card = read("src/components/driver-order-card.tsx");
+
+  it("„შენ ერიცხება“ აღარ არის (გრამატიკულად არასწორი)", () => {
+    expect(card).not.toContain("შენ ერიცხება");
+  });
+
+  it("გამოიყენება გამართული ფორმა „გერიცხება“", () => {
+    expect(card).toContain('"გერიცხება"');
+    expect(card).toContain("მიღების შემთხვევაში გერიცხება");
   });
 });
 
