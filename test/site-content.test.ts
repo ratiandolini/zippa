@@ -156,6 +156,22 @@ describe("DB backup workflow — pg_dump-ის შეცდომა pipe-შ�
   it("gzip-ის მთლიანობა მოწმდება (gzip -t)", () => {
     expect(wf).toContain("gzip -t");
   });
+
+  it("pg_dump 18.x-იდან — postgres:18 container (Neon server 18.x)", () => {
+    expect(wf).toMatch(/container:\s*\n\s*image:\s*postgres:18/);
+  });
+
+  it("pg_dump ვერსია 18.x-ზე მკაცრად მოწმდება — არა 18.x → workflow ვარდება", () => {
+    expect(wf).toContain("pg_dump --version");
+    expect(wf).toContain('*"(PostgreSQL) 18."*)');
+    // არა-18 ვერსიაზე workflow ვარდება
+    expect(wf).toMatch(/pg_dump არ არის 18\.x[^\n]*exit 1/);
+  });
+
+  it("client 16-ის apt-install-ზე აღარ ვეყრდნობით", () => {
+    expect(wf).not.toContain("postgresql-client-16");
+    expect(wf).not.toContain("postgresql-client-17");
+  });
 });
 
 describe("რეგისტრაცია — როლის პარამეტრით პირდაპირი ფორმა", () => {
