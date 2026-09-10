@@ -44,9 +44,15 @@
 
 | job | schedule | დაცვა |
 |---|---|---|
-| `/api/cron/expire-assignments` | `0 3 * * *` (`vercel.json`) | `CRON_SECRET` (Vercel Cron ავტომ. აგზავნის). secret-ის გარეშე endpoint **დაკეტილია** (503) |
+| `/api/cron/expire-assignments` | `0 3 * * *` (`vercel.json`) | `CRON_SECRET` (Vercel Cron ავტომ. აგზავნის) ან `SETUP_TOKEN`. არცერთის გარეშე endpoint **დაკეტილია** (503) |
 
-ხელით: `curl "https://.../api/cron/expire-assignments?token=$CRON_SECRET"`
+> ⚠️ **ამჟამად `CRON_SECRET` Production-ში დაყენებული არ არის** (2026-09). Vercel Cron
+> ავტორიზაციის header-ს ვერ დაამთხვევს `SETUP_TOKEN`-ს, ამიტომ **ყოველდღიური cron 401-ს
+> აბრუნებს და არ სრულდება.** გავლენა მცირეა: `expireStaleAssignments()` opportunistic-ად
+> ეშვება ყოველ `GET /api/orders`-ზე (დისპეჩერი/კურიერი როცა სიას ხსნის). backstop cron-ის
+> გასამართად: Vercel env → `CRON_SECRET` (`openssl rand -base64 24`) → redeploy.
+
+ხელით: `curl "https://.../api/cron/expire-assignments?token=$SETUP_TOKEN"`
 
 ---
 
@@ -102,8 +108,9 @@ Neon dashboard → Project → Branches → "Restore" → აირჩიე დ
 | `PROOF_BLOB_READ_WRITE_TOKEN` | **მიტანის ფოტოს** private Vercel Blob store-ის RW token. გარეშე — production-ში ფოტოს ატვირთვა ჩერდება (public-ზე fallback აკრძალულია). ცალკე private store შექმენი Vercel dashboard-ში |
 | `BLOB_READ_WRITE_TOKEN` | (არჩევითი) სხვა/legacy public Blob store |
 | `ADMIN_EMAIL` / `ADMIN_PHONE` / `ADMIN_PASSWORD` | პირველი დისპეჩერი (`/api/setup`). **პირველი შესვლის შემდეგ პაროლი შეცვალე და env-იდან წაშალე** |
-| `SMS_PROVIDER` / `SMSOFFICE_KEY` | SMS. `LOG` = არსად არ ლოგდება |
-| `SENTRY_DSN` | (არჩევითი) შეცდომების მონიტორინგი |
+| `SMS_PROVIDER` / `SMSOFFICE_KEY` | SMS. `LOG` = არსად არ ლოგდება (პირველი გაშვება — SMS არ ვრთავთ) |
+| `NEXT_PUBLIC_GEOAPIFY_KEY` | რუკის tiles + geocoding (Geoapify უფასო tier). გარეშე — fallback OpenStreetMap (Nominatim + OSM tiles), UI არ ტყდება |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | შეცდომების მონიტორინგი. ⚠️ ამჟამად `NEXT_PUBLIC_SENTRY_DSN` = placeholder `"SENTRY_DSN"` — რეალური DSN საჭიროა |
 | `AUTH_DEBUG_RESET_CODES` | **production-ში არ დააყენო** — მხოლოდ dev-ში აჩენს reset-კოდს კონსოლში |
 
 Secret-ის როტაცია: `AUTH_SECRET`-ის შეცვლა ყველა სესიას წყვეტს (მომხმარებლები თავიდან შედიან).
@@ -132,5 +139,7 @@ Secret-ის როტაცია: `AUTH_SECRET`-ის შეცვლა ყ
 - მიტანის ფოტო — private Vercel Blob (`PROOF_BLOB_READ_WRITE_TOKEN`). ნედლი blob URL არსად
   არ ქვეყნდება; წვდომა მხოლოდ `/api/orders/[id]/photo`-ით (role/owner check). public fallback აკრძალული.
 - ავტომატური backup მუშაობს **მხოლოდ** თუ GitHub secret `DATABASE_URL` დაყენებულია (იხ. §4).
-- Nominatim (მისამართის ავტოშევსება) — საჯარო სერვერი, ~1 req/წმ. დიდ ტრაფიკზე საკუთარი instance.
+- რუკა/geocoding — Geoapify (`NEXT_PUBLIC_GEOAPIFY_KEY`, უფასო tier). key-ის გარეშე fallback
+  OpenStreetMap Nominatim + OSM tiles (~1 req/წმ, OSM ToS heavy-use რისკი — მხოლოდ დროებით).
+- routing/OSRM — არ გამოიყენება; მანძილი haversine × 1.3.
 - გადახდა — `MOCK` რეჟიმში (ონლაინ ბარათი არ მუშაობს; COD/ნაღდი მუშაობს).

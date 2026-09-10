@@ -192,7 +192,7 @@ function Detail({ id }: { id: string }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">მეთოდი</span>
-                <span>{order.paymentMethod === "CASH" ? "ნაღდი" : "ბარათი"}</span>
+                <span>ნაღდი</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">წონა</span>

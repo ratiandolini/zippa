@@ -58,6 +58,83 @@ describe("დაბრუნების ტარიფის გამჭვ�
   });
 });
 
+describe("CASH-only launch — ბარათი/SMS არსად არ იპირება", () => {
+  const terms = read("src/app/(legal)/terms/page.tsx");
+  const privacy = read("src/app/(legal)/privacy/page.tsx");
+  const newOrder = read("src/app/app/new/page.tsx");
+  const forgot = read("src/app/(auth)/forgot/page.tsx");
+
+  it("Terms — არ ახსენებს ბარათით გადახდას ან გადახდის პროვაიდერს", () => {
+    expect(terms).not.toContain("ბარათით");
+    expect(terms).not.toContain("გადახდის პროვაიდერ");
+    expect(terms).not.toContain("ონლაინ გადახდილი");
+  });
+
+  it("Terms — მიტანის საფასური = ნაღდი კურიერთან; COD ცალკე განმარტებით", () => {
+    const t = terms.replace(/\s+/g, " ");
+    expect(t).toContain("მიტანის საფასურს მომხმარებელი იხდის ნაღდი ანგარიშსწორებით კურიერთან");
+    expect(t).toContain("COD (Cash on Delivery)");
+    expect(t).toContain("კურიერი მიმღებისგან ნაღდად");
+    expect(t).toContain("გამგზავნს უბრუნებს შეთანხმებული მეთოდით");
+  });
+
+  it("Privacy — არ ახსენებს გადახდის პროვაიდერს ან ბარათს", () => {
+    expect(privacy).not.toContain("გადახდის პროვაიდერ");
+    expect(privacy).not.toContain("ბარათის");
+    expect(privacy).not.toContain("CVV");
+  });
+
+  it("Terms/Privacy/forgot — SMS არსად არ იპირება მომხმარებელს", () => {
+    expect(terms).not.toContain("SMS");
+    expect(privacy).not.toContain("SMS");
+    expect(forgot).not.toContain("SMS");
+    expect(forgot).not.toContain("ტელეფონი ან ელფოსტა");
+  });
+
+  it("new-order UI — CARD არჩევანი არ არსებობს, deliveryProof default PHOTO", () => {
+    expect(newOrder).toContain('const payment = "CASH" as const');
+    expect(newOrder).not.toMatch(/"CARD"/);
+    expect(newOrder).toContain('useState<"PHOTO" | "PIN" | "NONE">("PHOTO")');
+  });
+
+  it("PIN — მიმღები კურიერს ეუბნება კოდს (SMS-ით არ იგზავნება)", () => {
+    expect(newOrder).toContain("მიმღები კურიერს ეტყვის 4-ნიშნა კოდს");
+    const track = read("src/app/app/track/page.tsx");
+    expect(track).toContain("გადაეცი ეს კოდი მიმღებს");
+  });
+});
+
+describe("რუკა — Geoapify + OpenStreetMap fallback", () => {
+  const tiles = read("src/lib/map-tiles.ts");
+  const map = read("src/components/map.tsx");
+  const picker = read("src/components/map-picker.tsx");
+
+  it("Geoapify key-ს იყენებს, key-ის გარეშე OSM fallback", () => {
+    expect(tiles).toContain("NEXT_PUBLIC_GEOAPIFY_KEY");
+    expect(tiles).toContain("maps.geoapify.com/v1/tile");
+    expect(tiles).toContain("tile.openstreetmap.org"); // fallback
+  });
+
+  it("attribution — Geoapify + OpenStreetMap", () => {
+    expect(tiles).toContain("Geoapify");
+    expect(tiles).toContain("OpenStreetMap");
+  });
+
+  it("map კომპონენტები საერთო tileConfig-ს იყენებენ (არა hard-coded URL)", () => {
+    expect(map).toContain("tileConfig");
+    expect(picker).toContain("tileConfig");
+    expect(map).not.toContain("{s}.tile.openstreetmap.org");
+    expect(picker).not.toContain("{s}.tile.openstreetmap.org");
+  });
+
+  it("geocoding — Geoapify key-ს იყენებს, key-ის გარეშე Nominatim fallback", () => {
+    const geo = read("src/lib/nominatim.ts");
+    expect(geo).toContain("api.geoapify.com/v1/geocode");
+    expect(geo).toContain("GEOAPIFY_KEY ? await geoapifySearch");
+    expect(geo).toContain("nominatimSearchRaw"); // fallback
+  });
+});
+
 describe("მთავარი გვერდი — მობილური გამარტივება", () => {
   const home = read("src/app/page.tsx");
 

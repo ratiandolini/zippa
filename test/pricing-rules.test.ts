@@ -10,7 +10,7 @@ const quoteBody = {
   pickup: { lat: 41.72, lng: 44.79 },
   delivery: { lat: 41.71, lng: 44.77 },
   weightKg: 3,
-  paymentMethod: "CARD" as const,
+  paymentMethod: "CASH" as const,
 };
 
 describe("ტარიფის წესები", () => {

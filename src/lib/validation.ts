@@ -78,7 +78,8 @@ export const createOrderSchema = z.object({
   description: z.string().trim().max(400).optional(),
   parcelValue: z.number().positive("მიუთითე ნივთის ღირებულება").max(100000),
   collectAmount: z.number().nonnegative().max(100000).optional(),
-  paymentMethod: z.enum(["CASH", "CARD"]).default("CASH"),
+  // პირველი გაშვება — მხოლოდ ნაღდი მიტანის საფასური (COD). ბარათით გადახდა არ არსებობს.
+  paymentMethod: z.literal("CASH").default("CASH"),
   payerSide: z.enum(["SENDER", "RECIPIENT"]).default("SENDER"),
   // მიტანის დადასტურება — რას ითხოვს კურიერისგან ჩაბარებისას
   deliveryProof: z.enum(["PHOTO", "PIN", "NONE"]).default("PHOTO"),
@@ -103,7 +104,7 @@ export const editOrderSchema = z
     description: z.string().trim().max(400).nullable(),
     parcelValue: z.number().nonnegative().max(100000).nullable(),
     collectAmount: z.number().nonnegative().max(100000).nullable(),
-    paymentMethod: z.enum(["CASH", "CARD"]),
+    paymentMethod: z.literal("CASH"),
     payerSide: z.enum(["SENDER", "RECIPIENT"]),
   })
   .partial()

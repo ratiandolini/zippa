@@ -55,8 +55,8 @@ export default function ForgotPage() {
         <CardTitle className="text-lg">პაროლის აღდგენა</CardTitle>
         <p className="text-sm text-muted-foreground">
           {step === 1
-            ? "მიუთითე ტელეფონი ან ელფოსტა — გამოგიგზავნით კოდს"
-            : "შეიყვანე მიღებული 6-ნიშნა კოდი და ახალი პაროლი"}
+            ? "მიუთითე რეგისტრირებული ელფოსტა — აღდგენის კოდს ელფოსტაზე გამოგიგზავნით"
+            : "შეიყვანე ელფოსტაზე მიღებული 6-ნიშნა კოდი და ახალი პაროლი"}
         </p>
       </CardHeader>
       <CardContent>
@@ -67,8 +67,8 @@ export default function ForgotPage() {
         ) : step === 1 ? (
           <form className="space-y-4" onSubmit={request}>
             <div className="space-y-1.5">
-              <Label htmlFor="id">ტელეფონი ან ელფოსტა</Label>
-              <Input id="id" value={id} onChange={(e) => setId(e.target.value)} required />
+              <Label htmlFor="id">ელფოსტა</Label>
+              <Input id="id" type="email" value={id} onChange={(e) => setId(e.target.value)} required />
             </div>
             {error && (
               <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>

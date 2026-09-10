@@ -44,3 +44,7 @@ _legacy/
 # vitest
 /test-results/
 backups/
+
+# ბაზის ბექაფები / dump-ები (customer PII — არასდროს commit-ში)
+db-backup*.zip
+zippa-*.sql.gz
