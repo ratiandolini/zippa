@@ -1,7 +1,7 @@
 name: DB Backup
 
 # ყოველდღიური pg_dump — არტიფაქტად ინახება GitHub-ზე (90 დღე, უფასო).
-# საჭიროა repo secret: DATABASE_URL (Neon-ის DIRECT_URL, არა pooled).
+# საჭიროა repo secret: DATABASE_URL (Neon-ის DIRECT connection string, არა pooled).
 
 on:
   schedule:
@@ -11,18 +11,25 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    # pg_dump backward-თავსებადი არაა: client >= server. Neon-ის server 18.x-ზეა,
+    # ubuntu-latest-ის pre-installed client კი 16 — ამიტომ pg_dump პირდაპირ
+    # ოფიციალური postgres:18 image-იდან.
+    container:
+      image: postgres:18
     steps:
-      - name: Install PostgreSQL client 17
+      - name: pg_dump უნდა იყოს 18.x
+        shell: bash
         run: |
           set -euo pipefail
-          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-          sudo apt-get update -qq
-          # უახლესი client — pg_dump backward-თავსებადი არაა (ძველი client ვერ dump-ავს ახალ server-ს)
-          sudo apt-get install -y -qq postgresql-client-17
+          which pg_dump
           pg_dump --version
+          case "$(pg_dump --version)" in
+            *"(PostgreSQL) 18."*) echo "pg_dump 18.x — OK" ;;
+            *) echo "::error::pg_dump არ არის 18.x (Neon-ის server 18.x-ზეა) — image-ის tag აწიე"; exit 1 ;;
+          esac
 
       - name: Dump database
+        shell: bash
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -54,10 +61,9 @@ jobs:
 
           gzip -9 "$RAW"
           test -s "$OUT" || { echo "::error::gzip შედეგი ცარიელია"; exit 1; }
-          # gzip-ის მთლიანობა
           gzip -t "$OUT" || { echo "::error::gzip დაზიანებულია"; exit 1; }
 
-          echo "backup OK — $(ls -lh "$OUT" | awk '{print $5}') ($(wc -c < "$OUT") bytes)"
+          echo "backup OK — $(wc -c < "$OUT") bytes"
           ls -lh zippa-*.sql.gz
 
       - name: Upload artifact
