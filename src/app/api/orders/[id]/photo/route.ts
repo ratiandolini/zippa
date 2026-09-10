@@ -69,6 +69,6 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       });
     }
 
-    return ok({ order: serializeOrder(updated) });
+    return ok({ order: serializeOrder(updated, session.role) });
   });
 }

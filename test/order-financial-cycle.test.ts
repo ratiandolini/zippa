@@ -24,6 +24,7 @@ const body = (over: Record<string, unknown> = {}) => ({
   weightKg: 3, // 0–6 კგ კალათა → კლიენტი 5 ₾, კურიერს 2.5 ₾
   parcelValue: 50,
   paymentMethod: "CASH",
+  deliveryProof: "NONE",
   ...over,
 });
 
@@ -53,10 +54,15 @@ const advance = async (id: string, drv: Awaited<ReturnType<typeof makeDriver>>, 
 describe("1. დისპეჩერი ანიჭებს კურიერს — ფასები ავტომატურად ითვლება", () => {
   it("შექმნისას სნეპშოტდება კლიენტის ფასი, კურიერის ანაზღაურება, partnerCost, Zippa-ს სხვაობა", async () => {
     const { order, disp, drv } = await setup();
+    // კლიენტი ხედავს მხოლოდ თავის ფასს; კურიერის ანაზღაურება/მარჟა დაფარულია
     expect(order.price.total).toBe(5);
-    expect(order.price.driverFee).toBe(2.5);
-    expect(order.price.partnerCost).toBe(0);
-    expect(order.price.companyMargin).toBe(2.5); // 5 − 2.5 − 0
+    expect(order.price.driverFee).toBe(0);
+    expect(order.price.companyMargin).toBe(0);
+    // სნეპშოტი ბაზაში სწორად ჩაიწერა
+    const snap = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(Number(snap.driverFee)).toBe(2.5);
+    expect(Number(snap.partnerCost)).toBe(0);
+    expect(Number(snap.companyMargin)).toBe(2.5); // 5 − 2.5 − 0
 
     // მინიჭება არ ცვლის სნეპშოტს
     actAs(session(disp));

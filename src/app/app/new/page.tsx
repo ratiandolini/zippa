@@ -45,6 +45,7 @@ export default function NewOrderPage() {
   const [parcelValue, setParcelValue] = useState("");
   const [collectAmount, setCollectAmount] = useState("");
   const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("SENDER");
+  const [deliveryProof, setDeliveryProof] = useState<"PHOTO" | "PIN" | "NONE">("PHOTO");
   const payment = "CASH" as const;
   const hasCollect = collectAmount.trim() !== "" && parseFloat(collectAmount) > 0;
   useEffect(() => {
@@ -148,6 +149,7 @@ export default function NewOrderPage() {
         collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : undefined,
         paymentMethod: payment,
         payerSide,
+        deliveryProof,
       });
       router.push(`/app/track?id=${order.id}`);
     } catch (e) {
@@ -244,6 +246,33 @@ export default function NewOrderPage() {
                   placeholder="მაგ. სადარბაზოს კოდი 1234, მე-4 სართული, დარეკე ჩამოსვლამდე"
                   hint="არასავალდებულო — მიტანის დეტალები"
                 />
+              </div>
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>ჩაბარების დადასტურება</Label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      ["PHOTO", "ფოტო", "კურიერი ატვირთავს მიტანის ფოტოს"],
+                      ["PIN", "კოდი", "მიმღები კურიერს ეტყვის 4-ნიშნა კოდს"],
+                      ["NONE", "არ სჭირდება", "დადასტურების გარეშე"],
+                    ] as const
+                  ).map(([k, label, desc]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setDeliveryProof(k)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                        deliveryProof === k
+                          ? "border-accent bg-accent/10 font-medium"
+                          : "border-border text-muted-foreground hover:bg-muted",
+                      )}
+                    >
+                      <div>{label}</div>
+                      <div className="mt-0.5 text-[11px] font-normal text-muted-foreground">{desc}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
               <Text
                 label="ნივთის ღირებულება, ₾ *"

@@ -18,6 +18,7 @@ const body = (over: Record<string, unknown> = {}) => ({
   weightKg: 3,
   parcelValue: 50,
   paymentMethod: "CASH",
+  deliveryProof: "NONE",
   ...over,
 });
 

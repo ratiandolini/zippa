@@ -5,7 +5,7 @@ import { handle, ok } from "@/lib/api";
 import { createOrderSchema } from "@/lib/validation";
 import { calculatePrice, resolveCityId, estimateDelivery } from "@/lib/pricing";
 import { orderInclude, serializeOrder } from "@/lib/serialize";
-import { generateTrackingNumber } from "@/lib/utils";
+import { generateTrackingNumber, generateDeliveryPin } from "@/lib/utils";
 import { notifyDispatchers } from "@/lib/notify";
 import { streetOf } from "@/lib/domain";
 import { expireStaleAssignments } from "@/lib/assignments";
@@ -34,7 +34,7 @@ export function GET(req: Request) {
       orderBy: { createdAt: "desc" },
       take: 200,
     });
-    return ok({ orders: orders.map(serializeOrder) });
+    return ok({ orders: orders.map((o) => serializeOrder(o, session.role)) });
   });
 }
 
@@ -110,6 +110,9 @@ export function POST(req: Request) {
         payerSide: data.payerSide,
         codAmount,
 
+        deliveryProof: data.deliveryProof,
+        deliveryPin: data.deliveryProof === "PIN" ? generateDeliveryPin() : null,
+
         events: { create: { status: "PENDING", note: "შეკვეთა შექმნილია", actorId: session.sub } },
       },
       include: orderInclude,
@@ -121,6 +124,6 @@ export function POST(req: Request) {
       data: { orderId: order.id },
     });
 
-    return ok({ order: serializeOrder(order) }, 201);
+    return ok({ order: serializeOrder(order, session.role) }, 201);
   });
 }

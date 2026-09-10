@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { ACTIVE_ORDER_STATUSES, type FinanceStatus } from "@/lib/domain";
 
 const num = (v: Prisma.Decimal | number | null | undefined) =>
@@ -28,7 +28,12 @@ export const orderInclude = {
 
 type OrderWith = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
-export function serializeOrder(o: OrderWith) {
+/** ვინ ხედავს შეკვეთას — განსაზღვრავს რა ველები დაიფარება.
+ *  DISPATCHER — სრული. CUSTOMER — თავისი ფასი, კურიერის ანაზღაურება/მარჟა დამალული.
+ *  DRIVER — თავისი ანაზღაურება ჩანს, კომპანიის მარჟა/კლიენტის PII/PIN დამალული. */
+export type OrderViewer = Extract<Role, "DISPATCHER" | "CUSTOMER" | "DRIVER">;
+
+export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER") {
   // ── ფინანსური სტატუსი ──
   // კლიენტის ვალდებულება Zippa-სთან (გაუქმება/დაბრუნება), ჯერ არ მიღებული
   const chargeTotal = Math.round((num(o.cancelFee) + num(o.returnFee)) * 100) / 100;
@@ -49,6 +54,10 @@ export function serializeOrder(o: OrderWith) {
           ? "DRIVER_PAYABLE"
           : "RECEIVED";
 
+  const isCustomer = viewer === "CUSTOMER";
+  const isDriver = viewer === "DRIVER";
+  const isDispatcher = viewer === "DISPATCHER";
+
   return {
     id: o.id,
     trackingNumber: o.trackingNumber,
@@ -62,19 +71,20 @@ export function serializeOrder(o: OrderWith) {
     estimatedDeliveryAt: o.estimatedDeliveryAt?.toISOString() ?? null,
 
     customerId: o.customerId,
-    customerName: o.customer.name,
+    customerName: isDriver ? "" : o.customer.name,
     customer: {
-      name: o.customer.name,
-      phone: o.customer.phone,
-      email: o.customer.email,
+      name: isDriver ? "" : o.customer.name,
+      phone: isDriver ? "" : o.customer.phone,
+      email: isDriver ? "" : o.customer.email,
       accountType: o.customer.accountType,
-      companyName: o.customer.companyName,
-      taxId: o.customer.taxId,
+      companyName: isDriver ? null : o.customer.companyName,
+      taxId: isDriver ? null : o.customer.taxId,
     },
 
     driverId: o.driverId,
     driverName: o.driver?.user.name ?? null,
-    driverPhone: o.driver?.user.phone ?? null,
+    // კურიერის ტელეფონი — მხოლოდ დისპეჩერს და შეკვეთის კლიენტს (კურიერთან დასაკავშირებლად)
+    driverPhone: isDriver ? null : (o.driver?.user.phone ?? null),
     // მდებარეობა მხოლოდ მიმდინარე მიტანაზე და მხოლოდ ახალი (≤10 წთ) — თორემ „გაყინული" ჩვენება
     driverLocation:
       o.driver?.currentLat != null &&
@@ -100,20 +110,27 @@ export function serializeOrder(o: OrderWith) {
     description: o.description,
     parcelValue: o.parcelValue == null ? null : num(o.parcelValue),
     collectAmount: num(o.collectAmount),
-    codCommission: num(o.codCommission),
+    codCommission: isDispatcher || isCustomer ? num(o.codCommission) : 0,
     codRemitted: o.codRemittanceId != null,
+
+    // მიტანის დადასტურება
+    deliveryProof: o.deliveryProof,
+    // PIN — მხოლოდ დისპეჩერს და კლიენტს (კლიენტი მიმღებს გადასცემს; კურიერმა არ უნდა იცოდეს)
+    deliveryPin: isDriver ? null : o.deliveryPin,
 
     distanceKm: num(o.distanceKm),
     price: {
       delivery: num(o.deliveryPrice),
       codFee: num(o.codFee),
       total: num(o.totalPrice),
-      driverFee: num(o.driverFee),
-      partnerCost: num(o.partnerCost),
-      companyMargin: num(o.companyMargin),
+      // კურიერს ერიცხება — ხედავს კურიერი (თავისი) და დისპეჩერი; კლიენტი — არა
+      driverFee: isCustomer ? 0 : num(o.driverFee),
+      // პარტნიორის ხარჯი და Zippa-ს მარჟა — მხოლოდ დისპეჩერს
+      partnerCost: isDispatcher ? num(o.partnerCost) : 0,
+      companyMargin: isDispatcher ? num(o.companyMargin) : 0,
     },
     pricingSource: o.pricingSource,
-    priceAdjustmentReason: o.priceAdjustmentReason,
+    priceAdjustmentReason: isDriver ? null : o.priceAdjustmentReason,
     priceAdjustedAt: o.priceAdjustedAt?.toISOString() ?? null,
     needsManualReview: o.needsManualReview,
 
@@ -121,15 +138,25 @@ export function serializeOrder(o: OrderWith) {
     paymentStatus: o.paymentStatus,
     payerSide: o.payerSide,
     codAmount: num(o.codAmount),
-    cancelFee: num(o.cancelFee),
-    returnFee: num(o.returnFee),
-    chargeSettledAt: o.chargeSettledAt?.toISOString() ?? null,
-    finance: {
-      status: financeStatus, // OWED | RECEIVED | DRIVER_PAYABLE | null
-      customerOwed, // კლიენტს გადასახდელი (მიღებამდე)
-      chargeReceived, // Zippa-მ მიიღო კლიენტისგან
-      driverPayable, // ამ შეკვეთაზე კურიერისთვის გადასახდელი
-    },
+    // კლიენტის დავალიანება (გაუქმება/დაბრუნება) — კურიერს არ ეხება
+    cancelFee: isDriver ? 0 : num(o.cancelFee),
+    returnFee: isDriver ? 0 : num(o.returnFee),
+    chargeSettledAt: isDriver ? null : (o.chargeSettledAt?.toISOString() ?? null),
+    finance: isDispatcher
+      ? {
+          status: financeStatus,
+          customerOwed,
+          chargeReceived,
+          driverPayable,
+        }
+      : isCustomer
+        ? {
+            status: (customerOwed > 0 ? "OWED" : null) as FinanceStatus | null,
+            customerOwed,
+            chargeReceived,
+            driverPayable: 0,
+          }
+        : { status: null as FinanceStatus | null, customerOwed: 0, chargeReceived: false, driverPayable: 0 },
     failureReason: o.failureReason,
     returnRequestedAt: o.returnRequestedAt?.toISOString() ?? null,
     returnReason: o.returnReason,

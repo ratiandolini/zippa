@@ -47,6 +47,6 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       data: { orderId: order.id },
     });
 
-    return ok({ order: serializeOrder(updated) });
+    return ok({ order: serializeOrder(updated, "DRIVER") });
   });
 }

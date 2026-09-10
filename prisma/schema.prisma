@@ -237,6 +237,13 @@ enum PayerSide {
   RECIPIENT
 }
 
+// მიტანის დადასტურების ტიპი — რას ითხოვს კურიერისგან ჩაბარებისას
+enum DeliveryProof {
+  PHOTO // მიტანის ფოტო სავალდებულოა (ნაგულისხმევი)
+  PIN // მიმღები ეუბნება კურიერს 4-ნიშნა კოდს
+  NONE // დადასტურება არ სჭირდება
+}
+
 // მიტანის ჩაშლის მიზეზი (RTO)
 enum OrderFailureReason {
   RECIPIENT_UNAVAILABLE // მიმღები ვერ მოიძებნა
@@ -314,6 +321,8 @@ model Order {
   codAmount     Decimal       @default(0) @db.Decimal(10, 2) // ნაღდად ასაღები თანხა (მიტანის საფასური ან/და parcelValue)
 
   // მიტანის დადასტურება
+  deliveryProof DeliveryProof @default(PHOTO) // რას ითხოვს კურიერისგან ჩაბარებისას
+  deliveryPin   String? // 4-ნიშნა კოდი — მხოლოდ deliveryProof = PIN-ზე
   proofPhotoUrl String?
   signatureUrl  String?
   deliveredAt   DateTime?

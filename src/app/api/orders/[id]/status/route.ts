@@ -59,6 +59,16 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (!isDispatcher && !isOwnerDriver && !isCustomerCancel)
       return fail(403, "წვდომა აკრძალულია");
 
+    // ── ტერმინალური სტატუსი — ცვლილება აღარ შეიძლება ──
+    const TERMINAL: OrderStatus[] = ["DELIVERED", "CANCELLED", "FAILED"];
+    if (TERMINAL.includes(order.status as OrderStatus))
+      throw new ApiError(409, "შეკვეთა დასრულებულია — სტატუსი ვეღარ იცვლება");
+
+    // ── დისპეჩერს ამ endpoint-იდან შეუძლია მხოლოდ გაუქმება/დაბრუნება ──
+    // (კურიერის ნაბიჯებს კურიერი ატარებს; ხელით წინსვლა დაშვებული არაა)
+    if (isDispatcher && body.status !== "CANCELLED")
+      throw new ApiError(409, "დისპეჩერს ამ ეტაპზე მხოლოდ გაუქმება/დაბრუნება შეუძლია");
+
     // ამანათი უკვე კურიერთანაა და შეკვეთა უქმდება (დისპეჩერი) — მიტანის ფასი აღარ ბრუნდება
     const isPostPickupCancel =
       body.status === "CANCELLED" && POST_PICKUP_STATUSES.includes(order.status as OrderStatus);
@@ -81,6 +91,17 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
 
     if (body.status === "FAILED" && !body.failureReason)
       throw new ApiError(422, "მიუთითე ჩაშლის მიზეზი");
+
+    // ── ჩაბარების დადასტურება — deliveryProof-ის მიხედვით ──
+    if (body.status === "DELIVERED") {
+      if (order.deliveryProof === "PHOTO" && !order.proofPhotoUrl)
+        throw new ApiError(422, "ჯერ ატვირთე მიტანის ფოტო");
+      if (order.deliveryProof === "PIN") {
+        const pin = (body.pin ?? "").replace(/\D/g, "");
+        if (!order.deliveryPin || pin !== order.deliveryPin)
+          throw new ApiError(422, "მიმღების PIN არ ემთხვევა");
+      }
+    }
 
     // ── მიტანის ჩაშლა (RTO) — ფინანსური ლოგიკა ──
     const driverFault = body.failureReason
@@ -323,6 +344,6 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       void sendSms(order.recipientPhone, smsTemplates.delivered(order.trackingNumber));
     }
 
-    return ok({ order: serializeOrder(updated) });
+    return ok({ order: serializeOrder(updated, session.role) });
   });
 }

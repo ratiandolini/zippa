@@ -16,6 +16,7 @@ const orderBody = (over: Record<string, unknown> = {}) => ({
   weightKg: 3,
   parcelValue: 50,
   paymentMethod: "CASH",
+  deliveryProof: "NONE",
   ...over,
 });
 
@@ -29,7 +30,8 @@ async function makeOrder(over: Record<string, unknown> = {}) {
 describe("driverWeightBrackets", () => {
   it("კურიერის თანხა წონა-ცხრილიდან, არა მანძილიდან", async () => {
     const { order } = await makeOrder({ weightKg: 12, delivery: { address: "შორს", lat: 41.62, lng: 44.9 } });
-    expect(order.price.driverFee).toBe(4); // 11–16 კგ კალათა → კურიერს 4 ₾
+    const snap = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(Number(snap.driverFee)).toBe(4); // 11–16 კგ კალათა → კურიერს 4 ₾
   });
 });
 

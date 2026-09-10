@@ -80,6 +80,8 @@ export const createOrderSchema = z.object({
   collectAmount: z.number().nonnegative().max(100000).optional(),
   paymentMethod: z.enum(["CASH", "CARD"]).default("CASH"),
   payerSide: z.enum(["SENDER", "RECIPIENT"]).default("SENDER"),
+  // მიტანის დადასტურება — რას ითხოვს კურიერისგან ჩაბარებისას
+  deliveryProof: z.enum(["PHOTO", "PIN", "NONE"]).default("PHOTO"),
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
@@ -188,6 +190,8 @@ export const updateStatusSchema = z.object({
   failureReason: z
     .enum(["RECIPIENT_UNAVAILABLE", "RECIPIENT_REFUSED", "ADDRESS_INVALID", "DAMAGED", "OTHER"])
     .optional(),
+  // მიმღების PIN-კოდი — deliveryProof = PIN-ზე ჩაბარებისას
+  pin: z.string().trim().max(8).optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
 });

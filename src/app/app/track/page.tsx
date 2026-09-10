@@ -138,6 +138,19 @@ function Detail({ id }: { id: string }) {
               </span>
             </div>
           )}
+          {order.deliveryProof === "PIN" &&
+            order.deliveryPin &&
+            !["DELIVERED", "CANCELLED", "FAILED"].includes(order.status) && (
+              <div className="rounded-lg border border-accent/40 bg-accent/[0.06] px-4 py-3">
+                <div className="text-sm font-medium">მიტანის კოდი</div>
+                <div className="mt-1 font-mono text-3xl font-bold tracking-[0.3em] text-accent">
+                  {order.deliveryPin}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  გადაეცი ეს კოდი მიმღებს — კურიერი ჩაბარებისას ჰკითხავს.
+                </p>
+              </div>
+            )}
           <LazyMap points={points} className="h-80 w-full" />
           <Card>
             <CardHeader>

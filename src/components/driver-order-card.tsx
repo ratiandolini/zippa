@@ -61,17 +61,29 @@ const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   FAILED: "ვერ ჩავაბარე",
 };
 
+const PROOF_HINT: Record<string, string> = {
+  PHOTO: "ჩასაბარებლად ატვირთე მიტანის ფოტო.",
+  PIN: "ჩასაბარებლად შეიყვანე მიმღების 4-ნიშნა კოდი.",
+};
+
 export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [failPick, setFailPick] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
+  const [pin, setPin] = useState("");
   const next = DRIVER_NEXT_STATUS[order.status] ?? [];
 
   const acceptedAt = [...order.events].reverse().find((e) => e.status === "ACCEPTED")?.createdAt;
   const pickedUpAt = [...order.events].reverse().find((e) => e.status === "PICKED_UP")?.createdAt;
 
+  // ჩაბარების ღილაკამდე რა უნდა შესრულდეს (deliveryProof-ის მიხედვით)
+  const deliverBlocked =
+    next.includes("DELIVERED" as OrderStatus) &&
+    ((order.deliveryProof === "PHOTO" && !order.proofPhotoUrl) ||
+      (order.deliveryProof === "PIN" && pin.replace(/\D/g, "").length !== 4));
+
   async function reject() {
-    if (!confirm("დარწმუნებული ხარ, რომ უარს ამბობ ამ შეკვეთაზე?")) return;
     setBusy("REJECT");
     setErr(null);
     try {
@@ -81,6 +93,7 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
       setErr(e instanceof Error ? e.message : "შეცდომა");
     } finally {
       setBusy(null);
+      setConfirmReject(false);
     }
   }
 
@@ -98,7 +111,9 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
           ),
         );
       }
-      await api(`/api/orders/${order.id}/status`, "PATCH", { status, failureReason, ...coords });
+      const pinArg =
+        status === "DELIVERED" && order.deliveryProof === "PIN" ? { pin } : {};
+      await api(`/api/orders/${order.id}/status`, "PATCH", { status, failureReason, ...pinArg, ...coords });
       onChange();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "შეცდომა");
@@ -191,32 +206,103 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         {pickedUpAt && <span>აიღე: {fmtDateTime(pickedUpAt)}</span>}
       </div>
 
-      {["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (
+      {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && order.deliveryProof === "PHOTO" && (
         <div className="mt-3">
           <ProofPhoto order={order} canUpload onChange={onChange} />
         </div>
       )}
+      {order.status === "DELIVERED" && order.proofPhotoUrl && (
+        <div className="mt-3">
+          <ProofPhoto order={order} />
+        </div>
+      )}
+
+      {/* ჩაბარების დადასტურება — PIN */}
+      {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && order.deliveryProof === "PIN" && (
+        <div className="mt-3">
+          <label className="text-xs font-medium text-muted-foreground">
+            მიმღების კოდი (გკითხე მიმღებს)
+          </label>
+          <input
+            inputMode="numeric"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="1234"
+            className="mt-1 h-12 w-full rounded-lg border border-border bg-background px-3 text-center text-xl tracking-[0.4em] tabular-nums outline-none focus:border-accent"
+          />
+        </div>
+      )}
+      {["PICKED_UP", "IN_TRANSIT"].includes(order.status) &&
+        deliverBlocked &&
+        PROOF_HINT[order.deliveryProof] && (
+          <p className="mt-2 text-xs text-amber-700">{PROOF_HINT[order.deliveryProof]}</p>
+        )}
 
       {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
 
-      {next.length > 0 && !failPick && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {next.map((s) => (
+      {next.length > 0 && !failPick && !confirmReject && (
+        <div className="mt-3 space-y-2">
+          {next
+            .filter((s) => s !== "FAILED")
+            .map((s) => (
+              <Button
+                key={s}
+                size="lg"
+                className="h-12 w-full text-base"
+                disabled={busy != null || (s === "DELIVERED" && deliverBlocked)}
+                onClick={() => move(s)}
+              >
+                {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
+              </Button>
+            ))}
+          {next.includes("FAILED" as OrderStatus) && (
             <Button
-              key={s}
-              size="sm"
-              variant={s === "FAILED" ? "outline" : "default"}
+              size="lg"
+              variant="outline"
+              className="h-11 w-full"
               disabled={busy != null}
-              onClick={() => (s === "FAILED" ? setFailPick(true) : move(s))}
+              onClick={() => setFailPick(true)}
             >
-              {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
-            </Button>
-          ))}
-          {order.status === "ASSIGNED" && (
-            <Button size="sm" variant="ghost" disabled={busy != null} onClick={reject}>
-              {busy === "REJECT" ? "…" : "უარი"}
+              {NEXT_LABEL.FAILED}
             </Button>
           )}
+          {order.status === "ASSIGNED" && (
+            <Button
+              size="lg"
+              variant="ghost"
+              className="h-11 w-full text-muted-foreground"
+              disabled={busy != null}
+              onClick={() => setConfirmReject(true)}
+            >
+              უარი შეკვეთაზე
+            </Button>
+          )}
+        </div>
+      )}
+
+      {confirmReject && (
+        <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+          <p className="mb-2 text-sm">უარს ამბობ ამ შეკვეთაზე? დაუბრუნდება დისპეჩერს.</p>
+          <div className="flex gap-2">
+            <Button
+              size="lg"
+              variant="destructive"
+              className="h-11 flex-1"
+              disabled={busy != null}
+              onClick={reject}
+            >
+              {busy === "REJECT" ? "…" : "დიახ, უარი"}
+            </Button>
+            <Button
+              size="lg"
+              variant="ghost"
+              className="h-11 flex-1"
+              onClick={() => setConfirmReject(false)}
+            >
+              დავტოვო
+            </Button>
+          </div>
         </div>
       )}
 

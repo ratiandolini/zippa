@@ -43,7 +43,7 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
       if (order.driverId !== dp?.id) return fail(403, "წვდომა აკრძალულია");
     }
 
-    return ok({ order: serializeOrder(order) });
+    return ok({ order: serializeOrder(order, session.role) });
   });
 }
 
@@ -184,6 +184,6 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       });
     }
 
-    return ok({ order: serializeOrder(updated) });
+    return ok({ order: serializeOrder(updated, session.role) });
   });
 }

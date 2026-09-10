@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { useOrders, type DriverListItem } from "@/lib/hooks";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, streetOf, FINANCE_STATUS_LABEL } from "@/lib/domain";
+import { GEL, streetOf, FINANCE_STATUS_LABEL, POST_PICKUP_STATUSES, RETURN_FEE_PCT } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -239,16 +239,18 @@ function RouteAssignBar({
   );
 }
 
-const TERMINAL = ["DELIVERED", "CANCELLED"];
+const TERMINAL = ["DELIVERED", "CANCELLED", "FAILED"];
 
 function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void }) {
   const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
+  const isReturn = POST_PICKUP_STATUSES.includes(order.status);
   const canCancel = !TERMINAL.includes(order.status);
   const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
   const canDelete = order.status === "CANCELLED" || order.status === "DRAFT";
@@ -257,40 +259,19 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canFixPrice = order.status === "PENDING" || order.status === "ASSIGNED";
   const [fixingPrice, setFixingPrice] = useState(false);
 
-  async function adjust() {
-    const amtStr = prompt(
-      `${order.trackingNumber} — ანაზღაურება მომხმარებელს (₾).\nჩაირიცხება „მიღებულ თანხებში".`,
-      order.returnFee > 0 ? String(order.price.delivery) : "",
-    );
-    if (amtStr === null) return;
-    const amount = parseFloat(amtStr);
-    if (!(amount > 0)) return;
-    const reason = prompt("მიზეზი (მაგ. კურიერის ბრალით დაზიანდა, Zippa-ს დაგვიანება):", "");
-    if (!reason) return;
-    setAdjusting(true);
-    try {
-      await api(`/api/orders/${order.id}/adjust`, "POST", {
-        amount,
-        kind: "COMPENSATION",
-        reason,
-        waiveReturnFee: order.returnFee > 0,
-      });
-      onChange();
-    } finally {
-      setAdjusting(false);
-    }
-  }
+  const returnFeePreview = Math.round(order.price.delivery * RETURN_FEE_PCT * 100) / 100;
 
   async function cancel() {
     setCancelling(true);
     try {
       await api(`/api/orders/${order.id}/status`, "PATCH", {
         status: "CANCELLED",
-        note: "დისპეჩერმა გააუქმა",
+        note: isReturn ? "დისპეჩერმა დააბრუნა" : "დისპეჩერმა გააუქმა",
       });
       onChange();
     } finally {
       setCancelling(false);
+      setConfirmCancel(false);
     }
   }
 
@@ -447,6 +428,35 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
         </div>
       )}
 
+      {confirmCancel && (
+        <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/[0.05] p-2.5 text-[11px]">
+          <div className="font-medium text-destructive">
+            {isReturn ? "ამანათის დაბრუნება?" : "შეკვეთის გაუქმება?"}
+          </div>
+          <p className="mt-0.5 text-muted-foreground">
+            {isReturn
+              ? `ამანათი უკვე კურიერთანაა. გამგზავნს დაერიცხება მიტანის ფასი ${GEL(order.price.delivery)} + დაბრუნება ${GEL(returnFeePreview)}. კურიერს — სრული ანაზღაურება.`
+              : "საფასურის გარეშე. კურიერი გათავისუფლდება."}
+          </p>
+          <div className="mt-1.5 flex gap-2">
+            <button
+              onClick={cancel}
+              disabled={cancelling}
+              className="font-medium text-destructive hover:underline disabled:opacity-50"
+            >
+              {cancelling ? "…" : isReturn ? "დიახ, დააბრუნე" : "დიახ, გააუქმე"}
+            </button>
+            <button onClick={() => setConfirmCancel(false)} className="text-muted-foreground hover:underline">
+              არა
+            </button>
+          </div>
+        </div>
+      )}
+
+      {adjusting && (
+        <AdjustForm order={order} onClose={() => setAdjusting(false)} onDone={() => { setAdjusting(false); onChange(); }} />
+      )}
+
       <div className="mt-1.5 flex flex-wrap items-center gap-3">
         <Link
           href={`/receipt/${order.id}`}
@@ -471,22 +481,20 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
             ფასის შესწორება
           </button>
         )}
-        {canAdjust && (
+        {canAdjust && !adjusting && (
           <button
-            onClick={adjust}
-            disabled={adjusting}
-            className="text-[11px] font-medium text-accent hover:underline disabled:opacity-50"
+            onClick={() => setAdjusting(true)}
+            className="text-[11px] font-medium text-accent hover:underline"
           >
-            {adjusting ? "…" : "ანაზღაურება მომხმარებელს"}
+            ანაზღაურება მომხმარებელს
           </button>
         )}
-        {canCancel && (
+        {canCancel && !confirmCancel && (
           <button
-            onClick={cancel}
-            disabled={cancelling}
-            className="text-[11px] text-muted-foreground hover:text-destructive disabled:opacity-50"
+            onClick={() => setConfirmCancel(true)}
+            className="text-[11px] text-muted-foreground hover:text-destructive"
           >
-            {cancelling ? "…" : "გაუქმება"}
+            {isReturn ? "დაბრუნება" : "გაუქმება"}
           </button>
         )}
         {canDelete && !confirmDelete && (
@@ -708,6 +716,81 @@ function PriceFixForm({
       <div className="flex gap-2">
         <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={save}>
           {busy ? "ინახება…" : "შენახვა"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onClose}>
+          გაუქმება
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AdjustForm({
+  order,
+  onClose,
+  onDone,
+}: {
+  order: OrderDTO;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState(order.returnFee > 0 ? String(order.price.delivery) : "");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const amt = parseFloat(amount);
+
+  async function save() {
+    if (!(amt > 0)) return setErr("შეავსე თანხა");
+    if (reason.trim().length < 3) return setErr("მიუთითე მიზეზი");
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/api/orders/${order.id}/adjust`, "POST", {
+        amount: amt,
+        kind: "COMPENSATION",
+        reason: reason.trim(),
+        waiveReturnFee: order.returnFee > 0,
+      });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "შეცდომა");
+      setBusy(false);
+    }
+  }
+
+  const field = "mt-0.5 h-8 w-full rounded-md border border-border bg-background px-2 text-xs";
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-accent/40 bg-accent/[0.05] p-2.5">
+      <div className="text-[11px] font-medium">ანაზღაურება მომხმარებელს</div>
+      <label className="block text-[11px] text-muted-foreground">
+        თანხა ₾ (ჩაირიცხება „მიღებულ თანხებში")
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.5"
+          className={`${field} tabular-nums`}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </label>
+      <label className="block text-[11px] text-muted-foreground">
+        მიზეზი
+        <input
+          className={field}
+          placeholder="მაგ. კურიერის ბრალით დაზიანდა, Zippa-ს დაგვიანება"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      {order.returnFee > 0 && (
+        <p className="text-[11px] text-muted-foreground">დაბრუნების საფასური ({GEL(order.returnFee)}) ჩამოიწერება.</p>
+      )}
+      {err && <div className="text-[11px] text-destructive">{err}</div>}
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={save}>
+          {busy ? "…" : "ჩარიცხვა"}
         </Button>
         <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onClose}>
           გაუქმება

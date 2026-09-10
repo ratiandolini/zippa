@@ -11,7 +11,7 @@ export function GET(_req: Request, { params }: { params: { tn: string } }) {
     });
     if (!order) return fail(404, "ასეთი ტრეკინგ-ნომერი ვერ მოიძებნა");
 
-    const full = serializeOrder(order);
+    const full = serializeOrder(order, "CUSTOMER");
     return ok({
       tracking: {
         trackingNumber: full.trackingNumber,

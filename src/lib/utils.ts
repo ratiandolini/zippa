@@ -39,6 +39,11 @@ export function generateTrackingNumber(): string {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+/** მიტანის დადასტურების 4-ნიშნა კოდი (1000–9999) */
+export function generateDeliveryPin(): string {
+  return String(1000 + Math.floor(Math.random() * 9000));
+}
+
 export function calculateDistance(
   lat1: number, lng1: number,
   lat2: number, lng2: number
