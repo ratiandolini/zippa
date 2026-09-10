@@ -133,6 +133,31 @@ describe("კურიერის ბარათი — ანაზღაუ�
   });
 });
 
+describe("DB backup workflow — pg_dump-ის შეცდომა pipe-ში არ იკარგება", () => {
+  const wf = read(".github/workflows/db-backup.yml");
+
+  it("Dump ნაბიჯში ჩართულია set -euo pipefail", () => {
+    const dumpStep = wf.slice(wf.indexOf("Dump database"));
+    expect(dumpStep).toContain("set -euo pipefail");
+  });
+
+  it("pg_dump ცალკე ფაილში იწერება (არა gzip-ის pipe-ში)", () => {
+    // pg_dump | gzip pattern აღარ არსებობს — exit code იკარგებოდა
+    expect(wf).not.toMatch(/pg_dump[^\n|]*\|\s*gzip/);
+    expect(wf).toMatch(/pg_dump[^\n]*>\s*"\$RAW"/);
+  });
+
+  it("dump ვალიდირდება — ზომა, PostgreSQL მარკერი, ცხრილი/მონაცემი", () => {
+    expect(wf).toContain('"$BYTES" -lt 2048');
+    expect(wf).toContain('grep -q "PostgreSQL database dump"');
+    expect(wf).toMatch(/grep -qE '.*CREATE TABLE/);
+  });
+
+  it("gzip-ის მთლიანობა მოწმდება (gzip -t)", () => {
+    expect(wf).toContain("gzip -t");
+  });
+});
+
 describe("რეგისტრაცია — როლის პარამეტრით პირდაპირი ფორმა", () => {
   const reg = read("src/app/(auth)/register/page.tsx");
   it("roleLocked ლოგიკა არსებობს", () => {

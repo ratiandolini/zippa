@@ -57,12 +57,16 @@
    commit `9bd9176`).
    - განრიგი: `cron: "0 3 * * *"` — ყოველ დღე **03:00 UTC** (07:00 თბილისში); აგრეთვე
      `workflow_dispatch` (ხელით გაშვება Actions ტაბიდან).
-   - აკეთებს: `postgresql-client-16` → `pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip`
-     → `actions/upload-artifact` (სახელი `db-backup`, **retention 90 დღე**).
+   - აკეთებს: `postgresql-client-17` → `pg_dump --format=plain > $RAW` → **ვალიდაცია**
+     (ზომა ≥ 2 KB, `PostgreSQL database dump` მარკერი, ცხრილი/მონაცემი) → `gzip -9` +
+     `gzip -t` → `actions/upload-artifact` (`db-backup`, **retention 90 დღე**).
+   - `set -euo pipefail` — pg_dump-ის შეცდომა აღარ იკარგება gzip-ის pipe-ში
+     (ადრე job „წარმატებით" სრულდებოდა 182-ბაიტიანი ცარიელი gzip-ით).
    - **მოითხოვს repo secret `DATABASE_URL` = Neon DIRECT string.** secret-ის გარეშე job
-     ვარდება (`test -n "$DATABASE_URL" || exit 1`) — ე.ი. სანამ secret არ დაყენდა,
-     ავტომატური backup **ფაქტობრივად არ მუშაობს**. ამის გადამოწმება: GitHub → Actions →
-     "DB Backup" — ბოლო run მწვანეა თუ არა.
+     ვარდება — ე.ი. სანამ secret არ დაყენდა, ავტომატური backup **არ მუშაობს**.
+     გადამოწმება: GitHub → Actions → "DB Backup" — run მწვანე + artifact ზომა > რამდენიმე KB.
+   - თუ job ვარდება „server version mismatch"-ით → Neon-ი უფრო ახალ PG ვერსიაზეა ვიდრე
+     `postgresql-client-17`; workflow-ში client ვერსია აწიე.
    - ⚠️ artifact-ები **მხოლოდ GitHub-ზეა**, offsite ასლი არ არსებობს, retention 90 დღე.
 2. **Neon-ის ისტორია** — Free ტარიფზე point-in-time restore ფანჯარა ~24 სთ.
 3. **ხელით** — `DATABASE_URL="postgres://…direct…" ./scripts/db-backup.sh ./backups`
