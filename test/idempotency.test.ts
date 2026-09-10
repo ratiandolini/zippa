@@ -78,14 +78,17 @@ describe("C1 — ორი DELIVERED request ერთ შეკვეთაზ�
 
 describe("C1 — ორი payout ერთ კურიერზე", () => {
   it("ერთი 200 / ერთი 409; ერთი Payout; unpaidEarnings 0 (არა უარყოფითი)", async () => {
-    const first = await makeOrderTo(
-      ["ACCEPTED", "EN_ROUTE_PICKUP", "PICKED_UP", "IN_TRANSIT", "DELIVERED"],
-      { paymentMethod: "CARD" },
-    );
+    const first = await makeOrderTo([
+      "ACCEPTED",
+      "EN_ROUTE_PICKUP",
+      "PICKED_UP",
+      "IN_TRANSIT",
+      "DELIVERED",
+    ]);
     // მეორე მიტანა იმავე კურიერზე
     const c2 = first.customer;
     actAs(session(c2));
-    const o2 = await call(createOrder, { body: body({ paymentMethod: "CARD" }) });
+    const o2 = await call(createOrder, { body: body() });
     const id2 = (o2.body.order as { id: string }).id;
     actAs(session(first.disp));
     await call(assign, { params: { id: id2 }, body: { driverId: first.drv.profile.id } });

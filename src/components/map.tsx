@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { tileConfig } from "@/lib/map-tiles";
 
 export interface MapPoint {
   lat: number;
@@ -59,10 +60,7 @@ export default function Map({
   return (
     <div className={`isolate overflow-hidden rounded-xl border border-border ${className}`}>
       <MapContainer center={center} zoom={12} scrollWheelZoom={false} className="h-full w-full">
-        <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer {...tileConfig} />
         {route && route.length > 1 && (
           <Polyline positions={route} pathOptions={{ color: "#178f68", weight: 4, opacity: 0.7 }} />
         )}

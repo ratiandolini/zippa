@@ -33,7 +33,7 @@ export function OrderRow({
       <div className="text-right">
         <div className="font-medium tabular-nums">{GEL(order.price.total)}</div>
         <div className="text-xs text-muted-foreground">
-          {order.paymentMethod === "CASH" ? "ნაღდი" : "ბარათი"}
+          ნაღდი
         </div>
       </div>
     </div>

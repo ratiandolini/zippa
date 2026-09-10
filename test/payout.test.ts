@@ -22,7 +22,7 @@ const body = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-async function deliverN(n: number, payment: "CASH" | "CARD") {
+async function deliverN(n: number, payment: "CASH") {
   const customer = await makeUser("CUSTOMER");
   const drv = await makeDriver({ approved: true });
   const disp = await makeUser("DISPATCHER");
@@ -51,7 +51,7 @@ describe("payout (დისპეჩერი)", () => {
   });
 
   it("გადახდა → unpaidEarnings მცირდება, Payout ჩანაწერი, earnings settled", async () => {
-    const { drv, disp } = await deliverN(3, "CARD");
+    const { drv, disp } = await deliverN(3, "CASH");
     actAs(session(disp));
     const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 7.5 } });
     expect(r.status).toBe(200);
@@ -62,21 +62,21 @@ describe("payout (დისპეჩერი)", () => {
   });
 
   it("გადასახდელზე მეტი → 400", async () => {
-    const { drv, disp } = await deliverN(1, "CARD"); // unpaid 3
+    const { drv, disp } = await deliverN(1, "CASH"); // unpaid 3
     actAs(session(disp));
     const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 100 } });
     expect(r.status).toBe(400);
   });
 
   it("არა-დისპეჩერი → 403", async () => {
-    const { drv } = await deliverN(1, "CARD");
+    const { drv } = await deliverN(1, "CASH");
     actAs(session(await makeUser("CUSTOMER")));
     const r = await call(payout, { params: { id: drv.profile.id }, body: { amount: 1 } });
     expect(r.status).toBe(403);
   });
 
   it("driver detail აჩვენებს დაუფარავ ანაზღაურებას", async () => {
-    const { drv, disp } = await deliverN(2, "CARD");
+    const { drv, disp } = await deliverN(2, "CASH");
     actAs(session(disp));
     const r = await call(driverDetail, { params: { id: drv.profile.id } });
     expect((r.body.driver as { unpaidEarnings: number }).unpaidEarnings).toBe(5);
@@ -86,7 +86,7 @@ describe("payout (დისპეჩერი)", () => {
 
 describe("ანგარიშსწორების ცხრილი (payroll)", () => {
   it("აჯამებს ანაზღაურებას, კომპანიის წილს და გადახდას პერიოდში", async () => {
-    const { drv, disp } = await deliverN(2, "CARD"); // 2 მიტანა, თითო driverFee 2.5, total 5
+    const { drv, disp } = await deliverN(2, "CASH"); // 2 მიტანა, თითო driverFee 2.5, total 5
     actAs(session(disp));
     await call(payout, { params: { id: drv.profile.id }, body: { amount: 4 } });
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { tileConfig } from "@/lib/map-tiles";
 
 const pinIcon = L.divIcon({
   className: "",
@@ -56,7 +57,7 @@ export default function MapPicker({
   return (
     <div className="isolate overflow-hidden rounded-xl border border-border">
       <MapContainer center={pos} zoom={14} scrollWheelZoom className="h-64 w-full">
-        <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer {...tileConfig} />
         <ClickToPlace onPick={place} />
         <SyncView lat={lat} lng={lng} />
         <Marker

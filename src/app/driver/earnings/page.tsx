@@ -159,7 +159,7 @@ export default function EarningsPage() {
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{o.trackingNumber}</td>
                     <td className="px-5 py-3 font-medium tabular-nums">{GEL(o.price.driverFee)}</td>
                     <td className="px-5 py-3 text-muted-foreground">
-                      {o.paymentMethod === "CASH" ? "ნაღდი" : "ბარათი"}
+                      ნაღდი
                     </td>
                   </tr>
                 ))}

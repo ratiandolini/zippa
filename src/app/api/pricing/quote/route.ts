@@ -7,7 +7,8 @@ const schema = z.object({
   pickup: z.object({ lat: z.number(), lng: z.number() }),
   delivery: z.object({ lat: z.number(), lng: z.number() }),
   weightKg: z.number().positive().max(1000),
-  paymentMethod: z.enum(["CASH", "CARD"]).default("CASH"),
+  // მხოლოდ ნაღდი (COD) — ბარათით გადახდა არ არსებობს
+  paymentMethod: z.literal("CASH").default("CASH"),
   collectAmount: z.number().nonnegative().optional(),
 });
 
