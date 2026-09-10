@@ -6,7 +6,7 @@ import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { notify } from "@/lib/notify";
 import type { Order } from "@prisma/client";
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 const OK_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 // ფოტოს ატვირთვა/შეცვლა მხოლოდ ამანათის აღების შემდეგ და ჩაბარებამდე.
 // DELIVERED/CANCELLED/FAILED-ის შემდეგ ფოტო უცვლელი მტკიცებულებაა.
@@ -70,7 +70,7 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) throw new ApiError(422, "ფაილი არ არის მიმაგრებული");
-    if (file.size > MAX_BYTES) throw new ApiError(422, "ფაილი 8MB-ზე დიდია");
+    if (file.size > MAX_BYTES) throw new ApiError(422, "ფოტო 4MB-ზე დიდია");
     if (file.type && !OK_TYPES.includes(file.type)) throw new ApiError(422, "მხოლოდ სურათია დაშვებული");
 
     const input = Buffer.from(await file.arrayBuffer());

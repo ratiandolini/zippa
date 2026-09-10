@@ -80,6 +80,26 @@ describe("მიტანის ფოტო", () => {
     expect(r.status).toBe(409);
   });
 
+  it("4 MB ლიმიტი — 4MB-მდე იტვირთება, 4MB-ზე მეტი იბლოკება", async () => {
+    const c = await makeUser("CUSTOMER");
+    const { user: dUser, profile } = await makeDriver({ approved: true });
+
+    // ზუსტად ლიმიტამდე — მიდის (მცირე ვალიდური PNG)
+    const okOrder = await makeOrder(c.id, profile.id, "IN_TRANSIT");
+    actAs(session(dUser));
+    expect((await callUpload(okOrder.id, await pngBuffer())).status).toBe(200);
+
+    // 4 MB + 1 ბაიტი — იბლოკება ატვირთვამდე გასაგები შეტყობინებით
+    const tooBig = await makeOrder(c.id, profile.id, "IN_TRANSIT");
+    const big = Buffer.alloc(4 * 1024 * 1024 + 1, 1);
+    const r = await callUpload(tooBig.id, big);
+    expect(r.status).toBe(422);
+    expect(r.body.error).toBe("ფოტო 4MB-ზე დიდია");
+    // ფაილი არ შენახულა
+    const db = await prisma.order.findUniqueOrThrow({ where: { id: tooBig.id } });
+    expect(db.proofPhotoUrl).toBeNull();
+  });
+
   it("ფაილის გარეშე (IN_TRANSIT) → 422", async () => {
     const c = await makeUser("CUSTOMER");
     const { user: dUser, profile } = await makeDriver({ approved: true });
