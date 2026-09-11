@@ -11,7 +11,6 @@ interface CompanyProfile {
   contactPersonName: string;
   status: string;
   lastAcceptance: { contractVersion: string; acceptedAt: string } | null;
-  activePricing: { pricingMode: string } | null;
 }
 interface Contract {
   version: string;
@@ -65,7 +64,7 @@ export default function CompanyContractPdfPage() {
               </div>
             )}
             {profile.status === "APPROVED" && (
-              <div>ტარიფი: {profile.activePricing ? "ინდივიდუალური (დამტკიცებული)" : "საჯარო (default)"}</div>
+              <div>ტარიფი: პარტნიორი კომპანიის ტარიფი</div>
             )}
           </div>
         )}
