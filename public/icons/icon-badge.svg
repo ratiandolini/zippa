@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Android push-notification "badge" — მონოქრომული (თეთრი) სილუეტი, გამჭვირვალე ფონზე.
+       იმავე ტრაკის გეომეტრია, რაც icon.svg-ში, მაგრამ filled (არა stroke) და ფონის rect-ის გარეშე,
+       რომ Android-ის status-bar-ის icon-მა მხოლოდ ეს ალფა-სილუეტი ამოკაფოს, არა მთლიანი კვადრატი. -->
+  <path fill="#ffffff" d="M116 168h178v150H116z" />
+  <path fill="#ffffff" d="M294 216h74l52 52v50H294z" />
+  <circle fill="#ffffff" cx="180" cy="360" r="30" />
+  <circle fill="#ffffff" cx="352" cy="360" r="30" />
+</svg>

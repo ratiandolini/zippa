@@ -66,8 +66,12 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Zippa";
   const options = {
     body: data.body || "",
+    // icon — სრულფეროვანი, ჩანს notification tray-ში (expanded).
+    // badge — Android-ის status bar-ის small icon: მონოქრომული (თეთრი) სილუეტი
+    // გამჭვირვალე ფონზე. Android ამ სურათის მხოლოდ ალფა-არხს იღებს — სრულფეროვან/
+    // opaque icon-ს (ან ფონიან PNG-ს) თეთრ კვადრატად დახატავდა.
     icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    badge: "/icons/icon-badge-96.png",
     tag: data.tag || "zippa",
     renotify: true,
     data: { url: data.url || "/" },
