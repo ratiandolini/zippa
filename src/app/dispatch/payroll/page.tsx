@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { PageHeader } from "@/components/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { jsonFetcher, api } from "@/lib/fetcher";
@@ -168,16 +168,38 @@ export default function PayrollPage() {
         ))}
       </div>
 
-      {t && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Tile label="კურიერების ანაზღაურება" value={GEL(t.earned)} sub="პერიოდში დარიცხული" />
-          <Tile label="კომპანიის წილი" value={GEL(t.company)} sub="პერიოდში" />
-          <Tile label="გადახდილი კურიერებზე" value={GEL(t.paid)} sub="პერიოდში" />
-          <Tile label="მიღებული ნაღდი" value={GEL(t.remitted)} sub="პერიოდში" />
-          <Tile label="დარჩენილი გადასახდელი" value={GEL(t.unpaidNow)} sub="ახლა, ყველა კურიერი" />
-          <Tile label="კურიერებთან ნაღდი" value={GEL(t.cashOutNow)} sub="ჯერ არ ჩაბარებული" />
-        </div>
-      )}
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {t ? (
+          <>
+            <Tile label="კურიერების ანაზღაურება" value={GEL(t.earned)} sub="პერიოდში დარიცხული" />
+            <Tile label="კომპანიის წილი" value={GEL(t.company)} sub="პერიოდში" />
+            <Tile label="გადახდილი კურიერებზე" value={GEL(t.paid)} sub="პერიოდში" />
+            <Tile label="მიღებული ნაღდი" value={GEL(t.remitted)} sub="პერიოდში" />
+          </>
+        ) : (
+          <>
+            <TileSkeleton />
+            <TileSkeleton />
+            <TileSkeleton />
+            <TileSkeleton />
+          </>
+        )}
+      </div>
+
+      <p className="mb-1.5 text-xs font-medium text-muted-foreground">მიმდინარე ნაშთები</p>
+      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+        {t ? (
+          <>
+            <Tile label="დარჩენილი გადასახდელი" value={GEL(t.unpaidNow)} sub="ახლა, ყველა კურიერი" />
+            <Tile label="კურიერებთან ნაღდი" value={GEL(t.cashOutNow)} sub="ჯერ არ ჩაბარებული" />
+          </>
+        ) : (
+          <>
+            <TileSkeleton />
+            <TileSkeleton />
+          </>
+        )}
+      </div>
 
       <Card>
         <CardHeader>
@@ -251,7 +273,11 @@ export default function PayrollPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>გამგზავნებზე თანხის ჩარიცხვა</CardTitle>
+          <CardTitle>COD ანგარიშსწორება</CardTitle>
+          <CardDescription>
+            მომხმარებლისგან (გამგზავნისგან) მიღებული COD თანხების ჩარიცხვა — ცალკეა კურიერების
+            ანაზღაურებისგან ზემოთ.
+          </CardDescription>
         </CardHeader>
         {cod.length === 0 ? (
           <CardContent className="text-sm text-muted-foreground">გასასწორებელი არაფერია.</CardContent>
@@ -352,12 +378,28 @@ export default function PayrollPage() {
   );
 }
 
+// label-ის ზონა ფიქსირებული (2-ხაზიანი) სიმაღლისაა, რომ value ყველა ბარათზე
+// ერთსა და იმავე ვერტიკალურ ხაზზე დაჯდეს — მოკლე და გრძელი label-ები აქამდე
+// ღირებულებას სხვადასხვა სიმაღლეზე აჩენდა (1 ხაზი vs 2 ხაზი wrap).
 function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-lg border border-border bg-background p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="flex min-h-[2.25rem] items-start text-xs text-muted-foreground">{label}</div>
       <div className="mt-0.5 font-serif text-lg font-semibold tabular-nums">{value}</div>
       <div className="text-[11px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+/** loading-ის დროს ბარათების ადგილი ნეიტრალურად ჩანაცვლდება (არ იმალება) */
+function TileSkeleton() {
+  return (
+    <div className="animate-pulse rounded-lg border border-border bg-background p-3">
+      <div className="min-h-[2.25rem]">
+        <div className="h-3 w-20 rounded bg-muted" />
+      </div>
+      <div className="mt-1.5 h-5 w-24 rounded bg-muted" />
+      <div className="mt-1.5 h-2.5 w-16 rounded bg-muted" />
     </div>
   );
 }
