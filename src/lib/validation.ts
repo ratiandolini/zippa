@@ -224,3 +224,67 @@ export const settlementReviewSchema = z.object({
   action: z.enum(["CONFIRM", "REJECT"]),
   note: z.string().trim().max(200).optional(),
 });
+
+// ─────────────────────────────────────────────
+// პარტნიორი კომპანია
+// ─────────────────────────────────────────────
+
+export const companyProfileSchema = z.object({
+  legalName: z.string().trim().min(2, "დასახელება ძალიან მოკლეა").max(200),
+  taxId: z.string().trim().min(5, "საიდენტიფიკაციო კოდი არასწორია").max(30),
+  legalAddress: z.string().trim().min(3).max(300),
+  contactPersonName: z.string().trim().min(2).max(120),
+  contactEmail: z.string().trim().toLowerCase().email("ელფოსტა არასწორია"),
+  contactPhone: phoneSchema,
+  billingEmail: z.string().trim().toLowerCase().email().optional().or(z.literal("")),
+});
+export type CompanyProfileInput = z.infer<typeof companyProfileSchema>;
+
+export const companySubmitSchema = z.object({
+  agreeToContract: z.literal(true, {
+    errorMap: () => ({ message: "ხელშეკრულებაზე თანხმობა სავალდებულოა" }),
+  }),
+  contractVersion: z.string().min(1),
+});
+
+export const companyReviewSchema = z.object({
+  action: z.enum(["APPROVE", "CHANGES_REQUESTED", "REJECT", "SUSPEND"]),
+  message: z.string().trim().max(1000).optional(),
+});
+
+export const companyPricingSchema = z.object({
+  pricingMode: z.enum(["DEFAULT", "DISCOUNT_PERCENT", "CUSTOM_RULES"]),
+  discountPercent: z.number().min(0).max(100).optional(),
+  customRules: z
+    .record(z.enum(["TBILISI", "REGIONAL_CITY", "TOWN_VILLAGE"]), z.array(z.object({ maxKg: z.number().positive().max(1000), price: z.number().nonnegative().max(100000) })))
+    .optional(),
+  effectiveUntil: z.string().datetime().optional().or(z.literal("")),
+});
+export type CompanyPricingInput = z.infer<typeof companyPricingSchema>;
+
+// ─────────────────────────────────────────────
+// კურიერის დოკუმენტური ვერიფიკაცია
+// ─────────────────────────────────────────────
+
+export const driverVerificationSubmitSchema = z.object({
+  transportType: z.enum(["FOOT", "BICYCLE", "MOTORCYCLE", "CAR", "VAN"]),
+  personalIdLast4: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, "მხოლოდ ბოლო 4 ციფრი")
+    .optional(),
+});
+
+export const DRIVER_DOCUMENT_TYPES = [
+  "ID_FRONT",
+  "ID_BACK",
+  "DRIVER_LICENSE_FRONT",
+  "DRIVER_LICENSE_BACK",
+  "VEHICLE_REGISTRATION",
+  "OTHER",
+] as const;
+
+export const driverVerificationReviewSchema = z.object({
+  action: z.enum(["APPROVE", "CHANGES_REQUESTED", "REJECT", "SUSPEND"]),
+  message: z.string().trim().max(1000).optional(),
+});

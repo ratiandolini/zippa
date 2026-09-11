@@ -50,13 +50,20 @@ model User {
   tokenVersion Int @default(0)
 
   driverProfile    DriverProfile?
-  ordersAsCustomer Order[]         @relation("CustomerOrders")
+  ordersAsCustomer Order[]              @relation("CustomerOrders")
   notifications    Notification[]
-  reviewsWritten   Review[]        @relation("ReviewAuthor")
+  reviewsWritten   Review[]             @relation("ReviewAuthor")
   passwordResets   PasswordReset[]
-  codRemittances   CodRemittance[]    @relation("CustomerCodRemittances")
+  codRemittances   CodRemittance[]      @relation("CustomerCodRemittances")
   adjustments      CustomerAdjustment[] @relation("CustomerAdjustments")
   pushSubs         PushSubscription[]
+
+  // პარტნიორი კომპანია — CUSTOMER-ის არჩევითი კომპანიის პროფილი
+  companyProfile              CompanyProfile?             @relation("CompanyProfileOwner")
+  companyProfilesReviewed     CompanyProfile[]            @relation("CompanyProfileReviewer")
+  contractAcceptances         CompanyContractAcceptance[] @relation("ContractAcceptedBy")
+  pricingProfilesCreated      CompanyPricingProfile[]     @relation("PricingProfileCreatedBy")
+  driverVerificationsReviewed DriverVerification[]        @relation("DriverVerificationReviewer")
 
   @@index([role])
 }
@@ -125,6 +132,8 @@ model DriverProfile {
   earnings    DriverEarning[]
   settlements CashSettlement[]
   payouts     Payout[]
+
+  verification DriverVerification?
 
   @@index([status])
   @@index([cityId])
@@ -286,11 +295,11 @@ model Order {
   deliveryNote    String?
 
   // ამანათი
-  weightKg    Decimal  @default(1) @db.Decimal(10, 2)
-  description String?
-  parcelValue Decimal? @db.Decimal(10, 2) // ნივთის ღირებულება — მხოლოდ დაზღვევის/პასუხისმგებლობის ლიმიტისთვის
-  collectAmount Decimal @default(0) @db.Decimal(10, 2) // COD — მიმღებისგან ასაღები თანხა ნივთში (მაღაზიის გაყიდვა)
-  codCommission Decimal @default(0) @db.Decimal(10, 2) // Zippa-ს საკომისიო collectAmount-იდან (სნეპშოტი)
+  weightKg      Decimal  @default(1) @db.Decimal(10, 2)
+  description   String?
+  parcelValue   Decimal? @db.Decimal(10, 2) // ნივთის ღირებულება — მხოლოდ დაზღვევის/პასუხისმგებლობის ლიმიტისთვის
+  collectAmount Decimal  @default(0) @db.Decimal(10, 2) // COD — მიმღებისგან ასაღები თანხა ნივთში (მაღაზიის გაყიდვა)
+  codCommission Decimal  @default(0) @db.Decimal(10, 2) // Zippa-ს საკომისიო collectAmount-იდან (სნეპშოტი)
 
   // COD-ის გამგზავნისთვის გადარიცხვა
   codRemittanceId String?
@@ -327,11 +336,11 @@ model Order {
   signatureUrl  String?
   deliveredAt   DateTime?
   cancelReason  String?
-  cancelFee     Decimal   @default(0) @db.Decimal(10, 2) // მომხმარებლის გაუქმების საფასური (კურიერის გზაში-ყოფნისას)
+  cancelFee     Decimal       @default(0) @db.Decimal(10, 2) // მომხმარებლის გაუქმების საფასური (კურიერის გზაში-ყოფნისას)
 
   // მიტანის ჩაშლა (RTO)
   failureReason OrderFailureReason?
-  returnFee     Decimal            @default(0) @db.Decimal(10, 2) // გამგზავნს დაბრუნებისთვის დარიცხული
+  returnFee     Decimal             @default(0) @db.Decimal(10, 2) // გამგზავნს დაბრუნებისთვის დარიცხული
 
   // გამგზავნის დავალიანება Zippa-სთან (returnFee + cancelFee) — იფარება COD-ის გადარიცხვისას
   chargeSettledAt DateTime?
@@ -466,19 +475,19 @@ model CustomerAdjustment {
 
 // COD-ის გადარიცხვა გამგზავნისთვის (შეგროვილი ფული მინუს Zippa-ს საკომისიო)
 model CodRemittance {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    User     @relation("CustomerCodRemittances", fields: [customerId], references: [id])
-  grossAmount     Decimal @db.Decimal(10, 2) // სულ შეგროვილი collectAmount
-  commission      Decimal @db.Decimal(10, 2) // Zippa-ს საკომისიო
-  chargesDeducted Decimal @default(0) @db.Decimal(10, 2) // გამოკლებული დავალიანება (returnFee + cancelFee)
-  creditsAdded    Decimal @default(0) @db.Decimal(10, 2) // დამატებული ანაზღაურება (დისპეჩერის დარიცხვა)
-  netAmount       Decimal @db.Decimal(10, 2) // გამგზავნისთვის (უარყოფითი = გამგზავნი გვმართებს)
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        User     @relation("CustomerCodRemittances", fields: [customerId], references: [id])
+  grossAmount     Decimal  @db.Decimal(10, 2) // სულ შეგროვილი collectAmount
+  commission      Decimal  @db.Decimal(10, 2) // Zippa-ს საკომისიო
+  chargesDeducted Decimal  @default(0) @db.Decimal(10, 2) // გამოკლებული დავალიანება (returnFee + cancelFee)
+  creditsAdded    Decimal  @default(0) @db.Decimal(10, 2) // დამატებული ანაზღაურება (დისპეჩერის დარიცხვა)
+  netAmount       Decimal  @db.Decimal(10, 2) // გამგზავნისთვის (უარყოფითი = გამგზავნი გვმართებს)
   orderCount      Int
-  method      String? // "ბანკი" / "ნაღდი"
-  note        String?
-  createdById String?
-  createdAt   DateTime @default(now())
+  method          String? // "ბანკი" / "ნაღდი"
+  note            String?
+  createdById     String?
+  createdAt       DateTime @default(now())
 
   orders Order[]
 
@@ -571,4 +580,209 @@ model RateLimit {
   resetAt DateTime // ამ დროის მერე ფანჯარა ნულდება
 
   @@index([resetAt])
+}
+
+// ─────────────────────────────────────────────
+// პარტნიორი კომპანია — რეგისტრაცია, ხელშეკრულება, ინდივიდუალური ტარიფები
+// (additive — არსებულ CUSTOMER ნაკადს არ ეხება, სანამ არჩევით არ გამოიყენება)
+// ─────────────────────────────────────────────
+
+enum CompanyProfileStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model CompanyProfile {
+  id          String @id @default(cuid())
+  // ერთი CUSTOMER-ს — მაქსიმუმ ერთი კომპანიის პროფილი (@unique)
+  ownerUserId String @unique
+  owner       User   @relation("CompanyProfileOwner", fields: [ownerUserId], references: [id])
+
+  legalName         String
+  taxId             String
+  legalAddress      String
+  contactPersonName String
+  contactEmail      String
+  contactPhone      String
+  billingEmail      String?
+
+  status                  CompanyProfileStatus @default(DRAFT)
+  rejectionReason         String?
+  changesRequestedMessage String?
+
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation("CompanyProfileReviewer", fields: [reviewedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contractAcceptances CompanyContractAcceptance[]
+  pricingProfiles     CompanyPricingProfile[]
+  auditEvents         PartnerAuditEvent[]
+
+  @@index([status])
+  @@index([taxId])
+}
+
+// ხელშეკრულების ვერსიაზე თანხმობის უცვლელი (append-only) ჩანაწერი.
+// ახალი ვერსიის გამოქვეყნება ძველ თანხმობებს არ ცვლის/შლის.
+model CompanyContractAcceptance {
+  id               String         @id @default(cuid())
+  companyProfileId String
+  companyProfile   CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+
+  contractVersion     String
+  contractTitle       String
+  contractContentHash String
+
+  acceptedByUserId  String
+  acceptedBy        User     @relation("ContractAcceptedBy", fields: [acceptedByUserId], references: [id])
+  acceptedAt        DateTime @default(now())
+  // შენახულია მხოლოდ audit/legal მტკიცებულებისთვის (თანხმობის ფაქტის დამადასტურებელი) —
+  // იხ. Privacy-ის განახლება ინახვის მიზნისა და ვადის შესახებ.
+  acceptedIp        String?
+  acceptedUserAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyProfileId])
+}
+
+enum CompanyPricingMode {
+  DEFAULT
+  DISCOUNT_PERCENT
+  CUSTOM_RULES
+}
+
+// კომპანიის ინდივიდუალური ტარიფი. მხოლოდ APPROVED კომპანიაზე მოქმედებს (quote/pricing.ts-ში).
+// ერთ დროს მაქსიმუმ ერთი აქტიური ჩანაწერი — აპლიკაციის ლოგიკა უზრუნველყოფს ტრანზაქციაში.
+model CompanyPricingProfile {
+  id               String         @id @default(cuid())
+  companyProfileId String
+  companyProfile   CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+
+  pricingMode     CompanyPricingMode @default(DEFAULT)
+  discountPercent Decimal?           @db.Decimal(5, 2)
+  // CUSTOM_RULES: { "TBILISI": [{"maxKg":6,"price":5}, ...], "REGIONAL_CITY": [...], "TOWN_VILLAGE": [...] }
+  // — იგივე ფორმა, რაც PricingRule.weightBrackets, ზონების მიხედვით.
+  customRules     Json?
+
+  effectiveFrom  DateTime  @default(now())
+  effectiveUntil DateTime?
+  active         Boolean   @default(false)
+
+  createdById String
+  createdBy   User     @relation("PricingProfileCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyProfileId, active])
+}
+
+// პარტნიორის განაცხადზე ყველა review-ქმედების (submit/approve/reject/…) აუდიტ ჩანაწერი
+model PartnerAuditEvent {
+  id               String         @id @default(cuid())
+  companyProfileId String
+  companyProfile   CompanyProfile @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  actorId          String?
+  action           String // SUBMITTED | CHANGES_REQUESTED | APPROVED | REJECTED | SUSPENDED | PRICING_UPDATED
+  message          String?
+  data             Json?
+  createdAt        DateTime       @default(now())
+
+  @@index([companyProfileId])
+}
+
+// ─────────────────────────────────────────────
+// კურიერის დოკუმენტური ვერიფიკაცია
+// (additive — რეალურ offer/assign-გატის ჯერ კვლავ DriverProfile.isApproved აკონტროლებს;
+// ეს ცხრილები არსებული ლოგიკის ჩამნაცვლებელი არაა, მხოლოდ დისპეჩერის review-ინსტრუმენტი,
+// რომლის "დამტკიცება/უარყოფა/შეჩერება" ქმედება წერს DriverProfile.isApproved-ს)
+// ─────────────────────────────────────────────
+
+enum TransportType {
+  FOOT
+  BICYCLE
+  MOTORCYCLE
+  CAR
+  VAN
+}
+
+enum DriverVerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model DriverVerification {
+  id       String        @id @default(cuid())
+  driverId String        @unique
+  driver   DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  transportType TransportType            @default(FOOT)
+  status        DriverVerificationStatus @default(NOT_SUBMITTED)
+
+  // მხოლოდ ბოლო 4 ციფრი — სრული პირადი ნომერი არასდროს ინახება/ჩანს payload-ში
+  personalIdLast4 String?
+
+  rejectionReason         String?
+  changesRequestedMessage String?
+
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation("DriverVerificationReviewer", fields: [reviewedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents DriverDocument[]
+
+  @@index([status])
+}
+
+enum DriverDocumentType {
+  ID_FRONT
+  ID_BACK
+  DRIVER_LICENSE_FRONT
+  DRIVER_LICENSE_BACK
+  VEHICLE_REGISTRATION
+  OTHER
+}
+
+enum DriverDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DriverDocument {
+  id                   String             @id @default(cuid())
+  driverVerificationId String
+  driverVerification   DriverVerification @relation(fields: [driverVerificationId], references: [id], onDelete: Cascade)
+
+  type              DriverDocumentType
+  // Vercel Blob PRIVATE store-ის key/url — putProofFile-ის იდენტური ინფრასტრუქტურა.
+  // raw URL client-ს/tracking-ს/public API-ს არასდროს გადაეცემა.
+  privateStorageKey String
+  mimeType          String
+  size              Int
+
+  uploadedAt DateTime  @default(now())
+  expiresAt  DateTime?
+
+  status       DriverDocumentStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewedById String?
+
+  @@index([driverVerificationId])
 }

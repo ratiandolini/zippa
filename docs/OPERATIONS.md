@@ -112,6 +112,7 @@ Neon dashboard → Project → Branches → "Restore" → აირჩიე დ
 | `NEXT_PUBLIC_GEOAPIFY_KEY` | რუკის tiles + geocoding (Geoapify უფასო tier). გარეშე — fallback OpenStreetMap (Nominatim + OSM tiles), UI არ ტყდება |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | შეცდომების მონიტორინგი. ⚠️ ამჟამად `NEXT_PUBLIC_SENTRY_DSN` = placeholder `"SENTRY_DSN"` — რეალური DSN საჭიროა |
 | `AUTH_DEBUG_RESET_CODES` | **production-ში არ დააყენო** — მხოლოდ dev-ში აჩენს reset-კოდს კონსოლში |
+| `NEXT_PUBLIC_PARTNER_ONBOARDING_ENABLED` / `NEXT_PUBLIC_DRIVER_VERIFICATION_ENABLED` | ახალი ფუნქციების feature flag-ები (`"true"`/`"false"`). Default false. production-ში ჩართვამდე — Preview-ზე სრული QA |
 
 Secret-ის როტაცია: `AUTH_SECRET`-ის შეცვლა ყველა სესიას წყვეტს (მომხმარებლები თავიდან შედიან).
 
