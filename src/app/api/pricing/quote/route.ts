@@ -30,6 +30,7 @@ export function POST(req: Request) {
       deliveryPrice: price.deliveryPrice,
       codFee: price.codFee,
       totalPrice: price.totalPrice,
+      priceCategory: price.priceCategory,
       overWeight: price.overWeight,
       needsManualReview: price.needsManualReview,
       manualReviewNote: price.needsManualReview ? "ფასს დისპეჩერი დაადასტურებს" : null,

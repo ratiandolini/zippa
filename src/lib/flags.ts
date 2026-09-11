@@ -4,3 +4,9 @@
 // რეალური enforcement მაინც სერვერზეა (ეს არ არის მხოლოდ UI-ის დამალვა).
 export const PARTNER_ONBOARDING_ENABLED = process.env.NEXT_PUBLIC_PARTNER_ONBOARDING_ENABLED === "true";
 export const DRIVER_VERIFICATION_ENABLED = process.env.NEXT_PUBLIC_DRIVER_VERIFICATION_ENABLED === "true";
+
+// Retail markup — მხოლოდ სერვერზე გამოსათვლელი, client-ს არასდროს ეხება პირდაპირ
+// (არა NEXT_PUBLIC_ — ფასის ლოგიკა client bundle-ში საერთოდ არ ხვდება).
+// false => ჩვეულებრივი CUSTOMER-ის ფასი ზუსტად ისეთივეა, როგორიც ამ ცვლილებამდე იყო.
+export const RETAIL_PRICE_MARKUP_ENABLED = process.env.RETAIL_PRICE_MARKUP_ENABLED === "true";
+export const RETAIL_PRICE_MARKUP_GEL = process.env.RETAIL_PRICE_MARKUP_GEL || "2";
