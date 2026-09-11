@@ -7,8 +7,6 @@ import { PageHeader } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { api, jsonFetcher, HttpError } from "@/lib/fetcher";
 
 interface Detail {
@@ -32,15 +30,9 @@ interface Detail {
   contractAcceptances: { contractVersion: string; acceptedAt: string; acceptedIp: string | null }[];
   currentContractVersion: string;
   acceptedCurrentVersion: boolean;
-  pricingProfiles: {
-    id: string;
-    pricingMode: string;
-    discountPercent: number | null;
-    active: boolean;
-    createdAt: string;
-  }[];
   auditEvents: { action: string; message: string | null; createdAt: string }[];
   legalReviewClauses: string[];
+  retailMarkupGel: number;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -56,8 +48,6 @@ export default function PartnerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, mutate } = useSWR<Detail>(`/api/dispatch/partners/${id}`, jsonFetcher);
   const [message, setMessage] = useState("");
-  const [pricingMode, setPricingMode] = useState<"DEFAULT" | "DISCOUNT_PERCENT" | "CUSTOM_RULES">("DEFAULT");
-  const [discountPercent, setDiscountPercent] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -68,17 +58,7 @@ export default function PartnerDetailPage() {
     setError("");
     setBusy(true);
     try {
-      await api(`/api/dispatch/partners/${id}/review`, "POST", {
-        action,
-        message: message || undefined,
-        pricing:
-          action === "APPROVE"
-            ? {
-                pricingMode,
-                discountPercent: pricingMode === "DISCOUNT_PERCENT" ? Number(discountPercent) : undefined,
-              }
-            : undefined,
-      });
+      await api(`/api/dispatch/partners/${id}/review`, "POST", { action, message: message || undefined });
       await mutate();
       setMessage("");
     } catch (e) {
@@ -87,8 +67,6 @@ export default function PartnerDetailPage() {
       setBusy(false);
     }
   }
-
-  const activePricing = data.pricingProfiles.find((p) => p.active);
 
   return (
     <>
@@ -141,61 +119,13 @@ export default function PartnerDetailPage() {
 
         <Card>
           <CardHeader><CardTitle>ტარიფი</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {activePricing ? (
-              <Row
-                l="მიმდინარე"
-                v={
-                  activePricing.pricingMode === "DISCOUNT_PERCENT"
-                    ? `ფასდაკლება ${activePricing.discountPercent}%`
-                    : activePricing.pricingMode
-                }
-              />
-            ) : (
-              <Row l="მიმდინარე" v="საჯარო (default)" />
-            )}
-            {profile.status === "APPROVED" && (
-              <div className="space-y-2 border-t border-border pt-3">
-                <Label>ახალი ტარიფის დაწესება</Label>
-                <select
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                  value={pricingMode}
-                  onChange={(e) => setPricingMode(e.target.value as typeof pricingMode)}
-                >
-                  <option value="DEFAULT">საჯარო ტარიფი (default)</option>
-                  <option value="DISCOUNT_PERCENT">პროცენტული ფასდაკლება</option>
-                </select>
-                {pricingMode === "DISCOUNT_PERCENT" && (
-                  <Input
-                    type="number"
-                    placeholder="ფასდაკლება %"
-                    value={discountPercent}
-                    onChange={(e) => setDiscountPercent(e.target.value)}
-                  />
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      await api(`/api/dispatch/partners/${id}/pricing`, "POST", {
-                        pricingMode,
-                        discountPercent: pricingMode === "DISCOUNT_PERCENT" ? Number(discountPercent) : undefined,
-                      });
-                      await mutate();
-                    } catch (e) {
-                      setError(e instanceof HttpError ? e.message : "შეცდომა");
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  ტარიფის შენახვა
-                </Button>
-              </div>
-            )}
+          <CardContent className="space-y-2 text-sm">
+            <Row l="კომპანიის ტარიფი" v="მოქმედი საბაზო ტარიფი" />
+            <Row l="ჩვეულებრივი მომხმარებლის ფასი" v={`კომპანიის ტარიფი +${data.retailMarkupGel} ₾`} />
+            <p className="pt-1 text-xs text-muted-foreground">
+              დამტკიცების შემდეგ ეს კომპანია ავტომატურად იღებს მოქმედ საბაზო ტარიფს (markup-ის გარეშე) —
+              ინდივიდუალური ფასდაკლება/custom ტარიფი ამ ეტაპზე არ გამოიყენება.
+            </p>
           </CardContent>
         </Card>
 

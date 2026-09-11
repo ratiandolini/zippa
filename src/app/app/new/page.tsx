@@ -22,6 +22,7 @@ interface Quote {
   deliveryPrice: number;
   codFee: number;
   totalPrice: number;
+  priceCategory: "RETAIL" | "PARTNER";
   codAmount: number;
   codCommission: number;
   codNet: number;
@@ -349,6 +350,9 @@ export default function NewOrderPage() {
               {ready && quoting && <p className="text-muted-foreground">ვთვლი…</p>}
               {ready && !quoting && quote && (
                 <>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {quote.priceCategory === "PARTNER" ? "პარტნიორი კომპანიის ტარიფი" : "სტანდარტული ტარიფი"}
+                  </p>
                   <Row label={`ზონა: ${DELIVERY_ZONE_LABEL[quote.zone]}`} value={`${quote.distanceKm} კმ`} />
                   <Row label={`მიტანა (${weightNum} კგ)`} value={GEL(quote.deliveryPrice)} />
                   {quote.codFee > 0 && <Row label="ნაღდის საკომისიო" value={GEL(quote.codFee)} />}

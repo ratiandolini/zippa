@@ -23,7 +23,6 @@ interface CompanyProfile {
   changesRequestedMessage: string | null;
   editable: boolean;
   lastAcceptance: { contractVersion: string; acceptedAt: string } | null;
-  activePricing: { pricingMode: string } | null;
 }
 
 interface Contract {
@@ -134,9 +133,7 @@ export default function CompanyProfilePage() {
               <p className="mt-1 text-sm text-destructive">მიზეზი: {profile.rejectionReason}</p>
             )}
             {profile.status === "APPROVED" && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                ტარიფი: {profile.activePricing ? "ინდივიდუალური" : "საჯარო (default)"}
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">ტარიფი: პარტნიორი კომპანიის ტარიფი</p>
             )}
           </CardContent>
         </Card>

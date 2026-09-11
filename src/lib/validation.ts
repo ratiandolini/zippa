@@ -252,15 +252,9 @@ export const companyReviewSchema = z.object({
   message: z.string().trim().max(1000).optional(),
 });
 
-export const companyPricingSchema = z.object({
-  pricingMode: z.enum(["DEFAULT", "DISCOUNT_PERCENT", "CUSTOM_RULES"]),
-  discountPercent: z.number().min(0).max(100).optional(),
-  customRules: z
-    .record(z.enum(["TBILISI", "REGIONAL_CITY", "TOWN_VILLAGE"]), z.array(z.object({ maxKg: z.number().positive().max(1000), price: z.number().nonnegative().max(100000) })))
-    .optional(),
-  effectiveUntil: z.string().datetime().optional().or(z.literal("")),
-});
-export type CompanyPricingInput = z.infer<typeof companyPricingSchema>;
+// companyPricingSchema (DISCOUNT_PERCENT/CUSTOM_RULES) მოხსნილია — ფასების სისტემა
+// გამარტივებულია ორ კატეგორიად (RETAIL/PARTNER), იხ. src/lib/pricing.ts.
+// CompanyPricingProfile Prisma-მოდელი დარჩენილია (არ წაშლილა/არ დაზიანებულა).
 
 // ─────────────────────────────────────────────
 // კურიერის დოკუმენტური ვერიფიკაცია

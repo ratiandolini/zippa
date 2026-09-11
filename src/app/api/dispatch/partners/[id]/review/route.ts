@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, throttle, ApiError } from "@/lib/api";
-import { companyReviewSchema, companyPricingSchema } from "@/lib/validation";
+import { companyReviewSchema } from "@/lib/validation";
 import { CONTRACT_VERSION } from "@/lib/partner-contract";
 import { notify } from "@/lib/notify";
 import { sendEmail } from "@/lib/email";
 import { PARTNER_ONBOARDING_ENABLED } from "@/lib/flags";
-import { z } from "zod";
 
 const REQUIRED_FIELDS = [
   "legalName",
@@ -16,9 +15,10 @@ const REQUIRED_FIELDS = [
   "contactPhone",
 ] as const;
 
-const bodySchema = companyReviewSchema.extend({
-  pricing: companyPricingSchema.optional(),
-});
+// შენიშვნა: APPROVE არ ითხოვს/არ წერს ინდივიდუალურ ტარიფს (CompanyPricingProfile) —
+// ფასების სისტემა გამარტივებულია ორ კატეგორიად (RETAIL/PARTNER), იხ. src/lib/pricing.ts.
+// CompanyPricingProfile მოდელი დარჩენილია (არ წაშლილა), მაგრამ calculatePrice() მას არ კითხულობს.
+const bodySchema = companyReviewSchema;
 
 const REVIEW_LABEL: Record<string, string> = {
   APPROVE: "დამტკიცდა",
@@ -90,33 +90,12 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
 
       const updated = await tx.companyProfile.update({ where: { id: profile.id }, data });
 
-      if (body.action === "APPROVE" && body.pricing) {
-        await tx.companyPricingProfile.updateMany({
-          where: { companyProfileId: profile.id, active: true },
-          data: { active: false },
-        });
-        if (body.pricing.pricingMode !== "DEFAULT") {
-          await tx.companyPricingProfile.create({
-            data: {
-              companyProfileId: profile.id,
-              pricingMode: body.pricing.pricingMode,
-              discountPercent: body.pricing.discountPercent ?? null,
-              customRules: body.pricing.customRules ?? undefined,
-              effectiveUntil: body.pricing.effectiveUntil ? new Date(body.pricing.effectiveUntil) : null,
-              active: true,
-              createdById: session.sub,
-            },
-          });
-        }
-      }
-
       await tx.partnerAuditEvent.create({
         data: {
           companyProfileId: profile.id,
           actorId: session.sub,
           action: body.action,
           message: body.message,
-          data: body.pricing ? (body.pricing as z.infer<typeof companyPricingSchema>) : undefined,
         },
       });
 

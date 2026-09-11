@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, ApiError } from "@/lib/api";
-import { PARTNER_ONBOARDING_ENABLED } from "@/lib/flags";
+import { PARTNER_ONBOARDING_ENABLED, RETAIL_PRICE_MARKUP_GEL } from "@/lib/flags";
 import { clausesNeedingLegalReview, CONTRACT_VERSION } from "@/lib/partner-contract";
 
 export function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -14,7 +14,6 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
         owner: { select: { email: true, phone: true, name: true } },
         reviewedBy: { select: { name: true } },
         contractAcceptances: { orderBy: { acceptedAt: "desc" } },
-        pricingProfiles: { orderBy: { createdAt: "desc" } },
         auditEvents: { orderBy: { createdAt: "desc" } },
       },
     });
@@ -47,22 +46,13 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
       acceptedCurrentVersion: profile.contractAcceptances.some(
         (a) => a.contractVersion === CONTRACT_VERSION,
       ),
-      pricingProfiles: profile.pricingProfiles.map((p) => ({
-        id: p.id,
-        pricingMode: p.pricingMode,
-        discountPercent: p.discountPercent ? Number(p.discountPercent) : null,
-        customRules: p.customRules,
-        active: p.active,
-        effectiveFrom: p.effectiveFrom.toISOString(),
-        effectiveUntil: p.effectiveUntil?.toISOString() ?? null,
-        createdAt: p.createdAt.toISOString(),
-      })),
       auditEvents: profile.auditEvents.map((e) => ({
         action: e.action,
         message: e.message,
         createdAt: e.createdAt.toISOString(),
       })),
       legalReviewClauses: clausesNeedingLegalReview(),
+      retailMarkupGel: Number(RETAIL_PRICE_MARKUP_GEL),
     });
   });
 }

@@ -17,7 +17,6 @@ export function GET() {
       where: { ownerUserId: session.sub },
       include: {
         contractAcceptances: { orderBy: { acceptedAt: "desc" }, take: 1 },
-        pricingProfiles: { where: { active: true }, take: 1 },
       },
     });
     if (!profile) return ok({ profile: null });
@@ -41,9 +40,6 @@ export function GET() {
               contractVersion: profile.contractAcceptances[0].contractVersion,
               acceptedAt: profile.contractAcceptances[0].acceptedAt.toISOString(),
             }
-          : null,
-        activePricing: profile.pricingProfiles[0]
-          ? { pricingMode: profile.pricingProfiles[0].pricingMode }
           : null,
       },
     });
