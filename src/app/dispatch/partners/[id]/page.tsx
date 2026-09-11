@@ -30,8 +30,9 @@ interface Detail {
   contractAcceptances: { contractVersion: string; acceptedAt: string; acceptedIp: string | null }[];
   currentContractVersion: string;
   acceptedCurrentVersion: boolean;
+  contractTitle: string;
+  contractClauses: { title: string; body: string }[];
   auditEvents: { action: string; message: string | null; createdAt: string }[];
-  legalReviewClauses: string[];
   retailMarkupGel: number;
 }
 
@@ -114,6 +115,17 @@ export default function PartnerDetailPage() {
             >
               PDF ნახვა →
             </a>
+            <details className="pt-2">
+              <summary className="cursor-pointer text-accent">{data.contractTitle} — სრული ტექსტი</summary>
+              <div className="mt-2 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-border p-3 text-xs">
+                {data.contractClauses.map((c) => (
+                  <div key={c.title}>
+                    <p className="font-medium">{c.title}</p>
+                    <p className="mt-0.5 whitespace-pre-line text-muted-foreground">{c.body}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
           </CardContent>
         </Card>
 

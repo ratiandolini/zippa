@@ -189,7 +189,7 @@ export default function CompanyProfilePage() {
                   {contractData.clauses.map((c) => (
                     <div key={c.title}>
                       <p className="font-medium">{c.title}</p>
-                      <p className="mt-1 text-muted-foreground">{c.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-muted-foreground">{c.body}</p>
                     </div>
                   ))}
                 </div>
@@ -216,7 +216,7 @@ export default function CompanyProfilePage() {
                     onChange={(e) => setAgree(e.target.checked)}
                     disabled={readOnly}
                   />
-                  წავიკითხე და ვეთანხმები პარტნიორობის ხელშეკრულებას
+                  წავიკითხე, მესმის და ვეთანხმები პარტნიორობისა და საკურიერო მომსახურების ხელშეკრულებას
                 </label>
               </>
             )}

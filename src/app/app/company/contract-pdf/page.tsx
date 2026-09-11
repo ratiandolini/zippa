@@ -73,7 +73,7 @@ export default function CompanyContractPdfPage() {
           {contract.clauses.map((c) => (
             <div key={c.title}>
               <p className="font-medium">{c.title}</p>
-              <p className="mt-1 text-gray-600">{c.body}</p>
+              <p className="mt-1 whitespace-pre-line text-gray-600">{c.body}</p>
             </div>
           ))}
         </div>
