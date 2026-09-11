@@ -12,10 +12,13 @@ import {
   BarChart3,
   UserCog,
   Banknote,
+  Building2,
+  ShieldCheck,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import type { NavItem } from "@/components/app-shell";
 import { ROLE_LABEL } from "@/lib/domain";
+import { PARTNER_ONBOARDING_ENABLED, DRIVER_VERIFICATION_ENABLED } from "@/lib/flags";
 
 const c = "h-4 w-4";
 
@@ -31,6 +34,9 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/driver/offers", label: "შემოთავაზებები", icon: <Inbox className={c} /> },
     { href: "/driver/orders", label: "ჩემი შეკვეთები", icon: <Package className={c} /> },
     { href: "/driver/earnings", label: "ფინანსები", icon: <Wallet className={c} /> },
+    ...(DRIVER_VERIFICATION_ENABLED
+      ? [{ href: "/driver/verification", label: "ვერიფიკაცია", icon: <ShieldCheck className={c} /> }]
+      : []),
   ],
   DISPATCHER: [
     { href: "/dispatch", label: "მიმოხილვა", icon: <LayoutGrid className={c} /> },
@@ -41,6 +47,9 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     { href: "/dispatch/pricing", label: "ტარიფები", icon: <Tag className={c} /> },
     { href: "/dispatch/analytics", label: "ანალიტიკა", icon: <BarChart3 className={c} /> },
     { href: "/dispatch/team", label: "გუნდი", icon: <UserCog className={c} /> },
+    ...(PARTNER_ONBOARDING_ENABLED
+      ? [{ href: "/dispatch/partners", label: "პარტნიორები", icon: <Building2 className={c} /> }]
+      : []),
   ],
 };
 
