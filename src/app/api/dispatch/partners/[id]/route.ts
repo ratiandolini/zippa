@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, ApiError } from "@/lib/api";
 import { PARTNER_ONBOARDING_ENABLED, RETAIL_PRICE_MARKUP_GEL } from "@/lib/flags";
-import { clausesNeedingLegalReview, CONTRACT_VERSION } from "@/lib/partner-contract";
+import { CONTRACT_VERSION, CONTRACT_TITLE, CONTRACT_CLAUSES } from "@/lib/partner-contract";
 
 export function GET(_req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
@@ -51,7 +51,8 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
         message: e.message,
         createdAt: e.createdAt.toISOString(),
       })),
-      legalReviewClauses: clausesNeedingLegalReview(),
+      contractTitle: CONTRACT_TITLE,
+      contractClauses: CONTRACT_CLAUSES,
       retailMarkupGel: Number(RETAIL_PRICE_MARKUP_GEL),
     });
   });

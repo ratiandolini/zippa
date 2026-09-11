@@ -140,7 +140,7 @@ describe("დისპეჩერის review გვერდი", () => {
     const detail = await call(getPartner, { params: { id: profile!.id } });
     expect(detail.status).toBe(200);
     expect(detail.body.profile.legalName).toBe("შპს ტესტი");
-    expect(detail.body.legalReviewClauses.length).toBeGreaterThan(0);
+    expect(detail.body.contractClauses.length).toBeGreaterThan(0);
   });
 
   it("CUSTOMER-ს დისპეჩერის review endpoint-ზე წვდომა არ აქვს", async () => {
