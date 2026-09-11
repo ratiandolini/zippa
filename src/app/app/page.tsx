@@ -8,7 +8,8 @@ import { OrderRow } from "@/components/order-row";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { useOrders, useMyCod } from "@/lib/hooks";
 import { GEL, streetOf, ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
-import { Plus, MapPin, Wallet } from "lucide-react";
+import { Plus, MapPin, Wallet, Building2 } from "lucide-react";
+import { PARTNER_ONBOARDING_ENABLED } from "@/lib/flags";
 
 export default function CustomerHome() {
   const { orders, isLoading } = useOrders("", 15000);
@@ -129,6 +130,25 @@ export default function CustomerHome() {
             )}
           </CardContent>
         </Card>
+
+        {PARTNER_ONBOARDING_ENABLED && (
+          <Card className="lg:col-span-3">
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-accent" />
+                <div>
+                  <p className="font-medium">კომპანიის პროფილის შექმნა</p>
+                  <p className="text-sm text-muted-foreground">
+                    ბიზნესი ხართ? დაამტკიცეთ კომპანია და ისარგებლეთ ინდივიდუალური ტარიფით — არჩევითია.
+                  </p>
+                </div>
+              </div>
+              <Link href="/app/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                გახსნა
+              </Link>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </>
   );
