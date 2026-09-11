@@ -6,11 +6,8 @@ export const COMPANY = {
   brand: "Zippa",
   taxId: "01008043044",
   address: "თბილისი, მინდელის ქ. 3",
-  // ამჟამად მოქმედი, რეალური საკონტაქტო ელფოსტა
-  email: "ratiandolini@gmail.com",
-  // ხილული ფორმატით (+995 598 42 32 34) და მანქანურით (tel: href)
-  phone: "+995 598 42 32 34",
-  phoneHref: "tel:+995598423234",
+  // საჯარო საკონტაქტო ელფოსტა — კომპანიის, არა პირადი
+  email: "support.zippa@gmail.com",
   site: "zippa.ge",
 } as const;
 

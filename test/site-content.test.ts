@@ -7,33 +7,53 @@ import { RETURN_FEE_PCT } from "@/lib/domain";
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 
 describe("საკონტაქტო კონფიგი — ერთი წყარო", () => {
-  it("COMPANY.email რეალურია (არა support@zippa.ge)", () => {
-    expect(COMPANY.email).toBe("ratiandolini@gmail.com");
+  it("COMPANY.email არის კომპანიის ახალი ელფოსტა (არა პირადი, არა support@zippa.ge)", () => {
+    expect(COMPANY.email).toBe("support.zippa@gmail.com");
     expect(COMPANY.email).not.toMatch(/@zippa\.ge$/);
     expect(COMPANY_MAILTO).toBe(`mailto:${COMPANY.email}`);
   });
 
-  it("COMPANY შეიცავს რეკვიზიტებს", () => {
+  it("COMPANY შეიცავს რეკვიზიტებს და არა პირად ტელეფონს", () => {
     expect(COMPANY.name).toBe("ინდ. მეწარმე რატი კურტანიძე");
     expect(COMPANY.taxId).toBe("01008043044");
     expect(COMPANY.address).toBe("თბილისი, მინდელის ქ. 3");
-    expect(COMPANY.phone).toBe("+995 598 42 32 34");
-    expect(COMPANY.phoneHref).toBe("tel:+995598423234");
+    expect(COMPANY).not.toHaveProperty("phone");
+    expect(COMPANY).not.toHaveProperty("phoneHref");
   });
 
+  const PUBLIC_FILES = [
+    "src/app/page.tsx",
+    "src/app/(legal)/faq/page.tsx",
+    "src/app/(legal)/privacy/page.tsx",
+    "src/app/(legal)/terms/page.tsx",
+    "src/app/(legal)/layout.tsx",
+    "src/lib/push.ts",
+    "src/lib/nominatim.ts",
+    "src/lib/company.ts",
+    "src/app/receipt/[id]/page.tsx",
+  ];
+
   it("არსად src-ში არ ჩანს support@zippa.ge", () => {
-    const files = [
-      "src/app/page.tsx",
-      "src/app/(legal)/faq/page.tsx",
-      "src/app/(legal)/privacy/page.tsx",
-      "src/app/(legal)/terms/page.tsx",
-      "src/app/(legal)/layout.tsx",
-      "src/lib/push.ts",
-      "src/lib/nominatim.ts",
-      "src/lib/company.ts",
-    ];
-    for (const f of files) {
+    for (const f of PUBLIC_FILES) {
       expect(read(f), `${f} შეიცავს support@zippa.ge-ს`).not.toContain("support@zippa.ge");
+    }
+  });
+
+  it("არსად საჯარო კოდში არ ჩანს ძველი პირადი ელფოსტა", () => {
+    for (const f of PUBLIC_FILES) {
+      expect(read(f), `${f} შეიცავს ratiandolini@gmail.com-ს`).not.toContain(
+        "ratiandolini@gmail.com",
+      );
+      expect(read(f), `${f} შეიცავს ratir1991@gmail.com-ს`).not.toContain(
+        "ratir1991@gmail.com",
+      );
+    }
+  });
+
+  it("არსად საჯარო კოდში არ ჩანს პირადი ტელეფონის ნომერი", () => {
+    for (const f of PUBLIC_FILES) {
+      expect(read(f), `${f} შეიცავს ტელეფონის ნომერს`).not.toMatch(/598[\s-]?42[\s-]?32[\s-]?34/);
+      expect(read(f), `${f} შეიცავს tel: href-ს`).not.toContain("tel:+995598423234");
     }
   });
 });

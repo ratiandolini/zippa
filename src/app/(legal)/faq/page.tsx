@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { FAQ } from "@/lib/faq";
 import { FaqAccordion } from "@/components/faq-accordion";
-import { COMPANY, COMPANY_MAILTO } from "@/lib/company";
+import { COMPANY_MAILTO } from "@/lib/company";
 
 export const metadata: Metadata = { title: "ხშირად დასმული კითხვები" };
 
@@ -15,10 +15,6 @@ export default function FaqPage() {
           ვერ იპოვე პასუხი?{" "}
           <a href={COMPANY_MAILTO} className="text-accent hover:underline">
             მოგვწერე
-          </a>{" "}
-          ან დაგვირეკე{" "}
-          <a href={COMPANY.phoneHref} className="text-accent hover:underline">
-            {COMPANY.phone}
           </a>
         </p>
       </div>

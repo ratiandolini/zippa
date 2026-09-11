@@ -27,9 +27,8 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <span className="ml-auto">© 2026 Zippa</span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            <a href={COMPANY.phoneHref} className="hover:text-foreground">{COMPANY.phone}</a>
             <a href={COMPANY_MAILTO} className="hover:text-foreground">{COMPANY.email}</a>
-            <span>{COMPANY.name}</span>
+            <span>{COMPANY.brand}</span>
             <span>ს/კ {COMPANY.taxId}</span>
             <span>{COMPANY.address}</span>
           </div>

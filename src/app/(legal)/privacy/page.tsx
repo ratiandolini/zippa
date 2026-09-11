@@ -154,7 +154,6 @@ export default function PrivacyPage() {
           <li>ს/კ: {COMPANY.taxId}</li>
           <li>მისამართი: {COMPANY.address}</li>
           <li>ელფოსტა: {COMPANY.email}</li>
-          <li>ტელეფონი: {COMPANY.phone}</li>
         </L>
       </Sec>
     </LegalDoc>
