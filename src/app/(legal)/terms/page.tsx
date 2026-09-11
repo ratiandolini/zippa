@@ -244,7 +244,6 @@ export default function TermsPage() {
           <li>ს/კ: {COMPANY.taxId}</li>
           <li>მისამართი: {COMPANY.address}</li>
           <li>ელფოსტა: {COMPANY.email}</li>
-          <li>ტელეფონი: {COMPANY.phone}</li>
         </L>
       </Sec>
     </LegalDoc>

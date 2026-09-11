@@ -83,7 +83,6 @@ function JsonLd() {
       addressCountry: "GE",
     },
     email: COMPANY.email,
-    telephone: COMPANY.phoneHref.replace("tel:", ""),
   };
   return (
     <script
@@ -216,12 +215,9 @@ export default function LandingPage() {
           <div className="space-y-1 sm:text-right">
             <p className="font-medium text-foreground">კონტაქტი</p>
             <p>
-              <a href={COMPANY.phoneHref} className="hover:text-foreground">{COMPANY.phone}</a>
-            </p>
-            <p>
               <a href={COMPANY_MAILTO} className="hover:text-foreground">{COMPANY.email}</a>
             </p>
-            <p>{COMPANY.name}</p>
+            <p>{COMPANY.brand}</p>
             <p>ს/კ: {COMPANY.taxId}</p>
             <p>{COMPANY.address}</p>
           </div>
