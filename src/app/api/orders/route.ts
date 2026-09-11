@@ -54,6 +54,7 @@ export function POST(req: Request) {
       weightKg: data.weightKg,
       paymentMethod: data.paymentMethod,
       deliveryCityId,
+      customerId: session.sub,
     });
 
     const collectAmount = data.collectAmount ?? 0;

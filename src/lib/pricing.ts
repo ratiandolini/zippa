@@ -29,6 +29,10 @@ export interface PriceInput {
   weightKg: number;
   paymentMethod: PaymentMethod;
   deliveryCityId?: string | null;
+  /** თუ მითითებულია და მას აქვს APPROVED კომპანიის პროფილი აქტიური ტარიფით —
+   *  deliveryPrice კომპანიის ტარიფით ჩანაცვლდება. undefined/customer-ის გარეშე —
+   *  ცვლილება ნულოვანია, ძველი behavior ხელუხლებელი. */
+  customerId?: string | null;
 }
 
 export interface PriceBreakdown {
@@ -42,6 +46,30 @@ export interface PriceBreakdown {
   companyMargin: number; // Zippa-ს მარჟა (COD საკომისიოს გარეშე)
   overWeight: boolean; // წონა ბოლო კალათას სცდება
   needsManualReview: boolean; // 20 კგ+ ან რთული — ავტო-მინიჭება იბლოკება
+  /** გამოყენებული პარტნიორის ინდივიდუალური ტარიფის id, თუ ასეთი მოქმედებდა */
+  companyPricingProfileId?: string;
+}
+
+/** APPROVED კომპანიის აქტიური ტარიფი customerId-ით (customerId = User.id, არა CompanyProfile.id) */
+async function activeCompanyPricing(customerId: string | null | undefined) {
+  if (!customerId) return null;
+  const company = await prisma.companyProfile.findUnique({
+    where: { ownerUserId: customerId },
+    select: { id: true, status: true },
+  });
+  if (!company || company.status !== "APPROVED") return null;
+
+  const now = new Date();
+  const active = await prisma.companyPricingProfile.findFirst({
+    where: {
+      companyProfileId: company.id,
+      active: true,
+      effectiveFrom: { lte: now },
+      OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+    },
+    orderBy: { effectiveFrom: "desc" },
+  });
+  return active;
 }
 
 const n = (v: unknown) => Number(v);
@@ -94,7 +122,25 @@ export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown>
   if (!rule.isActive) throw new InactiveZoneError();
 
   const brackets = (rule.weightBrackets as unknown as WeightBracket[]) ?? [];
-  const { price: deliveryPrice, over } = bracketPrice(brackets, input.weightKg);
+  let { price: deliveryPrice, over } = bracketPrice(brackets, input.weightKg);
+
+  // კომპანიის ინდივიდუალური ტარიფი — მხოლოდ APPROVED კომპანიაზე, deliveryPrice-ს ცვლის.
+  // driverFee/partnerCost საჯარო წესიდან უცვლელი რჩება — ფასდაკლებას Zippa-ს მარჟა შთანთქავს.
+  const companyPricing = await activeCompanyPricing(input.customerId);
+  if (companyPricing) {
+    if (companyPricing.pricingMode === "DISCOUNT_PERCENT" && companyPricing.discountPercent != null) {
+      const pct = n(companyPricing.discountPercent);
+      deliveryPrice = Math.round(deliveryPrice * (1 - pct / 100) * 100) / 100;
+    } else if (companyPricing.pricingMode === "CUSTOM_RULES" && companyPricing.customRules) {
+      const rules = companyPricing.customRules as unknown as Record<string, WeightBracket[]>;
+      const zoneBrackets = rules[zone];
+      if (Array.isArray(zoneBrackets) && zoneBrackets.length > 0) {
+        const custom = bracketPrice(zoneBrackets, input.weightKg);
+        deliveryPrice = custom.price;
+        over = custom.over;
+      }
+    }
+  }
 
   const codFee = input.paymentMethod === "CASH" ? n(rule.codFee) : 0;
   const totalPrice = Math.round((deliveryPrice + codFee) * 100) / 100;
@@ -127,6 +173,7 @@ export async function calculatePrice(input: PriceInput): Promise<PriceBreakdown>
     companyMargin,
     overWeight: over,
     needsManualReview,
+    companyPricingProfileId: companyPricing?.id,
   };
 }
 

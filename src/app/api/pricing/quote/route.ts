@@ -14,10 +14,10 @@ const schema = z.object({
 
 export function POST(req: Request) {
   return handle(async () => {
-    await requireUser();
+    const session = await requireUser();
     const data = schema.parse(await req.json());
     const deliveryCityId = await resolveCityId(data.delivery);
-    const price = await calculatePrice({ ...data, deliveryCityId });
+    const price = await calculatePrice({ ...data, deliveryCityId, customerId: session.sub });
     const collectAmount = data.collectAmount ?? 0;
     const codAmount = (data.paymentMethod === "CASH" ? price.totalPrice : 0) + collectAmount;
     const codPct = collectAmount > 0 ? await getSetting("cod_commission_percent") : 0;

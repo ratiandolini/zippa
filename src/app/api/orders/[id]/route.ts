@@ -138,6 +138,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         weightKg,
         paymentMethod,
         deliveryCityId,
+        customerId: order.customerId,
       });
       const eta = await estimateDelivery(price.zone);
 
