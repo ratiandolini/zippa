@@ -15,7 +15,8 @@ import { jsonFetcher, api } from "@/lib/fetcher";
 import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate, SETTLEMENT_STATUS_LABEL, EARNING_KIND_LABEL } from "@/lib/domain";
 import type { SettlementStatus } from "@prisma/client";
 import type { VehicleType } from "@prisma/client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { DRIVER_VERIFICATION_ENABLED } from "@/lib/flags";
 
 interface DriverDetail {
   driver: {
@@ -148,6 +149,15 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
         description={`${d.phone} · ${VEHICLE_LABEL[d.vehicleType as VehicleType]}${d.vehicleNumber ? ` · ${d.vehicleNumber}` : ""}`}
         action={<Badge tone={d.status === "AVAILABLE" ? "green" : d.status === "BUSY" ? "accent" : "neutral"}>{DRIVER_STATUS_LABEL[d.status]}</Badge>}
       />
+
+      {DRIVER_VERIFICATION_ENABLED && (
+        <Link
+          href={`/dispatch/drivers/${d.id}/verification`}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+        >
+          <ShieldCheck className="h-4 w-4" /> დოკუმენტური ვერიფიკაცია →
+        </Link>
+      )}
 
       <div className="mb-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="მიტანა" value={String(d.totalDeliveries)} />
