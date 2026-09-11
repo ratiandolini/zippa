@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetDb, call, makeUser, actAs, session, prisma } from "./helpers";
 import { GET as getCompany, POST as postCompany } from "@/app/api/company/route";
 import { POST as submitCompany } from "@/app/api/company/submit/route";
@@ -34,7 +34,7 @@ const orderBody = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-async function submitAndApprove(customer: Awaited<ReturnType<typeof makeUser>>, pricing?: unknown) {
+async function submitAndApprove(customer: Awaited<ReturnType<typeof makeUser>>) {
   actAs(session(customer));
   await call(postCompany, { body: profileBody() });
   await call(submitCompany, { body: { agreeToContract: true, contractVersion: CONTRACT_VERSION } });
@@ -44,7 +44,7 @@ async function submitAndApprove(customer: Awaited<ReturnType<typeof makeUser>>, 
   actAs(session(dispatcher));
   const approved = await call(reviewPartner, {
     params: { id: profile!.id },
-    body: { action: "APPROVE", pricing },
+    body: { action: "APPROVE" },
   });
   return { profile: profile!, approved, dispatcher };
 }
@@ -180,55 +180,170 @@ describe("დისპეჩერის review გვერდი", () => {
   });
 });
 
-describe("custom pricing — მხოლოდ APPROVED კომპანიაზე", () => {
-  it("DRAFT/SUBMITTED კომპანიის quote საჯარო ტარიფით ითვლება", async () => {
-    const c = await makeUser("CUSTOMER");
-    actAs(session(c));
-    await call(postCompany, { body: profileBody() });
-    await call(submitCompany, { body: { agreeToContract: true, contractVersion: CONTRACT_VERSION } });
-    const r = await call(quote, {
-      body: { pickup: orderBody().pickup, delivery: orderBody().delivery, weightKg: 3, paymentMethod: "CASH" },
-    });
-    expect(r.status).toBe(200);
-    expect(r.body.deliveryPrice).toBe(5); // საჯარო თბილისის ტარიფი 3კგ → 5₾
+// RETAIL_PRICE_MARKUP_ENABLED default false-ია test/env.ts-შიც (production-ის იდენტური),
+// რომ calculatePrice-ის ყველა არსებული პირდაპირი გამომძახებელი (test/pricing.test.ts და სხვ.)
+// უცვლელი დარჩეს. ეს ბლოკი ცალკე, module-isolated stub-ით ჩართავს markup-ს მხოლოდ
+// საკუთარი ტესტებისთვის — quote/createOrder/editOrder თავიდან იმპორტირდება ყოველ ტესტზე.
+describe("ორი-კატეგორია ფასი — RETAIL (+2₾) vs PARTNER (მოქმედი საბაზო ტარიფი)", () => {
+  let quoteMarkup: typeof import("@/app/api/pricing/quote/route").POST;
+  let createOrderMarkup: typeof import("@/app/api/orders/route").POST;
+  let editOrderMarkup: typeof import("@/app/api/orders/[id]/route").PATCH;
+  let postCompanyMarkup: typeof import("@/app/api/company/route").POST;
+  let submitCompanyMarkup: typeof import("@/app/api/company/submit/route").POST;
+  let reviewPartnerMarkup: typeof import("@/app/api/dispatch/partners/[id]/review/route").POST;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv("RETAIL_PRICE_MARKUP_ENABLED", "true");
+    ({ POST: quoteMarkup } = await import("@/app/api/pricing/quote/route"));
+    ({ POST: createOrderMarkup } = await import("@/app/api/orders/route"));
+    ({ PATCH: editOrderMarkup } = await import("@/app/api/orders/[id]/route"));
+    ({ POST: postCompanyMarkup } = await import("@/app/api/company/route"));
+    ({ POST: submitCompanyMarkup } = await import("@/app/api/company/submit/route"));
+    ({ POST: reviewPartnerMarkup } = await import("@/app/api/dispatch/partners/[id]/review/route"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
-  it("APPROVED კომპანიის 20% ფასდაკლება ავტომატურად ჩაირთვება quote-ზე", async () => {
-    const c = await makeUser("CUSTOMER");
-    await submitAndApprove(c, { pricingMode: "DISCOUNT_PERCENT", discountPercent: 20 });
+  async function submitAndApproveMarkup(customer: Awaited<ReturnType<typeof makeUser>>) {
+    actAs(session(customer));
+    await call(postCompanyMarkup, { body: profileBody() });
+    await call(submitCompanyMarkup, { body: { agreeToContract: true, contractVersion: CONTRACT_VERSION } });
+    const profile = await prisma.companyProfile.findUnique({ where: { ownerUserId: customer.id } });
+    const dispatcher = await makeUser("DISPATCHER");
+    actAs(session(dispatcher));
+    await call(reviewPartnerMarkup, { params: { id: profile!.id }, body: { action: "APPROVE" } });
+    return profile!;
+  }
 
-    actAs(session(c));
-    const r = await call(quote, {
-      body: { pickup: orderBody().pickup, delivery: orderBody().delivery, weightKg: 3, paymentMethod: "CASH" },
-    });
-    expect(r.status).toBe(200);
-    expect(r.body.deliveryPrice).toBe(4); // 5 * 0.8
+  const quoteBody = () => ({
+    pickup: orderBody().pickup,
+    delivery: orderBody().delivery,
+    weightKg: 3,
+    paymentMethod: "CASH" as const,
   });
 
-  it("ძველ (APPROVED-მდე შექმნილ) შეკვეთას ფასდაკლების დამტკიცების შემდეგაც ფასი არ ეცვლება", async () => {
+  it("1. ჩვეულებრივი CUSTOMER (company-პროფილის გარეშე) → არსებული ფასი +2₾", async () => {
     const c = await makeUser("CUSTOMER");
     actAs(session(c));
-    const created = await call(createOrder, { body: orderBody() });
+    const r = await call(quoteMarkup, { body: quoteBody() });
+    expect(r.status).toBe(200);
+    expect(r.body.deliveryPrice).toBe(7); // 5 + 2
+    expect(r.body.priceCategory).toBe("RETAIL");
+  });
+
+  it("2. APPROVED კომპანია → არსებული ფასი (markup-ის გარეშე)", async () => {
+    const c = await makeUser("CUSTOMER");
+    await submitAndApproveMarkup(c);
+    actAs(session(c));
+    const r = await call(quoteMarkup, { body: quoteBody() });
+    expect(r.body.deliveryPrice).toBe(5);
+    expect(r.body.priceCategory).toBe("PARTNER");
+  });
+
+  it.each([
+    ["3. DRAFT", "DRAFT"],
+    ["4. SUBMITTED", "SUBMITTED"],
+    ["5. CHANGES_REQUESTED", "CHANGES_REQUESTED"],
+    ["6. REJECTED", "REJECTED"],
+    ["7. SUSPENDED", "SUSPENDED"],
+  ])("%s კომპანია → +2₾ (მხოლოდ APPROVED იღებს პარტნიორის ფასს)", async (_label, status) => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    await call(postCompanyMarkup, { body: profileBody() });
+    await prisma.companyProfile.update({ where: { ownerUserId: c.id }, data: { status: status as never } });
+    const r = await call(quoteMarkup, { body: quoteBody() });
+    expect(r.body.deliveryPrice).toBe(7);
+    expect(r.body.priceCategory).toBe("RETAIL");
+  });
+
+  it("8. quote და create-order ერთსა და იმავე ფასს აბრუნებს", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const q = await call(quoteMarkup, { body: quoteBody() });
+    const created = await call(createOrderMarkup, { body: orderBody() });
     expect(created.status).toBe(201);
-    const orderId = (created.body.order as { id: string }).id;
+    expect(Number(created.body.order.price.delivery)).toBe(q.body.deliveryPrice);
+  });
+
+  it("9. +2₾ მხოლოდ ერთხელ ემატება — არა კგ-ზე ან წონის ბრეკეტების რაოდენობაზე", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const light = await call(quoteMarkup, { body: { ...quoteBody(), weightKg: 3 } });
+    const heavier = await call(quoteMarkup, { body: { ...quoteBody(), weightKg: 10 } });
+    expect(light.body.deliveryPrice).toBe(7); // 5+2
+    expect(heavier.body.deliveryPrice).toBe(8); // 6+2, არა 5+2+2 ან სხვა გამრავლება
+  });
+
+  it("10. COD (collectAmount) თანხას +2₾ არ ემატება", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const r = await call(quoteMarkup, { body: { ...quoteBody(), collectAmount: 100 } });
+    expect(r.body.deliveryPrice).toBe(7); // 5+2
+    expect(r.body.codAmount).toBe(107); // deliveryPrice(7) + collectAmount(100), collectAmount უცვლელი
+  });
+
+  it("11. წონის/ზონის surcharge (codFee, partnerCost) markup-ით არ იცვლება", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const r = await call(quoteMarkup, { body: quoteBody() });
+    expect(r.body.codFee).toBe(0); // production-ში ყველა ზონას codFee=0
+  });
+
+  it("12. არსებული (APPROVED-მდე შექმნილ) შეკვეთის ფასი approval-ის შემდეგაც არ იცვლება", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const created = await call(createOrderMarkup, { body: orderBody() });
+    const orderId = created.body.order.id;
     const before = await prisma.order.findUnique({ where: { id: orderId } });
 
-    await submitAndApprove(c, { pricingMode: "DISCOUNT_PERCENT", discountPercent: 50 });
+    await submitAndApproveMarkup(c);
 
     const after = await prisma.order.findUnique({ where: { id: orderId } });
     expect(Number(after!.deliveryPrice)).toBe(Number(before!.deliveryPrice));
+    expect(Number(after!.deliveryPrice)).toBe(7); // RETAIL-ად შექმნილი, +2₾-ითვე რჩება
   });
 
-  it("სხვა (company-პროფილის არმქონე) CUSTOMER-ის ფასი უცვლელია", async () => {
+  it("13. კომპანიის დამტკიცება მხოლოდ მომავალ შეკვეთებზე მოქმედებს", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const before = await call(createOrderMarkup, { body: orderBody() });
+    expect(before.body.order.price.delivery).toBe(7);
+
+    await submitAndApproveMarkup(c);
+
+    actAs(session(c));
+    const after = await call(createOrderMarkup, { body: orderBody() });
+    expect(after.body.order.price.delivery).toBe(5);
+  });
+
+  it("14. სხვა CUSTOMER-ის კომპანიის სტატუსით ფასის მიღება შეუძლებელია", async () => {
     const c1 = await makeUser("CUSTOMER");
-    await submitAndApprove(c1, { pricingMode: "DISCOUNT_PERCENT", discountPercent: 30 });
+    await submitAndApproveMarkup(c1); // c1 → APPROVED
 
     const c2 = await makeUser("CUSTOMER");
     actAs(session(c2));
-    const r = await call(quote, {
-      body: { pickup: orderBody().pickup, delivery: orderBody().delivery, weightKg: 3, paymentMethod: "CASH" },
-    });
-    expect(r.body.deliveryPrice).toBe(5);
+    const r = await call(quoteMarkup, { body: quoteBody() });
+    expect(r.body.deliveryPrice).toBe(7); // c2-ს company-პროფილი არ აქვს → RETAIL
+    expect(r.body.priceCategory).toBe("RETAIL");
+  });
+
+  it("დისპეჩერის edit — ფასი ორდერის მფლობელი CUSTOMER-ის სტატუსით, არა დისპეჩერის როლით", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs(session(c));
+    const created = await call(createOrderMarkup, { body: orderBody({ weightKg: 3 }) });
+    const orderId = created.body.order.id;
+    expect(created.body.order.price.delivery).toBe(7); // RETAIL
+
+    await submitAndApproveMarkup(c); // c → APPROVED
+
+    const dispatcher = await makeUser("DISPATCHER");
+    actAs(session(dispatcher));
+    const edited = await call(editOrderMarkup, { method: "PATCH", params: { id: orderId }, body: { weightKg: 4 } });
+    expect(edited.status).toBe(200);
+    expect(edited.body.order.price.delivery).toBe(5); // c-ს status=APPROVED → PARTNER, დისპეჩერის როლს მიუხედავად
   });
 });
 
