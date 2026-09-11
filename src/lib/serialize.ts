@@ -24,6 +24,9 @@ export const orderInclude = {
   events: { orderBy: { createdAt: "asc" } },
   review: { select: { rating: true, comment: true } },
   earnings: { select: { kind: true, driverAmount: true, companyAmount: true, isSettled: true } },
+  // მრავალამანათიანი შეკვეთა (Phase 1, read-only) — ლეგასი (isMultiParcel=false)
+  // შეკვეთაზე ეს ცხრილი ცარიელია, ქვემოთ `parcels: []`-ს აბრუნებს.
+  parcels: { orderBy: { sequenceNo: "asc" } },
 } satisfies Prisma.OrderInclude;
 
 type OrderWith = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -174,6 +177,30 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
       lat: e.lat,
       lng: e.lng,
       createdAt: e.createdAt.toISOString(),
+    })),
+
+    // მრავალამანათიანი შეკვეთა (Phase 1, read-only) — ლეგასი შეკვეთაზე ყოველთვის [].
+    isMultiParcel: o.isMultiParcel,
+    parcelCount: o.parcelCount,
+    parcels: o.parcels.map((p) => ({
+      id: p.id,
+      sequenceNo: p.sequenceNo,
+      label: p.label,
+      weightKg: num(p.weightKg),
+      description: p.description,
+      declaredValue: p.declaredValue == null ? null : num(p.declaredValue),
+      status: p.status,
+      pickupAttempts: p.pickupAttempts,
+      codAmount: num(p.codAmount),
+      failureReason: p.failureReason,
+      failureNote: p.failureNote,
+      pickedUpAt: p.pickedUpAt?.toISOString() ?? null,
+      deliveredAt: p.deliveredAt?.toISOString() ?? null,
+      returnRequestedAt: p.returnRequestedAt?.toISOString() ?? null,
+      returnedAt: p.returnedAt?.toISOString() ?? null,
+      cancelledAt: p.cancelledAt?.toISOString() ?? null,
+      // ნედლი blob URL — Phase 2+-ის დაცული proxy endpoint-ის გარეშე არასდროს არ გაცემა
+      proofPhotoUrl: null as string | null,
     })),
   };
 }

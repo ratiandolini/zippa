@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { GEL, streetOf } from "@/lib/domain";
+import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 
@@ -19,6 +20,11 @@ export function OrderRow({
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground">{order.trackingNumber}</span>
           <OrderStatusBadge status={order.status} />
+          {MULTI_PARCEL_ORDERS_ENABLED && order.parcelCount > 1 && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {order.parcelCount} ამანათი
+            </span>
+          )}
         </div>
         <div className="mt-1 flex items-center gap-1.5 truncate text-sm">
           <span className="truncate">{streetOf(order.pickup.address)}</span>

@@ -9,6 +9,7 @@ import type {
   DeliveryZone,
   OrderFailureReason,
   SettlementStatus,
+  ParcelStatus,
 } from "@prisma/client";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -96,6 +97,27 @@ export const FAILURE_REASON_LABEL: Record<OrderFailureReason, string> = {
   DAMAGED: "ამანათი დაზიანდა",
   OTHER: "სხვა",
 };
+
+// ─────────────────────────────────────────────
+// მრავალამანათიანი შეკვეთა (Phase 1 — schema + read-only ჩვენება)
+// ─────────────────────────────────────────────
+
+export const PARCEL_STATUS_LABEL: Record<ParcelStatus, string> = {
+  PENDING: "მოლოდინში",
+  PICKED_UP: "აღებული",
+  NOT_PICKED_UP: "არ აღებულა (ხელახლა საცდელი)",
+  IN_TRANSIT: "გზაშია",
+  DELIVERED: "ჩაბარებული",
+  REFUSED: "მიმღებმა უარი თქვა",
+  RETURN_REQUESTED: "დაბრუნება მოთხოვნილია",
+  RETURNED: "დაბრუნებული",
+  CANCELLED: "გაუქმებული",
+  FAILED: "ჩაიშალა",
+};
+
+// Terms §7.3-ის შესაბამისად — თუ ამანათს/შეკვეთას დეკლარირებული ღირებულება არ
+// ჰქონდა მითითებული, პასუხისმგებლობის მაქსიმალური ოდენობაა ეს ლარი.
+export const DEFAULT_LIABILITY_LIMIT_GEL = 100;
 
 export const SETTLEMENT_STATUS_LABEL: Record<SettlementStatus, string> = {
   PENDING: "დადასტურების მოლოდინში",

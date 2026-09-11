@@ -10,3 +10,8 @@ export const DRIVER_VERIFICATION_ENABLED = process.env.NEXT_PUBLIC_DRIVER_VERIFI
 // false => ჩვეულებრივი CUSTOMER-ის ფასი ზუსტად ისეთივეა, როგორიც ამ ცვლილებამდე იყო.
 export const RETAIL_PRICE_MARKUP_ENABLED = process.env.RETAIL_PRICE_MARKUP_ENABLED === "true";
 export const RETAIL_PRICE_MARKUP_GEL = process.env.RETAIL_PRICE_MARKUP_GEL || "2";
+
+// მრავალამანათიანი შეკვეთა — Phase 1: schema + read-only UI. false-ზე არც შექმნის,
+// არც სტატუსის ლოგიკა არსად არსებობს — ეს flag მხოლოდ დამატებულ read-only
+// parcel-სიის ჩვენებას იმართავს (ცარიელი მასივია ყოველთვის, სანამ Phase 2 არ დაიწყება).
+export const MULTI_PARCEL_ORDERS_ENABLED = process.env.NEXT_PUBLIC_MULTI_PARCEL_ORDERS_ENABLED === "true";

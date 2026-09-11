@@ -11,6 +11,8 @@ import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ProofPhoto } from "@/components/proof-photo";
+import { OrderParcelList } from "@/components/order-parcel-list";
+import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
 const columns: { key: OrderDTO["status"][]; title: string; done?: boolean }[] = [
@@ -361,6 +363,12 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
           </div>
         )}
       </div>
+
+      {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
+        <div className="mt-2">
+          <OrderParcelList parcels={order.parcels} />
+        </div>
+      )}
 
       {order.needsManualReview && !fixingPrice && (
         <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">

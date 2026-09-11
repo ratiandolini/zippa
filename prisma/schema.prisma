@@ -362,6 +362,14 @@ model Order {
   earnings    DriverEarning[]
   adjustments CustomerAdjustment[]
 
+  // მრავალამანათიანი შეკვეთა (additive, Phase 1 — schema + read-only).
+  // ძველი (isMultiParcel=false) შეკვეთებზე OrderParcel-row არ იქმნება — ყველა
+  // არსებული ველი ზემოთ (weightKg/parcelValue/deliveryPrice/...) ამ შეკვეთებზე
+  // ისევ ერთადერთი წყაროა, ისე როგორც აქამდე.
+  parcelCount   Int           @default(1)
+  isMultiParcel Boolean       @default(false)
+  parcels       OrderParcel[] @relation("OrderParcels")
+
   @@index([status])
   @@index([customerId])
   @@index([driverId])
@@ -469,6 +477,11 @@ model CustomerAdjustment {
   createdById String?
   settledAt   DateTime? // გადაიხადა COD-ის გადარიცხვისას
   createdAt   DateTime  @default(now())
+
+  // მრავალამანათიანი შეკვეთის კონკრეტულ parcel-თან დაკავშირებული adjustment
+  // (Phase 4-ის პროპორციული ანაზღაურება) — არჩევითი, ძველ ჩანაწერებზე null.
+  parcelId String?
+  parcel   OrderParcel? @relation("ParcelAdjustments", fields: [parcelId], references: [id])
 
   @@index([customerId, settledAt])
 }
@@ -785,4 +798,86 @@ model DriverDocument {
   reviewedById String?
 
   @@index([driverVerificationId])
+}
+
+// ─────────────────────────────────────────────
+// მრავალამანათიანი შეკვეთა (Phase 1 — additive schema + read-only UI).
+// ერთი Order = ერთი dispatcher assignment + ერთი driver; N OrderParcel = თითო
+// ამანათის საკუთარი status/failure/return/proof/COD. ძველი (isMultiParcel=false)
+// შეკვეთებზე ეს ცხრილები არასდროს გამოიყენება — ისინი Order-ის არსებულ
+// ველებზე (weightKg/parcelValue/deliveryPrice/...) ისევ ისე მუშაობენ, როგორც
+// აქამდე. NEXT_PUBLIC_MULTI_PARCEL_ORDERS_ENABLED-ის მიღმა (default false)
+// შექმნის/სტატუსის ლოგიკა არსად არ არსებობს — Phase 1 მხოლოდ ამის schema-ა.
+// ─────────────────────────────────────────────
+
+enum ParcelStatus {
+  PENDING
+  PICKED_UP
+  NOT_PICKED_UP // retryable/intermediate — არა terminal (Phase 3 საკითხავია)
+  IN_TRANSIT
+  DELIVERED
+  REFUSED
+  RETURN_REQUESTED
+  RETURNED // terminal, მხოლოდ დისპეჩერის გადაწყვეტილებით
+  CANCELLED // terminal, მხოლოდ დისპეჩერის გადაწყვეტილებით
+  FAILED
+}
+
+model OrderParcel {
+  id         String @id @default(cuid())
+  orderId    String
+  order      Order  @relation("OrderParcels", fields: [orderId], references: [id], onDelete: Cascade)
+  sequenceNo Int // 1..N, ჩვენებისთვის ("ამანათი 3/10")
+
+  label         String?
+  weightKg      Decimal  @db.Decimal(10, 2)
+  description   String?
+  // ნივთის დეკლარირებული ღირებულება — არჩევითი (Terms §7.3-ის შესაბამისად).
+  // null => ამ ერთ ამანათზე პასუხისმგებლობის ლიმიტია სტანდარტული 100 GEL.
+  declaredValue Decimal? @db.Decimal(10, 2)
+
+  status         ParcelStatus @default(PENDING)
+  pickupAttempts Int          @default(0)
+  pickedUpAt     DateTime?
+  deliveredAt    DateTime?
+
+  failureReason     OrderFailureReason?
+  failureNote       String?
+  returnRequestedAt DateTime?
+  returnedAt        DateTime?
+  cancelledAt       DateTime?
+  proofPhotoUrl     String?
+
+  // COD — თითო ამანათის საკუთარი ასაღები თანხა (Order.collectAmount
+  // მრავალამანათიან შეკვეთაზე ხდება ამათი ჯამის rollup, არა წყარო)
+  codAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  // Order.deliveryPrice/driverFee-დან წონა-პროპორციულად გამოთვლილი წილი —
+  // fix-irdება შექმნისას, არასდროს არ იცვლება უკვე DELIVERED ამანათზე
+  // (Phase 4-ის პროპორციული ფინანსური კორექტირების საფუძველი).
+  allocatedDeliveryPrice Decimal @default(0) @db.Decimal(10, 2)
+  allocatedDriverFee     Decimal @default(0) @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events      OrderParcelEvent[]
+  adjustments CustomerAdjustment[] @relation("ParcelAdjustments")
+
+  @@unique([orderId, sequenceNo])
+  @@index([orderId])
+  @@index([status])
+}
+
+// თითო ამანათის სტატუსის ისტორია — OrderEvent-ის ანალოგი, parcel-level
+model OrderParcelEvent {
+  id        String       @id @default(cuid())
+  parcelId  String
+  parcel    OrderParcel  @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  status    ParcelStatus
+  note      String?
+  actorId   String?
+  createdAt DateTime     @default(now())
+
+  @@index([parcelId])
 }

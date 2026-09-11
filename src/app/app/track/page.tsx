@@ -10,8 +10,10 @@ import { OrderTimeline } from "@/components/order-timeline";
 import { CancelOrderButton, RatingWidget, ReturnRequest } from "@/components/order-actions";
 import { ProofPhoto } from "@/components/proof-photo";
 import { LazyMap } from "@/components/map-lazy";
+import { OrderParcelList } from "@/components/order-parcel-list";
 import { useOrder, useOrders } from "@/lib/hooks";
 import { GEL, streetOf, FREE_CANCEL_STATUSES, PAID_CANCEL_STATUSES, CANCEL_FEE_GEL, ACTIVE_ORDER_STATUSES, FAILURE_REASON_LABEL } from "@/lib/domain";
+import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import { haversineKm } from "@/lib/geo";
 import { ArrowRight } from "lucide-react";
 
@@ -179,6 +181,9 @@ function Detail({ id }: { id: string }) {
               )}
             </CardContent>
           </Card>
+          {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
+            <OrderParcelList parcels={order.parcels} />
+          )}
         </div>
         <div className="space-y-6">
           <Card>
