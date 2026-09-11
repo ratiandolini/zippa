@@ -1,18 +1,19 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok } from "@/lib/api";
+import { periodFrom, type PayrollPeriod } from "@/lib/period";
 
-// კურიერების ანგარიშსწორება — პერიოდის ჭრილში + მიმდინარე ბალანსები
+const VALID_PERIODS: PayrollPeriod[] = ["week", "month", "all"];
+
+// კურიერების ანგარიშსწორება — კალენდარული პერიოდის ჭრილში + მიმდინარე ბალანსები
 export function GET(req: Request) {
   return handle(async () => {
     await requireRole("DISPATCHER");
-    const period = new URL(req.url).searchParams.get("period") ?? "week";
+    const raw = new URL(req.url).searchParams.get("period") ?? "week";
+    const period: PayrollPeriod = VALID_PERIODS.includes(raw as PayrollPeriod)
+      ? (raw as PayrollPeriod)
+      : "week";
 
-    const from = new Date();
-    if (period === "week") from.setDate(from.getDate() - 7);
-    else if (period === "month") from.setDate(from.getDate() - 30);
-    else from.setFullYear(2000); // "all"
-    from.setHours(0, 0, 0, 0);
-    const inPeriod = { gte: from };
+    const inPeriod = { gte: periodFrom(period) };
 
     const drivers = await prisma.driverProfile.findMany({
       where: { isApproved: true },
