@@ -61,10 +61,18 @@ describe("შეკვეთის შექმნა", () => {
     expect(r.status).toBe(401);
   });
 
-  it("ნივთის ღირებულების გარეშე → 422", async () => {
+  it("ნივთის ღირებულების გარეშე → 201, parcelValue null (100 ₾ პასუხისმგებლობის ლიმიტი)", async () => {
     const c = await makeUser("CUSTOMER");
     actAs({ sub: c.id, role: "CUSTOMER", name: "c", email: "c@t.ge" });
     const r = await call(createOrder, { body: orderBody({ parcelValue: undefined }) });
+    expect(r.status).toBe(201);
+    expect(r.body.order.parcelValue).toBeNull();
+  });
+
+  it("ნივთის ღირებულება 0-ზე ნაკლები/ტოლი → 422 (თუ საერთოდ მითითებულია, დადებითი უნდა იყოს)", async () => {
+    const c = await makeUser("CUSTOMER");
+    actAs({ sub: c.id, role: "CUSTOMER", name: "c", email: "c@t.ge" });
+    const r = await call(createOrder, { body: orderBody({ parcelValue: 0 }) });
     expect(r.status).toBe(422);
   });
 

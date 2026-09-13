@@ -95,8 +95,18 @@ export const FAILURE_REASON_LABEL: Record<OrderFailureReason, string> = {
   RECIPIENT_REFUSED: "მიმღებმა უარი თქვა",
   ADDRESS_INVALID: "მისამართი არასწორია",
   DAMAGED: "ამანათი დაზიანდა",
+  RETURN: "დაბრუნება",
   OTHER: "სხვა",
 };
+
+// Phase 2 — მრავალამანათიან შეკვეთაზე ჩაბარების ეტაპზე შესაძლო მიზეზები დანარჩენი
+// (ვერ ჩაბარებული) ამანათებისთვის. Underlying ველი იგივე OrderFailureReason-ია.
+export const DELIVERY_SHORTFALL_REASONS = [
+  "RECIPIENT_REFUSED",
+  "RECIPIENT_UNAVAILABLE",
+  "RETURN",
+  "OTHER",
+] as const;
 
 // ─────────────────────────────────────────────
 // მრავალამანათიანი შეკვეთა (Phase 1 — schema + read-only ჩვენება)

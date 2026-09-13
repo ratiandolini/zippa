@@ -179,14 +179,25 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
       createdAt: e.createdAt.toISOString(),
     })),
 
-    // მრავალამანათიანი შეკვეთა (Phase 1, read-only) — ლეგასი შეკვეთაზე ყოველთვის [].
+    // მრავალამანათიანი შეკვეთა (Phase 1 read-only + Phase 2 რაოდენობრივი დადასტურება)
+    // — ლეგასი შეკვეთაზე ყოველთვის [].
     isMultiParcel: o.isMultiParcel,
     parcelCount: o.parcelCount,
+    // სწრაფი შეჯამება UI-სთვის — "სულ/აღებული/ჩაბარებული/დარჩენილი-დასაბრუნებელი"
+    parcelSummary: {
+      total: o.parcelCount,
+      pickedUp: o.parcels.filter((p) => p.status !== "PENDING" && p.status !== "NOT_PICKED_UP").length,
+      delivered: o.parcels.filter((p) => p.status === "DELIVERED").length,
+      remaining: o.parcels.filter((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP").length,
+      returning: o.parcels.filter((p) =>
+        ["REFUSED", "RETURN_REQUESTED", "RETURNED", "FAILED"].includes(p.status),
+      ).length,
+    },
     parcels: o.parcels.map((p) => ({
       id: p.id,
       sequenceNo: p.sequenceNo,
       label: p.label,
-      weightKg: num(p.weightKg),
+      weightKg: p.weightKg == null ? null : num(p.weightKg),
       description: p.description,
       declaredValue: p.declaredValue == null ? null : num(p.declaredValue),
       status: p.status,

@@ -76,8 +76,12 @@ export const createOrderSchema = z.object({
   delivery: point.extend({ note: z.string().trim().max(200).optional() }),
   weightKg: z.number().positive("წონა 0-ზე მეტი").max(500),
   description: z.string().trim().max(400).optional(),
-  parcelValue: z.number().positive("მიუთითე ნივთის ღირებულება").max(100000),
+  // არჩევითი — თუ არ მიუთითეს, მოქმედებს სტანდარტული 100 ₾ პასუხისმგებლობის ლიმიტი (Terms §7.3).
+  parcelValue: z.number().positive("ღირებულება 0-ზე მეტი უნდა იყოს").max(100000).optional(),
   collectAmount: z.number().nonnegative().max(100000).optional(),
+  // Phase 2 — მრავალამანათიანი შეკვეთა: მხოლოდ რაოდენობა (>1 → isMultiParcel).
+  // Feature flag გამორთვისას ეს ველი უგულებელყოფილია (ყოველთვის 1).
+  parcelCount: z.number().int().min(1).max(300).optional(),
   // პირველი გაშვება — მხოლოდ ნაღდი მიტანის საფასური (COD). ბარათით გადახდა არ არსებობს.
   paymentMethod: z.literal("CASH").default("CASH"),
   payerSide: z.enum(["SENDER", "RECIPIENT"]).default("SENDER"),
@@ -196,6 +200,31 @@ export const updateStatusSchema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
 });
+
+// ─────────────────────────────────────────────
+// მრავალამანათიანი შეკვეთა — Phase 2 (რაოდენობრივი დადასტურება)
+// ─────────────────────────────────────────────
+
+export const parcelPickupSchema = z.object({
+  pickedUpCount: z.number().int().min(0).max(300),
+  reason: z.string().trim().max(300).optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+});
+
+export type ParcelPickupInput = z.infer<typeof parcelPickupSchema>;
+
+export const parcelDeliverSchema = z.object({
+  deliveredCount: z.number().int().min(0).max(300),
+  reason: z.enum(["RECIPIENT_REFUSED", "RECIPIENT_UNAVAILABLE", "RETURN", "OTHER"]).optional(),
+  note: z.string().trim().max(300).optional(),
+  // მიმღების PIN — deliveryProof = PIN-ზე, მხოლოდ deliveredCount > 0-ზე მოწმდება
+  pin: z.string().trim().max(8).optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+});
+
+export type ParcelDeliverInput = z.infer<typeof parcelDeliverSchema>;
 
 // დისპეჩერის ხელით ფასის შესწორება (PENDING / ASSIGNED შეკვეთაზე)
 export const PRICE_ADJUST_REASONS = [

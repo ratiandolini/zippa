@@ -366,7 +366,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
 
       {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
         <div className="mt-2">
-          <OrderParcelList parcels={order.parcels} />
+          <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} />
         </div>
       )}
 

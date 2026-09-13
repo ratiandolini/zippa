@@ -182,7 +182,7 @@ function Detail({ id }: { id: string }) {
             </CardContent>
           </Card>
           {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
-            <OrderParcelList parcels={order.parcels} />
+            <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} />
           )}
         </div>
         <div className="space-y-6">

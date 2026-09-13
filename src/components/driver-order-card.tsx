@@ -14,6 +14,8 @@ import {
 import { Clock, Navigation, Phone } from "lucide-react";
 import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
+import { ParcelPickupConfirm } from "@/components/parcel-pickup-confirm";
+import { ParcelDeliverConfirm } from "@/components/parcel-deliver-confirm";
 import type { OrderDTO } from "@/lib/serialize";
 import type { OrderStatus, OrderFailureReason } from "@prisma/client";
 
@@ -254,45 +256,73 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
 
       {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
 
-      {next.length > 0 && !failPick && !confirmReject && (
-        <div className="mt-3 space-y-2">
-          {next
-            .filter((s) => s !== "FAILED")
-            .map((s) => (
-              <Button
-                key={s}
-                size="lg"
-                className="h-12 w-full text-base"
-                disabled={busy != null || (s === "DELIVERED" && deliverBlocked)}
-                onClick={() => move(s)}
-              >
-                {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
-              </Button>
-            ))}
-          {next.includes("FAILED" as OrderStatus) && (
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-11 w-full"
-              disabled={busy != null}
-              onClick={() => setFailPick(true)}
-            >
-              {NEXT_LABEL.FAILED}
-            </Button>
-          )}
-          {order.status === "ASSIGNED" && (
-            <Button
-              size="lg"
-              variant="ghost"
-              className="h-11 w-full text-muted-foreground"
-              disabled={busy != null}
-              onClick={() => setConfirmReject(true)}
-            >
-              უარი შეკვეთაზე
-            </Button>
-          )}
-        </div>
+      {/* Phase 2 — მრავალამანათიან შეკვეთაზე PICKED_UP/DELIVERED/FAILED რაოდენობრივი
+          ფორმებით მუშავდება, ჩვეულებრივი ღილაკების ნაცვლად (იხ. [id]/parcels/* endpoint-ები). */}
+      {order.isMultiParcel && order.status === "EN_ROUTE_PICKUP" && (
+        <ParcelPickupConfirm order={order} onChange={onChange} />
       )}
+      {order.isMultiParcel && order.status === "IN_TRANSIT" && (
+        <ParcelDeliverConfirm
+          order={order}
+          onChange={onChange}
+          deliverBlocked={deliverBlocked}
+          pin={pin}
+        />
+      )}
+
+      {(!order.isMultiParcel || !["EN_ROUTE_PICKUP", "IN_TRANSIT"].includes(order.status)) &&
+        next.length > 0 &&
+        !failPick &&
+        !confirmReject && (
+          <div className="mt-3 space-y-2">
+            {next
+              .filter((s) => s !== "FAILED")
+              .filter((s) => !(order.isMultiParcel && (s === "PICKED_UP" || s === "DELIVERED")))
+              .map((s) => (
+                <Button
+                  key={s}
+                  size="lg"
+                  className="h-12 w-full text-base"
+                  disabled={busy != null || (s === "DELIVERED" && deliverBlocked)}
+                  onClick={() => move(s)}
+                >
+                  {busy === s ? "…" : NEXT_LABEL[s] ?? ORDER_STATUS_LABEL[s]}
+                </Button>
+              ))}
+            {!order.isMultiParcel && next.includes("FAILED" as OrderStatus) && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-11 w-full"
+                disabled={busy != null}
+                onClick={() => setFailPick(true)}
+              >
+                {NEXT_LABEL.FAILED}
+              </Button>
+            )}
+            {order.status === "ASSIGNED" && (
+              <Button
+                size="lg"
+                variant="ghost"
+                className="h-11 w-full text-muted-foreground"
+                disabled={busy != null}
+                onClick={() => setConfirmReject(true)}
+              >
+                უარი შეკვეთაზე
+              </Button>
+            )}
+          </div>
+        )}
+      {order.isMultiParcel &&
+        order.status === "PICKED_UP" &&
+        order.parcels.some((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP") && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+              დარჩენილი ამანათების ხელახლა აღება
+            </summary>
+            <ParcelPickupConfirm order={order} onChange={onChange} />
+          </details>
+        )}
 
       {confirmReject && (
         <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">

@@ -64,6 +64,13 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     if (TERMINAL.includes(order.status as OrderStatus))
       throw new ApiError(409, "შეკვეთა დასრულებულია — სტატუსი ვეღარ იცვლება");
 
+    // მრავალამანათიან შეკვეთაზე აღება/ჩაბარება/ჩაშლა მხოლოდ რაოდენობრივი
+    // დადასტურების endpoint-ებით ხდება (/parcels/pickup, /parcels/deliver) —
+    // აქედან დაბლოკილია, რომ item-level აღრიცხვა არასდროს გვერდი აუარონ.
+    // ლეგასი (isMultiParcel=false) შეკვეთაზე ეს პირობა არასდროს არ ეშვება.
+    if (order.isMultiParcel && ["PICKED_UP", "DELIVERED", "FAILED"].includes(body.status))
+      throw new ApiError(409, "მრავალამანათიან შეკვეთაზე გამოიყენე ამანათების დადასტურების ფორმა");
+
     // ── დისპეჩერს ამ endpoint-იდან შეუძლია მხოლოდ გაუქმება/დაბრუნება ──
     // (კურიერის ნაბიჯებს კურიერი ატარებს; ხელით წინსვლა დაშვებული არაა)
     if (isDispatcher && body.status !== "CANCELLED")

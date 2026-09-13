@@ -259,6 +259,7 @@ enum OrderFailureReason {
   RECIPIENT_REFUSED // მიმღებმა უარი თქვა
   ADDRESS_INVALID // მისამართი არასწორია
   DAMAGED // ამანათი დაზიანდა
+  RETURN // დაბრუნება — გამგზავნის/კურიერის გადაწყვეტილებით (Phase 2, მრავალამანათიანი ჩაბარება)
   OTHER
 }
 
@@ -830,7 +831,9 @@ model OrderParcel {
   sequenceNo Int // 1..N, ჩვენებისთვის ("ამანათი 3/10")
 
   label         String?
-  weightKg      Decimal  @db.Decimal(10, 2)
+  // Phase 2 — მასობრივი შექმნისას (მხოლოდ რაოდენობა) წონა თითო ამანათზე არ იკრიბება;
+  // null-ია, სანამ Phase 3+ ცალკეულ ამანათს არ დაუმატებს დეტალურ მონაცემებს.
+  weightKg      Decimal? @db.Decimal(10, 2)
   description   String?
   // ნივთის დეკლარირებული ღირებულება — არჩევითი (Terms §7.3-ის შესაბამისად).
   // null => ამ ერთ ამანათზე პასუხისმგებლობის ლიმიტია სტანდარტული 100 GEL.

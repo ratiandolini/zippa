@@ -10,6 +10,8 @@ import { notifyDispatchers } from "@/lib/notify";
 import { streetOf } from "@/lib/domain";
 import { expireStaleAssignments } from "@/lib/assignments";
 import { getSetting } from "@/lib/settings";
+import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
+import { splitEvenly } from "@/lib/parcels";
 
 export function GET(req: Request) {
   return handle(async () => {
@@ -66,6 +68,14 @@ export function POST(req: Request) {
       Math.round((price.companyMargin + codCommission) * 100) / 100;
     const eta = await estimateDelivery(price.zone);
 
+    // Phase 2 — მრავალამანათიანი შეკვეთა: მხოლოდ feature flag ჩართვისას, count>1-ზე.
+    // გამორთვისას/count=1-ზე ეს ყოველთვის ცარიელია — ძველი flow ბაიტობრივად უცვლელი.
+    const parcelCount = MULTI_PARCEL_ORDERS_ENABLED ? (data.parcelCount ?? 1) : 1;
+    const isMultiParcel = parcelCount > 1;
+    const deliveryShares = isMultiParcel ? splitEvenly(price.deliveryPrice, parcelCount) : [];
+    const driverShares = isMultiParcel ? splitEvenly(price.driverFee, parcelCount) : [];
+    const codShares = isMultiParcel ? splitEvenly(collectAmount, parcelCount) : [];
+
     const order = await prisma.order.create({
       data: {
         trackingNumber: generateTrackingNumber(),
@@ -113,6 +123,22 @@ export function POST(req: Request) {
 
         deliveryProof: data.deliveryProof,
         deliveryPin: data.deliveryProof === "PIN" ? generateDeliveryPin() : null,
+
+        ...(isMultiParcel
+          ? {
+              isMultiParcel: true,
+              parcelCount,
+              parcels: {
+                create: Array.from({ length: parcelCount }, (_, i) => ({
+                  sequenceNo: i + 1,
+                  status: "PENDING" as const,
+                  allocatedDeliveryPrice: deliveryShares[i],
+                  allocatedDriverFee: driverShares[i],
+                  codAmount: codShares[i],
+                })),
+              },
+            }
+          : {}),
 
         events: { create: { status: "PENDING", note: "შეკვეთა შექმნილია", actorId: session.sub } },
       },

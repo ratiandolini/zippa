@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AddressField, type AddressValue } from "@/components/address-field";
-import { GEL, PAYMENT_METHOD_LABEL, DELIVERY_ZONE_LABEL, fmtDate } from "@/lib/domain";
+import { GEL, PAYMENT_METHOD_LABEL, DELIVERY_ZONE_LABEL, DEFAULT_LIABILITY_LIMIT_GEL, fmtDate } from "@/lib/domain";
 import { api, HttpError } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
 import { useContacts, type SavedContact } from "@/lib/hooks";
+import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import type { OrderDTO } from "@/lib/serialize";
 
 const empty: AddressValue = { address: "", lat: null, lng: null };
@@ -45,6 +46,7 @@ export default function NewOrderPage() {
   const [courierNote, setCourierNote] = useState("");
   const [parcelValue, setParcelValue] = useState("");
   const [collectAmount, setCollectAmount] = useState("");
+  const [parcelCount, setParcelCount] = useState("1");
   const [payerSide, setPayerSide] = useState<"SENDER" | "RECIPIENT">("SENDER");
   const [deliveryProof, setDeliveryProof] = useState<"PHOTO" | "PIN" | "NONE">("PHOTO");
   const payment = "CASH" as const;
@@ -148,6 +150,8 @@ export default function NewOrderPage() {
         description: description || undefined,
         parcelValue: parcelValue.trim() ? parseFloat(parcelValue) : undefined,
         collectAmount: collectAmount.trim() ? parseFloat(collectAmount) : undefined,
+        parcelCount:
+          MULTI_PARCEL_ORDERS_ENABLED && parcelCount.trim() ? parseInt(parcelCount, 10) : undefined,
         paymentMethod: payment,
         payerSide,
         deliveryProof,
@@ -171,7 +175,6 @@ export default function NewOrderPage() {
     senderPhone.trim() &&
     recipientName.trim() &&
     recipientPhone.trim() &&
-    parseFloat(parcelValue) > 0 &&
     !submitting;
 
   return (
@@ -239,6 +242,16 @@ export default function NewOrderPage() {
                 error={fe("weightKg")}
               />
               <Text label="აღწერა" value={description} onChange={setDescription} placeholder="მაგ. დოკუმენტები, ტანსაცმელი" />
+              {MULTI_PARCEL_ORDERS_ENABLED && (
+                <Text
+                  label="ამანათების რაოდენობა"
+                  value={parcelCount}
+                  onChange={(v) => setParcelCount(v.replace(/\D/g, ""))}
+                  type="number"
+                  step="1"
+                  hint="თუ ერთზე მეტია (მაგ. 12), კურიერი მათ ცალ-ცალკე დაადასტურებს აღებისა და ჩაბარებისას."
+                />
+              )}
               <div className="sm:col-span-2">
                 <Text
                   label="შენიშვნა კურიერს"
@@ -276,12 +289,12 @@ export default function NewOrderPage() {
                 </div>
               </div>
               <Text
-                label="ნივთის ღირებულება, ₾ *"
+                label="დეკლარირებული ღირებულება, ₾ (არჩევითი)"
                 value={parcelValue}
                 onChange={setParcelValue}
                 type="number"
                 step="1"
-                hint="სავალდებულოა. მიუთითე ამანათის ღირებულება — ეს განსაზღვრავს დაზღვევის ლიმიტს დაზიანების ან დაკარგვისას. მიმღები ამ თანხას არ იხდის."
+                hint={`მიუთითებლობის შემთხვევაში პასუხისმგებლობის ლიმიტი შეადგენს ${DEFAULT_LIABILITY_LIMIT_GEL} ₾-ს. მიმღები ამ თანხას არ იხდის.`}
                 error={fe("parcelValue")}
               />
               <Text
