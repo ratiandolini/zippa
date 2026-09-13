@@ -4,9 +4,10 @@ import { ParcelStatusBadge } from "@/components/parcel-status-badge";
 import { GEL, DEFAULT_LIABILITY_LIMIT_GEL, FAILURE_REASON_LABEL } from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 
-// Phase 1 — read-only ჩვენება. Phase 2 — რაოდენობრივი შეჯამება (სულ/აღებული/
-// ჩაბარებული/დარჩენილი/დასაბრუნებელი) + ფინანსური ჩაშლა (საწყისი/შესრულებული/
-// ჩამოწერილი/საბოლოო გადასახდელი), თითო ამანათის დეტალური სტატუსის გვერდით.
+// Phase 1 — read-only ჩვენება. Phase 2 fix — რაოდენობრივი შეჯამება (სულ/აღებული/
+// ჩაბარებული/დასაბრუნებელი-მოლოდინში/დაბრუნებული/ვერ-აღებული/ჩამოწერილი) +
+// ფინანსური ჩაშლა (საწყისი/შესრულებული/საბოლოო გადასახდელი), თითო ამანათის
+// დეტალური სტატუსის გვერდით.
 export function OrderParcelList({
   parcels,
   summary,
@@ -22,7 +23,7 @@ export function OrderParcelList({
     <div className="space-y-2 rounded-lg border border-border p-4">
       <p className="text-sm font-medium">ამანათები ({parcels.length})</p>
       {summary && (
-        <div className="grid grid-cols-5 gap-1 rounded-md bg-muted/40 px-2 py-2 text-center text-xs">
+        <div className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-center text-xs sm:grid-cols-7">
           <div>
             <div className="font-semibold tabular-nums">{summary.total}</div>
             <div className="text-muted-foreground">სულ</div>
@@ -36,12 +37,20 @@ export function OrderParcelList({
             <div className="text-muted-foreground">ჩაბარებული</div>
           </div>
           <div>
-            <div className="font-semibold tabular-nums">{summary.remaining}</div>
-            <div className="text-muted-foreground">დარჩენილი</div>
+            <div className="font-semibold tabular-nums text-amber-700">{summary.awaitingReturn}</div>
+            <div className="text-muted-foreground">დასაბრუნებელი</div>
           </div>
           <div>
-            <div className="font-semibold tabular-nums text-amber-700">{summary.returning}</div>
-            <div className="text-muted-foreground">დასაბრუნებელი</div>
+            <div className="font-semibold tabular-nums">{summary.returned}</div>
+            <div className="text-muted-foreground">დაბრუნებული</div>
+          </div>
+          <div>
+            <div className="font-semibold tabular-nums">{summary.notPickedUp}</div>
+            <div className="text-muted-foreground">ვერ აღებული</div>
+          </div>
+          <div>
+            <div className="font-semibold tabular-nums text-muted-foreground">{summary.cancelled}</div>
+            <div className="text-muted-foreground">ჩამოწერილი</div>
           </div>
         </div>
       )}
@@ -53,24 +62,28 @@ export function OrderParcelList({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">შესრულებული ნაწილის ფასი</span>
-            <span className="tabular-nums">{GEL(finance.earnedTotal)}</span>
+            <span className="tabular-nums">{GEL(finance.earnedDeliveryPrice)}</span>
           </div>
           {finance.waivedAmount > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>ჩამოწერილი/დაბრუნებული ნაწილი</span>
+              <span>ჩამოწერილი/ვერ-შესრულებული ნაწილი</span>
               <span className="tabular-nums">−{GEL(finance.waivedAmount)}</span>
-            </div>
-          )}
-          {finance.returnFee > 0 && (
-            <div className="flex justify-between text-destructive">
-              <span>დაბრუნების საფასური</span>
-              <span className="tabular-nums">+{GEL(finance.returnFee)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-border pt-1 font-medium">
             <span>საბოლოო გადასახდელი</span>
             <span className="tabular-nums">{GEL(finance.finalPayable)}</span>
           </div>
+          {finance.unsettledPayable > 0 ? (
+            <div className="flex justify-between text-destructive">
+              <span>მათ შორის ჯერ გადაუხდელი</span>
+              <span className="tabular-nums">{GEL(finance.unsettledPayable)}</span>
+            </div>
+          ) : (
+            finance.finalPayable > 0 && (
+              <div className="text-green-700">✓ ანგარიშსწორებულია</div>
+            )
+          )}
         </div>
       )}
       <div className="divide-y divide-border">

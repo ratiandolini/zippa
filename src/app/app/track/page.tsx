@@ -232,7 +232,7 @@ function Detail({ id }: { id: string }) {
                   </p>
                 </div>
               )}
-              {order.status === "FAILED" && (
+              {order.status === "FAILED" && !order.isMultiParcel && (
                 <div className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   მიტანა ვერ შესრულდა
                   {order.failureReason ? ` — ${FAILURE_REASON_LABEL[order.failureReason]}` : ""}.
@@ -241,10 +241,22 @@ function Detail({ id }: { id: string }) {
                     : " ამანათი ბრუნდება."}
                 </div>
               )}
+              {order.status === "FAILED" && order.isMultiParcel && (
+                <div className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  ვერცერთი ამანათი ვერ ჩაბარდა.
+                  {order.parcelSummary.awaitingReturn > 0 &&
+                    ` ${order.parcelSummary.awaitingReturn} ამანათი დასაბრუნებელია.`}
+                </div>
+              )}
               {order.status === "PARTIALLY_COMPLETED" && (
                 <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   ნაწილობრივ შესრულდა — {order.parcelSummary.delivered}/{order.parcelSummary.total} ჩაბარებულია.
-                  {order.returnFee > 0 && ` დაბრუნების საფასური ${GEL(order.returnFee)}.`}
+                  {order.parcelSummary.awaitingReturn > 0 &&
+                    ` ${order.parcelSummary.awaitingReturn} ამანათი დასაბრუნებელია.`}
+                  {order.parcelSummary.returned > 0 &&
+                    ` ${order.parcelSummary.returned} უკვე დაბრუნებულია.`}
+                  {order.parcelFinance && order.parcelFinance.finalPayable > 0 &&
+                    ` საბოლოო გადასახდელი: ${GEL(order.parcelFinance.finalPayable)}.`}
                 </div>
               )}
               {!order.isMultiParcel && ["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (

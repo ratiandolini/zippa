@@ -20,6 +20,7 @@ import Link from "next/link";
 import { ProofPhoto } from "@/components/proof-photo";
 import { OrderParcelList } from "@/components/order-parcel-list";
 import { ParcelResolvePickup } from "@/components/parcel-resolve-pickup";
+import { ParcelReturnConfirm } from "@/components/parcel-return-confirm";
 import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
@@ -383,9 +384,14 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
           <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} finance={order.parcelFinance} />
         </div>
       )}
-      {MULTI_PARCEL_ORDERS_ENABLED && order.isMultiParcel && order.parcelSummary.remaining > 0 && (
+      {MULTI_PARCEL_ORDERS_ENABLED && order.isMultiParcel && order.parcelSummary.notPickedUp > 0 && (
         <div className="mt-2">
           <ParcelResolvePickup order={order} onChange={onChange} />
+        </div>
+      )}
+      {MULTI_PARCEL_ORDERS_ENABLED && order.isMultiParcel && order.parcelSummary.awaitingReturn > 0 && (
+        <div className="mt-2">
+          <ParcelReturnConfirm order={order} onChange={onChange} />
         </div>
       )}
 

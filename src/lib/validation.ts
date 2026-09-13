@@ -226,11 +226,24 @@ export const parcelDeliverSchema = z.object({
 
 export type ParcelDeliverInput = z.infer<typeof parcelDeliverSchema>;
 
+// დაბრუნების ფაქტობრივი დადასტურება — RETURN_REQUESTED ამანათი ფიზიკურად
+// უკვე დაუბრუნდა გამგზავნს. მიზეზი/დრო უკვე ცნობილია (ჩაბარების მცდელობიდან) —
+// აქ მხოლოდ დამატებითი შენიშვნაა არჩევითი.
+export const parcelReturnConfirmSchema = z.object({
+  returnedCount: z.number().int().min(0).max(300),
+  note: z.string().trim().max(300).optional(),
+});
+
+export type ParcelReturnConfirmInput = z.infer<typeof parcelReturnConfirmSchema>;
+
 // დისპეჩერის მარტივი ქმედება დარჩენილ (PENDING/NOT_PICKED_UP) რაოდენობაზე —
 // უკვე PICKED_UP/DELIVERED ამანათს არასდროს ეხება.
 export const resolvePickupSchema = z.object({
   action: z.enum(["REASSIGN", "WRITE_OFF"]),
   reason: z.string().trim().min(1, "მიუთითე მიზეზი").max(300),
+  // REASSIGN-ზე არჩევითი — თუ მითითებულია, დარჩენილი რაოდენობა სხვა
+  // (დამტკიცებულ) კურიერს გადაეცემა; თუ არა, იგივე კურიერს უბრუნდება.
+  driverId: z.string().cuid().optional(),
 });
 
 export type ResolvePickupInput = z.infer<typeof resolvePickupSchema>;

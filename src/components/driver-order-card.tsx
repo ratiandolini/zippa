@@ -17,6 +17,7 @@ import { ProofPhoto } from "@/components/proof-photo";
 import { ParcelPickupConfirm } from "@/components/parcel-pickup-confirm";
 import { ParcelDeliverConfirm } from "@/components/parcel-deliver-confirm";
 import { OrderParcelList } from "@/components/order-parcel-list";
+import { ParcelReturnConfirm } from "@/components/parcel-return-confirm";
 import type { OrderDTO } from "@/lib/serialize";
 import type { OrderStatus, OrderFailureReason } from "@prisma/client";
 
@@ -226,6 +227,9 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         <div className="mt-2">
           <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} finance={order.parcelFinance} />
         </div>
+      )}
+      {order.isMultiParcel && order.parcelSummary.awaitingReturn > 0 && (
+        <ParcelReturnConfirm order={order} onChange={onChange} />
       )}
 
       {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && order.deliveryProof === "PHOTO" && (

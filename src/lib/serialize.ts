@@ -27,6 +27,11 @@ export const orderInclude = {
   // მრავალამანათიანი შეკვეთა (Phase 1, read-only) — ლეგასი (isMultiParcel=false)
   // შეკვეთაზე ეს ცხრილი ცარიელია, ქვემოთ `parcels: []`-ს აბრუნებს.
   parcels: { orderBy: { sequenceNo: "asc" } },
+  // Phase 2 fix — DELIVERY_CHARGE/RETURN_FEE ჩანაწერები (parcelFinance-ის
+  // ერთადერთი წყარო, არა UI-გამოთვლა). ლეგასი შეკვეთაზეც შეიძლება არსებობდეს
+  // ძველი REFUND/COMPENSATION/GOODWILL ჩანაწერი — ეს ველი მხოლოდ parcelFinance-ს
+  // ემსახურება და customer-ისთვის ცალკე არ ბრუნდება.
+  adjustments: { select: { amount: true, kind: true, parcelId: true, settledAt: true } },
 } satisfies Prisma.OrderInclude;
 
 type OrderWith = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -38,9 +43,21 @@ export type OrderViewer = Extract<Role, "DISPATCHER" | "CUSTOMER" | "DRIVER">;
 
 export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER") {
   // ── ფინანსური სტატუსი ──
-  // კლიენტის ვალდებულება Zippa-სთან (გაუქმება/დაბრუნება), ჯერ არ მიღებული
-  const chargeTotal = Math.round((num(o.cancelFee) + num(o.returnFee)) * 100) / 100;
-  const chargeReceived = o.chargeSettledAt != null;
+  // კლიენტის ვალდებულება Zippa-სთან (გაუქმება/დაბრუნება), ჯერ არ მიღებული.
+  // მრავალამანათიან შეკვეთაზე იგივე ვალდებულება DELIVERY_CHARGE/RETURN_FEE
+  // ჩანაწერებშია (იხ. parcelFinance) — არა cancelFee/returnFee ველებში.
+  const unsettledLedgerCharge =
+    Math.round(
+      o.adjustments
+        .filter((a) => (a.kind === "DELIVERY_CHARGE" || a.kind === "RETURN_FEE") && !a.settledAt)
+        .reduce((s, a) => s - num(a.amount), 0) * 100,
+    ) / 100;
+  // cancelFee/returnFee (ლეგასი) ან ledger-charge (მრავალამანათიანი) — ორივე
+  // ერთდროულად ერთ Order-ზე პრაქტიკულად არ ხდება, მაგრამ ჯამი მაინც უსაფრთხოა.
+  const legacyCharge = Math.round((num(o.cancelFee) + num(o.returnFee)) * 100) / 100;
+  const legacyReceived = legacyCharge <= 0 || o.chargeSettledAt != null;
+  const chargeTotal = Math.round((legacyCharge + unsettledLedgerCharge) * 100) / 100;
+  const chargeReceived = legacyReceived && unsettledLedgerCharge <= 0;
   const customerOwed = chargeTotal > 0 && !chargeReceived ? chargeTotal : 0;
   // ამ შეკვეთაზე კურიერისთვის გადასახდელი (დარიცხული, ჯერ არ ჩართული payout-ში)
   const driverPayable =
@@ -183,27 +200,29 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
     // — ლეგასი შეკვეთაზე ყოველთვის [].
     isMultiParcel: o.isMultiParcel,
     parcelCount: o.parcelCount,
-    // სწრაფი შეჯამება UI-სთვის — "სულ/აღებული/ჩაბარებული/დარჩენილი/დასაბრუნებელი"
-    // (customer, driver, dispatcher — ერთი და იგივე derivation ყველგან).
+    // სწრაფი შეჯამება UI-სთვის — customer/driver/dispatcher ერთნაირად ხედავენ.
+    // CANCELLED (write-off) და NOT_PICKED_UP ცალკეა "დასაბრუნებლისგან" — ეს
+    // ორივე ფიზიკურად არასდროს ყოფილა კურიერთან, დასაბრუნებელი არაფერი აქვთ.
     parcelSummary: {
       total: o.parcelCount,
-      // CANCELLED (დისპეჩერის write-off) მხოლოდ PENDING/NOT_PICKED_UP-დან მოდის —
-      // ანუ ფაქტობრივად არასდროს აღებულა. "აღებული" ამიტომ ცალკეა გამორიცხული.
       pickedUp: o.parcels.filter(
         (p) => !["PENDING", "NOT_PICKED_UP", "CANCELLED"].includes(p.status),
       ).length,
       delivered: o.parcels.filter((p) => p.status === "DELIVERED").length,
-      // ჯერ კიდევ საქმის კურსშია — ხელახლა ასაღებია
-      remaining: o.parcels.filter((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP").length,
-      // საბოლოოდ ვერ ჩაბარდა — დასაბრუნებელია/ჩამოწერილია
-      returning: o.parcels.filter((p) =>
-        ["REFUSED", "RETURN_REQUESTED", "RETURNED", "FAILED", "CANCELLED"].includes(p.status),
-      ).length,
+      // ჩაბარება ვერ მოხერხდა, მაგრამ ფიზიკურად ჯერ კურიერთანაა — დაბრუნება ჯერ არ დადასტურებულა
+      awaitingReturn: o.parcels.filter((p) => p.status === "RETURN_REQUESTED").length,
+      // ფაქტობრივად უკვე დაბრუნებულია გამგზავნთან (/parcels/return-confirm)
+      returned: o.parcels.filter((p) => p.status === "RETURNED").length,
+      // ჯერ არც აღებულა, ჯერ კიდევ ხელახლა-საცდელია
+      notPickedUp: o.parcels.filter((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP").length,
+      // დისპეჩერის write-off — არასდროს აღებულა
+      cancelled: o.parcels.filter((p) => p.status === "CANCELLED").length,
     },
-    // Phase 2 fix — ფინანსური შეჯამება მხოლოდ დასრულებულ (DELIVERED/PARTIALLY_COMPLETED/
-    // FAILED) მრავალამანათიან შეკვეთაზე. სრულად გამოთვლილია parcels.allocated*-იდან —
-    // Order.deliveryPrice/driverFee/totalPrice (საწყისი snapshot) არსად არ იცვლება,
-    // ასე რომ ეს ბლოკი ყოველთვის ხელახლა აღდგენადია, მონაცემი არ იკარგება.
+    // Phase 2 fix — ფინანსური შეჯამება, მხოლოდ დასრულებულ (DELIVERED/PARTIALLY_COMPLETED/
+    // FAILED) მრავალამანათიან შეკვეთაზე. `finalPayable`/`unsettledPayable` პირდაპირ
+    // ამ Order-ის CustomerAdjustment(DELIVERY_CHARGE/RETURN_FEE) ჩანაწერების ჯამია —
+    // იგივე ჩანაწერები, რასაც COD/remittance route-ები რეალურად კითხულობენ და ასახლებენ.
+    // Order.deliveryPrice/driverFee/totalPrice (საწყისი snapshot) არსად არ იცვლება.
     parcelFinance:
       o.isMultiParcel && ["DELIVERED", "PARTIALLY_COMPLETED", "FAILED"].includes(o.status)
         ? (() => {
@@ -212,22 +231,25 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
               Math.round(delivered.reduce((s, p) => s + num(p.allocatedDeliveryPrice), 0) * 100) / 100;
             const earnedDriverFee =
               Math.round(delivered.reduce((s, p) => s + num(p.allocatedDriverFee), 0) * 100) / 100;
-            const ratio = o.parcelCount > 0 ? delivered.length / o.parcelCount : 0;
-            const earnedCodFeeShare = Math.round(num(o.codFee) * ratio * 100) / 100;
-            const earnedTotal = Math.round((earnedDeliveryPrice + earnedCodFeeShare) * 100) / 100;
             const originalTotal = num(o.totalPrice);
-            const waivedAmount = Math.round((originalTotal - earnedTotal) * 100) / 100;
-            const returnFee = num(o.returnFee);
+
+            const charges = o.adjustments.filter((a) => a.kind === "DELIVERY_CHARGE" || a.kind === "RETURN_FEE");
+            const sum = (rows: typeof charges) => Math.round(rows.reduce((s, a) => s - num(a.amount), 0) * 100) / 100;
+            const finalPayable = sum(charges);
+            const unsettledPayable = sum(charges.filter((a) => !a.settledAt));
+            const waivedAmount = Math.round((originalTotal - earnedDeliveryPrice) * 100) / 100;
+
             return {
               originalTotal,
               originalDeliveryPrice: num(o.deliveryPrice),
               originalDriverFee: num(o.driverFee),
-              earnedTotal,
               earnedDeliveryPrice,
               earnedDriverFee,
               waivedAmount,
-              returnFee,
-              finalPayable: Math.round((earnedTotal + returnFee) * 100) / 100,
+              // ჯამური, ლეჯერიდან წამოსული (არა UI-გამოთვლილი) საბოლოო თანხა
+              finalPayable,
+              unsettledPayable,
+              settled: charges.length > 0 && unsettledPayable === 0,
             };
           })()
         : null,

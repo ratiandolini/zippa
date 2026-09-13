@@ -24,6 +24,7 @@ async function withMultiParcelEnabled<T>(fn: (mods: {
   pickup: typeof import("@/app/api/orders/[id]/parcels/pickup/route").PATCH;
   deliver: typeof import("@/app/api/orders/[id]/parcels/deliver/route").PATCH;
   resolvePickup: typeof import("@/app/api/orders/[id]/parcels/resolve-pickup/route").PATCH;
+  returnConfirm: typeof import("@/app/api/orders/[id]/parcels/return-confirm/route").PATCH;
 }) => Promise<T>): Promise<T> {
   vi.resetModules();
   vi.stubEnv("NEXT_PUBLIC_MULTI_PARCEL_ORDERS_ENABLED", "true");
@@ -31,8 +32,9 @@ async function withMultiParcelEnabled<T>(fn: (mods: {
   const { PATCH: pickup } = await import("@/app/api/orders/[id]/parcels/pickup/route");
   const { PATCH: deliver } = await import("@/app/api/orders/[id]/parcels/deliver/route");
   const { PATCH: resolvePickup } = await import("@/app/api/orders/[id]/parcels/resolve-pickup/route");
+  const { PATCH: returnConfirm } = await import("@/app/api/orders/[id]/parcels/return-confirm/route");
   try {
-    return await fn({ createOrder, pickup, deliver, resolvePickup });
+    return await fn({ createOrder, pickup, deliver, resolvePickup, returnConfirm });
   } finally {
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -159,8 +161,14 @@ describe("მრავალამანათიანი შეკვეთა
       // snapshot (price.*) არასდროს არ იცვლება — ესეც სრულ ჩაბარებაზეც
       expect(r.body.order.price.delivery).toBe(originalDeliveryPrice);
       expect(r.body.order.paymentStatus).toBe("PAID");
-      expect(r.body.order.parcelFinance.earnedTotal).toBe(r.body.order.parcelFinance.originalTotal);
+      expect(r.body.order.parcelFinance.finalPayable).toBe(r.body.order.parcelFinance.originalTotal);
       expect(r.body.order.parcelFinance.waivedAmount).toBe(0);
+
+      // ledger — ერთი DELIVERY_CHARGE ჩანაწერი, არა UI-გამოთვლა
+      const adj = await prisma.customerAdjustment.findMany({ where: { orderId } });
+      expect(adj).toHaveLength(1);
+      expect(adj[0].kind).toBe("DELIVERY_CHARGE");
+      expect(Number(adj[0].amount)).toBe(-5);
 
       const earning = await prisma.driverEarning.findFirst({ where: { orderId } });
       expect(earning).toBeTruthy();
@@ -197,30 +205,40 @@ describe("მრავალამანათიანი შეკვეთა
       expect(r.body.order.price.driverFee).toBe(2.5);
       // COD/collectAmount ოპერაციულად საჭიროა (remittance) — ეს განახლდება ფაქტობრივზე
       expect(r.body.order.collectAmount).toBe(60); // 100 * 3/5
-      // parcelFinance — derived, ფაქტობრივად შესრულებული ნაწილი
+      // parcelFinance — ledger-based (CustomerAdjustment-ის ჯამი), არა UI-გამოთვლა
       expect(r.body.order.parcelFinance.originalTotal).toBe(5);
-      expect(r.body.order.parcelFinance.earnedTotal).toBe(3);
+      expect(r.body.order.parcelFinance.finalPayable).toBe(3);
+      expect(r.body.order.parcelFinance.unsettledPayable).toBe(3);
       expect(r.body.order.parcelFinance.earnedDriverFee).toBe(1.5);
       expect(r.body.order.parcelFinance.waivedAmount).toBe(2);
 
       const parcels = await prisma.orderParcel.findMany({ where: { orderId }, orderBy: { sequenceNo: "asc" } });
       expect(parcels.filter((p) => p.status === "DELIVERED")).toHaveLength(3);
-      expect(parcels.filter((p) => p.status === "REFUSED")).toHaveLength(2);
+      // ვერ-ჩაბარებული ფიზიკურად კვლავ კურიერთანაა — RETURN_REQUESTED, არა REFUSED/FAILED
+      expect(parcels.filter((p) => p.status === "RETURN_REQUESTED")).toHaveLength(2);
 
+      // ერთი ledger ჩანაწერი მთელი ფინალიზაციისთვის — DELIVERY_CHARGE, არა REFUND-per-parcel
       const adjustments = await prisma.customerAdjustment.findMany({ where: { orderId } });
-      expect(adjustments).toHaveLength(2);
-      expect(adjustments.every((a) => a.parcelId != null)).toBe(true);
-      const sumAdjust = adjustments.reduce((s, a) => s + Number(a.amount), 0);
-      expect(Math.round(sumAdjust * 100) / 100).toBe(2); // 5 - 3 = 2
+      expect(adjustments).toHaveLength(1);
+      expect(adjustments[0].kind).toBe("DELIVERY_CHARGE");
+      expect(adjustments[0].parcelId).toBeNull();
+      expect(Number(adjustments[0].amount)).toBe(-3); // კლიენტი ევალება ზუსტად 3-ს
 
-      // COD remittance query ხედავს PARTIALLY_COMPLETED-საც
+      // COD remittance query ხედავს PARTIALLY_COMPLETED-საც და ledger-charge-საც
       const { GET: codView } = await import("@/app/api/dispatch/cod/route");
       actAs(session(await makeUser("DISPATCHER")));
       const codRes = await call(codView, {});
-      const row = (codRes.body.outstanding as { customerId: string; gross: number }[]).find(
-        (rr) => rr.customerId === c.id,
-      );
+      const row = (codRes.body.outstanding as {
+        customerId: string;
+        gross: number;
+        commission: number;
+        credits: number;
+        net: number;
+      }[]).find((rr) => rr.customerId === c.id);
       expect(row?.gross).toBe(60);
+      expect(row?.credits).toBe(-3); // DELIVERY_CHARGE — კლიენტს აკლდება
+      // net = gross − commission − charges + credits (codCommission earned proportionally: 2*3/5=1.2)
+      expect(row?.net).toBe(Math.round((60 - (row?.commission ?? 0) + -3) * 100) / 100);
     });
   });
 
@@ -245,8 +263,12 @@ describe("მრავალამანათიანი შეკვეთა
       expect(r.body.order.status).toBe("FAILED");
       // snapshot (price.delivery) უცვლელია FAILED-ზეც
       expect(r.body.order.price.delivery).toBe(5);
-      expect(r.body.order.parcelFinance.earnedTotal).toBe(0);
+      expect(r.body.order.parcelFinance.finalPayable).toBe(0);
       expect(r.body.order.parcelFinance.waivedAmount).toBe(5);
+
+      // 0 ჩაბარებულზე DELIVERY_CHARGE არ იქმნება — არაფერი არ ერიცხება კლიენტს
+      const adj = await prisma.customerAdjustment.findMany({ where: { orderId } });
+      expect(adj).toHaveLength(0);
 
       const earning = await prisma.driverEarning.findFirst({ where: { orderId } });
       expect(earning).toBeNull();
@@ -292,8 +314,10 @@ describe("მრავალამანათიანი შეკვეთა
         total: 5,
         pickedUp: 3,
         delivered: 0,
-        remaining: 0,
-        returning: 2,
+        awaitingReturn: 0,
+        returned: 0,
+        notPickedUp: 0,
+        cancelled: 2,
       });
 
       const events = await prisma.orderParcelEvent.findMany({
@@ -434,7 +458,7 @@ describe("მრავალამანათიანი შეკვეთა
       expect(r2.status).toBe(409);
 
       const adjustments = await prisma.customerAdjustment.findMany({ where: { orderId } });
-      expect(adjustments).toHaveLength(2); // და არა 4
+      expect(adjustments).toHaveLength(1); // ერთი DELIVERY_CHARGE ჩანაწერი, და არა ორმაგად 2
 
       const earnings = await prisma.driverEarning.findMany({ where: { orderId } });
       expect(earnings).toHaveLength(1); // და არა 2
@@ -515,9 +539,187 @@ describe("მრავალამანათიანი შეკვეთა
     });
   });
 
+  it("დაბრუნების ნამდვილი flow: RETURN_REQUESTED → return-confirm → RETURNED, RETURN_FEE ლეჯერით, idempotent", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, returnConfirm }) => {
+      const c = await makeUser("CUSTOMER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 4 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 4 } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+
+      const del = await call(deliver, {
+        params: { id: orderId },
+        body: { deliveredCount: 2, reason: "RECIPIENT_REFUSED" },
+      });
+      expect(del.status).toBe(200);
+      expect(del.body.order.parcelSummary.awaitingReturn).toBe(2);
+      expect(del.body.order.parcelSummary.returned).toBe(0);
+      // ჯერ არაფერი დაბრუნებულა — returnFee ჯერ არ დარიცხულა
+      let adj = await prisma.customerAdjustment.findMany({ where: { orderId } });
+      expect(adj.filter((a) => a.kind === "RETURN_FEE")).toHaveLength(0);
+
+      const noneYet = await call(returnConfirm, {
+        params: { id: orderId },
+        body: { returnedCount: 1 },
+      });
+      expect(noneYet.status).toBe(200);
+      expect(noneYet.body.order.parcelSummary.awaitingReturn).toBe(1);
+      expect(noneYet.body.order.parcelSummary.returned).toBe(1);
+
+      adj = await prisma.customerAdjustment.findMany({ where: { orderId, kind: "RETURN_FEE" } });
+      expect(adj).toHaveLength(1);
+      expect(adj[0].parcelId).not.toBeNull();
+      // allocatedDeliveryPrice თითო ამანათზე = 5/4 = 1.25; returnFee = 1.25*0.5 = 0.625 → 0.63
+      expect(Number(adj[0].amount)).toBeCloseTo(-0.63, 2);
+
+      // დანარჩენი 1-იც დაბრუნდა
+      const rest = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 1 } });
+      expect(rest.status).toBe(200);
+      expect(rest.body.order.parcelSummary.awaitingReturn).toBe(0);
+      expect(rest.body.order.parcelSummary.returned).toBe(2);
+
+      // idempotent — აღარაფერია დასაბრუნებელი, მესამე request 409-ია, ორმაგი დარიცხვა არ ხდება
+      const again = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 1 } });
+      expect(again.status).toBe(409);
+
+      const finalAdj = await prisma.customerAdjustment.findMany({ where: { orderId, kind: "RETURN_FEE" } });
+      expect(finalAdj).toHaveLength(2); // ზუსტად ორი — თითო ამანათზე ერთხელ
+    });
+  });
+
+  it("resolve-pickup REASSIGN — სხვა კურიერზე მინიჭება დაბლოკილია (409), იგივე კურიერზე დაშვებული", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      const otherDrv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 4 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 2, reason: "ორი დაკეტილი" } });
+
+      actAs(session(disp));
+      const blocked = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "REASSIGN", reason: "სცადე", driverId: otherDrv.profile.id },
+      });
+      expect(blocked.status).toBe(409);
+
+      const same = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "REASSIGN", reason: "სცადე", driverId: drv.profile.id },
+      });
+      expect(same.status).toBe(200);
+      expect(same.body.order.driverId).toBe(drv.profile.id);
+    });
+  });
+
+  it("12-ამანათიანი მაგალითი: 9 აღებული, 7 ჩაბარებული, 2 დაბრუნებული, 3 ვერ აღებული", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, resolvePickup, returnConfirm }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 12 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+
+      actAs(session(drv.user));
+      // 9/12 აღებული, 3 დარჩა NOT_PICKED_UP
+      const p1 = await call(pickup, {
+        params: { id: orderId },
+        body: { pickedUpCount: 9, reason: "3 მისამართზე ვერ დაუკავშირდა" },
+      });
+      expect(p1.status).toBe(200);
+      expect(p1.body.order.parcelSummary).toMatchObject({ total: 12, pickedUp: 9, notPickedUp: 3 });
+
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+
+      // ვერ დაფინალდება — 3 ჯერ კიდევ NOT_PICKED_UP
+      const blocked = await call(deliver, { params: { id: orderId }, body: { deliveredCount: 7, reason: "RECIPIENT_REFUSED" } });
+      expect(blocked.status).toBe(409);
+
+      // დისპეჩერი წერს ჩამოწერაზე დარჩენილ 3-ს
+      actAs(session(disp));
+      await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "3 დღეზე მეტია ვერ აუღიათ" },
+      });
+
+      // 7 ჩაბარებული, 2 უარი (RETURN_REQUESTED)
+      actAs(session(drv.user));
+      const del = await call(deliver, {
+        params: { id: orderId },
+        body: { deliveredCount: 7, reason: "RECIPIENT_REFUSED", note: "2 მისამართზე უარი თქვეს" },
+      });
+      expect(del.status).toBe(200);
+      expect(del.body.order.status).toBe("PARTIALLY_COMPLETED");
+      expect(del.body.order.parcelSummary).toEqual({
+        total: 12,
+        pickedUp: 9,
+        delivered: 7,
+        awaitingReturn: 2,
+        returned: 0,
+        notPickedUp: 0,
+        cancelled: 3,
+      });
+
+      // ორივე უარი-თქმული ბრუნდება გამგზავნთან
+      const ret = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 2 } });
+      expect(ret.status).toBe(200);
+      expect(ret.body.order.parcelSummary).toEqual({
+        total: 12,
+        pickedUp: 9,
+        delivered: 7,
+        awaitingReturn: 0,
+        returned: 2,
+        notPickedUp: 0,
+        cancelled: 3,
+      });
+
+      // ფინანსები: deliveryPrice 5₾ → allocated 12-ზე; 7 ჩაბარებულზე earnedDeliveryPrice
+      const parcels = await prisma.orderParcel.findMany({ where: { orderId } });
+      const sumAll = parcels.reduce((s, p) => s + Number(p.allocatedDeliveryPrice), 0);
+      expect(Math.round(sumAll * 100) / 100).toBe(5); // ჯამი ყოველთვის ორიგინალს უტოლდება
+
+      const chargeAdj = await prisma.customerAdjustment.findMany({ where: { orderId, kind: "DELIVERY_CHARGE" } });
+      expect(chargeAdj).toHaveLength(1);
+      const returnAdj = await prisma.customerAdjustment.findMany({ where: { orderId, kind: "RETURN_FEE" } });
+      expect(returnAdj).toHaveLength(2);
+
+      const finalOrder = await call(getOrder, { params: { id: orderId } });
+      const pf = finalOrder.body.order.parcelFinance;
+      expect(pf.originalTotal).toBe(5);
+      // snapshot ველები არასდროს იცვლება
+      expect(finalOrder.body.order.price.delivery).toBe(5);
+      expect(finalOrder.body.order.price.driverFee).toBe(2.5);
+      // საბოლოო გადასახდელი = DELIVERY_CHARGE + RETURN_FEE-ების ჯამი ლეჯერიდან
+      const expectedFinal =
+        Math.round((-Number(chargeAdj[0].amount) + returnAdj.reduce((s, a) => s - Number(a.amount), 0)) * 100) / 100;
+      expect(pf.finalPayable).toBe(expectedFinal);
+    });
+  });
+
   it("Phase 2 endpoint-ები flag გამორთვისას 404-ს აბრუნებენ", async () => {
     const { PATCH: pickup } = await import("@/app/api/orders/[id]/parcels/pickup/route");
     const r = await call(pickup, { params: { id: "nonexistent" }, body: { pickedUpCount: 1 } });
     expect(r.status).toBe(404);
+
+    const { PATCH: returnConfirm } = await import("@/app/api/orders/[id]/parcels/return-confirm/route");
+    const r2 = await call(returnConfirm, { params: { id: "nonexistent" }, body: { returnedCount: 1 } });
+    expect(r2.status).toBe(404);
+
+    const { PATCH: resolvePickup } = await import("@/app/api/orders/[id]/parcels/resolve-pickup/route");
+    const r3 = await call(resolvePickup, {
+      params: { id: "nonexistent" },
+      body: { action: "WRITE_OFF", reason: "x" },
+    });
+    expect(r3.status).toBe(404);
   });
 });

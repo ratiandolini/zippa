@@ -39,7 +39,7 @@ export function ParcelResolvePickup({ order, onChange }: { order: OrderDTO; onCh
     return (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-[11px]">
         <span className="text-amber-900">
-          დარჩენილი {order.parcelSummary.remaining} ამანათი — ვერ აიღეს
+          დარჩენილი {order.parcelSummary.notPickedUp} ამანათი — ვერ აიღეს
         </span>
         <div className="ml-auto flex gap-1.5">
           {canReassign && (
@@ -66,7 +66,7 @@ export function ParcelResolvePickup({ order, onChange }: { order: OrderDTO; onCh
   return (
     <div className="rounded-md border border-border bg-muted/40 p-2">
       <p className="text-[11px] font-medium">
-        {action === "REASSIGN" ? "ხელახლა მინიჭება" : "ჩამოწერა"} — {order.parcelSummary.remaining} ამანათი
+        {action === "REASSIGN" ? "ხელახლა მინიჭება" : "ჩამოწერა"} — {order.parcelSummary.notPickedUp} ამანათი
       </p>
       <textarea
         value={reason}

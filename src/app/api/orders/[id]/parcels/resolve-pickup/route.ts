@@ -5,15 +5,23 @@ import { orderInclude, serializeOrder } from "@/lib/serialize";
 import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import { notifyDriver } from "@/lib/notify";
 
-// Phase 2 fix — დისპეჩერის მარტივი ქმედება დარჩენილ (ჯერ არაღებულ) რაოდენობაზე:
-//  - REASSIGN: შეკვეთის სტატუსი უბრუნდება EN_ROUTE_PICKUP-ს — იგივე კურიერი
-//    ხელახლა მიდის დარჩენილი ამანათებისთვის. დაშვებულია მხოლოდ PICKED_UP-დან
-//    (ნაწილი უკვე აღებულია, დანარჩენი — NOT_PICKED_UP).
-//  - WRITE_OFF: დარჩენილი (PENDING/NOT_PICKED_UP) ამანათები CANCELLED-ზე გადადის,
-//    დაშვებულია ნებისმიერ დროს (ფინალიზაციამდეც და მერეც). არასდროს ეხება
-//    უკვე PICKED_UP/DELIVERED/სხვა-სტატუსიან ამანათს. ფინანსური adjustment
-//    ცალკე არ იქმნება აქ — [id]/parcels/deliver-ის ფინალიზაცია უკვე ითვლის
-//    ყველა არა-DELIVERED ამანათს (write-off-ის ჩათვლით) ერთხელ.
+// Phase 2 fix — დისპეჩერის მარტივი ქმედება დარჩენილ (ჯერ არაღებულ — PENDING/
+// NOT_PICKED_UP) რაოდენობაზე. არასდროს ეხება PICKED_UP/DELIVERED/RETURN_REQUESTED/
+// RETURNED ამანათს — `remaining` მასივი წინასწარ გაფილტრულია.
+//
+//  - REASSIGN: შეკვეთის სტატუსი უბრუნდება EN_ROUTE_PICKUP-ს, რომ დარჩენილი
+//    ისევ ასაღები გახდეს. დაშვებულია მხოლოდ PICKED_UP-დან (ნაწილი უკვე
+//    აღებულია, დანარჩენი — NOT_PICKED_UP).
+//    სხვა კურიერზე მინიჭება (body.driverId !== order.driverId) განზრახ
+//    დაბლოკილია: driverId ამ არქიტექტურაში მთელ Order-ს ეკუთვნის, არა
+//    ცალკეულ parcel-ს — გადართვა ახლანდელ კურიერს წაართმევდა უკვე
+//    ხელში-არსებული (PICKED_UP) ამანათების ხილვადობასაც. Parcel-დონის
+//    კურიერის მინიჭება მომავალი ფაზის საკითხია.
+//  - WRITE_OFF: დარჩენილი ამანათები CANCELLED-ზე გადადის, დაშვებულია
+//    ნებისმიერ დროს (ფინალიზაციამდეც და მერეც). ფინანსური adjustment ცალკე
+//    არ იქმნება აქ — [id]/parcels/deliver-ის ფინალიზაცია ან ეს parcel უბრალოდ
+//    "delivered:0"-ის წილში აღარ ითვლება, ფინანსური გავლენა არ აქვს (არასდროს
+//    დარიცხულა მისი მიტანის საფასური).
 export function PATCH(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     if (!MULTI_PARCEL_ORDERS_ENABLED) return fail(404, "ვერ მოიძებნა");
@@ -39,9 +47,23 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         409,
         "ხელახლა მინიჭება შესაძლებელია მხოლოდ მას შემდეგ, რაც ნაწილი უკვე აღებულია",
       );
+    if (body.action === "REASSIGN" && body.driverId && body.driverId !== order.driverId)
+      throw new ApiError(
+        409,
+        "სხვა კურიერზე მინიჭება ამ ეტაპზე არ არის მხარდაჭერილი — ამანათი მთელ შეკვეთას ეკუთვნის, არა კონკრეტულ კურიერს",
+      );
 
     const updated = await prisma.$transaction(async (tx) => {
       for (const p of remaining) {
+        if (body.action === "WRITE_OFF") {
+          // compare-and-swap — პარალელური/განმეორებითი request-ი იმავე ამანათს
+          // მეორედ ვერ ჩამოწერს
+          const claimed = await tx.orderParcel.updateMany({
+            where: { id: p.id, status: p.status },
+            data: { status: "CANCELLED", cancelledAt: new Date(), failureNote: body.reason },
+          });
+          if (claimed.count === 0) continue;
+        }
         await tx.orderParcelEvent.create({
           data: {
             parcelId: p.id,
@@ -50,12 +72,6 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
             actorId: session.sub,
           },
         });
-        if (body.action === "WRITE_OFF") {
-          await tx.orderParcel.update({
-            where: { id: p.id },
-            data: { status: "CANCELLED", cancelledAt: new Date(), failureNote: body.reason },
-          });
-        }
       }
 
       return tx.order.update({
