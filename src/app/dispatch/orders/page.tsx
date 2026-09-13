@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { useOrders, type DriverListItem } from "@/lib/hooks";
 import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, streetOf, FINANCE_STATUS_LABEL, POST_PICKUP_STATUSES, RETURN_FEE_PCT } from "@/lib/domain";
+import {
+  GEL,
+  streetOf,
+  FINANCE_STATUS_LABEL,
+  POST_PICKUP_STATUSES,
+  TERMINAL_ORDER_STATUSES,
+  RETURN_FEE_PCT,
+} from "@/lib/domain";
 import type { OrderDTO } from "@/lib/serialize";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ProofPhoto } from "@/components/proof-photo";
 import { OrderParcelList } from "@/components/order-parcel-list";
+import { ParcelResolvePickup } from "@/components/parcel-resolve-pickup";
 import { MULTI_PARCEL_ORDERS_ENABLED } from "@/lib/flags";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +27,7 @@ const columns: { key: OrderDTO["status"][]; title: string; done?: boolean }[] = 
   { key: ["PENDING"], title: "მოლოდინში" },
   { key: ["ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"], title: "მინიჭებული" },
   { key: ["PICKED_UP", "IN_TRANSIT"], title: "გზაშია" },
+  { key: ["PARTIALLY_COMPLETED"], title: "ნაწილობრივ შესრულებული" },
   { key: ["DELIVERED", "FAILED", "CANCELLED"], title: "დასრულებული", done: true },
 ];
 
@@ -241,8 +250,6 @@ function RouteAssignBar({
   );
 }
 
-const TERMINAL = ["DELIVERED", "CANCELLED", "FAILED"];
-
 function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void }) {
   const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -253,11 +260,18 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
   const canAssign =
     order.status === "PENDING" || order.status === "ASSIGNED" || order.status === "FAILED";
   const isReturn = POST_PICKUP_STATUSES.includes(order.status);
-  const canCancel = !TERMINAL.includes(order.status);
+  // მრავალამანათიან შეკვეთაზე post-pickup გაუქმება /status-იდან დაბლოკილია
+  // (იხ. [id]/status/route.ts) — დარჩენილი რაოდენობის მართვა ცალკე ბლოკშია ქვემოთ.
+  const canCancel =
+    !TERMINAL_ORDER_STATUSES.includes(order.status) &&
+    !(order.isMultiParcel && POST_PICKUP_STATUSES.includes(order.status));
   const canEdit = ["PENDING", "ASSIGNED", "ACCEPTED", "EN_ROUTE_PICKUP"].includes(order.status);
   const canDelete = order.status === "DRAFT";
   const canAdjust =
-    order.status === "FAILED" || order.status === "CANCELLED" || !!order.returnRequestedAt;
+    order.status === "FAILED" ||
+    order.status === "PARTIALLY_COMPLETED" ||
+    order.status === "CANCELLED" ||
+    !!order.returnRequestedAt;
   const canFixPrice = order.status === "PENDING" || order.status === "ASSIGNED";
   const [fixingPrice, setFixingPrice] = useState(false);
 
@@ -366,7 +380,12 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
 
       {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
         <div className="mt-2">
-          <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} />
+          <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} finance={order.parcelFinance} />
+        </div>
+      )}
+      {MULTI_PARCEL_ORDERS_ENABLED && order.isMultiParcel && order.parcelSummary.remaining > 0 && (
+        <div className="mt-2">
+          <ParcelResolvePickup order={order} onChange={onChange} />
         </div>
       )}
 

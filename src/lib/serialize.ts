@@ -183,16 +183,50 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
     // — ლეგასი შეკვეთაზე ყოველთვის [].
     isMultiParcel: o.isMultiParcel,
     parcelCount: o.parcelCount,
-    // სწრაფი შეჯამება UI-სთვის — "სულ/აღებული/ჩაბარებული/დარჩენილი-დასაბრუნებელი"
+    // სწრაფი შეჯამება UI-სთვის — "სულ/აღებული/ჩაბარებული/დარჩენილი/დასაბრუნებელი"
+    // (customer, driver, dispatcher — ერთი და იგივე derivation ყველგან).
     parcelSummary: {
       total: o.parcelCount,
       pickedUp: o.parcels.filter((p) => p.status !== "PENDING" && p.status !== "NOT_PICKED_UP").length,
       delivered: o.parcels.filter((p) => p.status === "DELIVERED").length,
+      // ჯერ კიდევ საქმის კურსშია — ხელახლა ასაღებია
       remaining: o.parcels.filter((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP").length,
+      // საბოლოოდ ვერ ჩაბარდა — დასაბრუნებელია/ჩამოწერილია
       returning: o.parcels.filter((p) =>
-        ["REFUSED", "RETURN_REQUESTED", "RETURNED", "FAILED"].includes(p.status),
+        ["REFUSED", "RETURN_REQUESTED", "RETURNED", "FAILED", "CANCELLED"].includes(p.status),
       ).length,
     },
+    // Phase 2 fix — ფინანსური შეჯამება მხოლოდ დასრულებულ (DELIVERED/PARTIALLY_COMPLETED/
+    // FAILED) მრავალამანათიან შეკვეთაზე. სრულად გამოთვლილია parcels.allocated*-იდან —
+    // Order.deliveryPrice/driverFee/totalPrice (საწყისი snapshot) არსად არ იცვლება,
+    // ასე რომ ეს ბლოკი ყოველთვის ხელახლა აღდგენადია, მონაცემი არ იკარგება.
+    parcelFinance:
+      o.isMultiParcel && ["DELIVERED", "PARTIALLY_COMPLETED", "FAILED"].includes(o.status)
+        ? (() => {
+            const delivered = o.parcels.filter((p) => p.status === "DELIVERED");
+            const earnedDeliveryPrice =
+              Math.round(delivered.reduce((s, p) => s + num(p.allocatedDeliveryPrice), 0) * 100) / 100;
+            const earnedDriverFee =
+              Math.round(delivered.reduce((s, p) => s + num(p.allocatedDriverFee), 0) * 100) / 100;
+            const ratio = o.parcelCount > 0 ? delivered.length / o.parcelCount : 0;
+            const earnedCodFeeShare = Math.round(num(o.codFee) * ratio * 100) / 100;
+            const earnedTotal = Math.round((earnedDeliveryPrice + earnedCodFeeShare) * 100) / 100;
+            const originalTotal = num(o.totalPrice);
+            const waivedAmount = Math.round((originalTotal - earnedTotal) * 100) / 100;
+            const returnFee = num(o.returnFee);
+            return {
+              originalTotal,
+              originalDeliveryPrice: num(o.deliveryPrice),
+              originalDriverFee: num(o.driverFee),
+              earnedTotal,
+              earnedDeliveryPrice,
+              earnedDriverFee,
+              waivedAmount,
+              returnFee,
+              finalPayable: Math.round((earnedTotal + returnFee) * 100) / 100,
+            };
+          })()
+        : null,
     parcels: o.parcels.map((p) => ({
       id: p.id,
       sequenceNo: p.sequenceNo,

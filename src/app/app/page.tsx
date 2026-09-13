@@ -121,7 +121,12 @@ export default function CustomerHome() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Line label="შეკვეთები" value={String(orders.length)} />
-            <Line label="ჩაბარებული" value={String(orders.filter((o) => o.status === "DELIVERED").length)} />
+            <Line
+              label="ჩაბარებული"
+              value={String(
+                orders.filter((o) => o.status === "DELIVERED" || o.status === "PARTIALLY_COMPLETED").length,
+              )}
+            />
             <Line label="დახარჯული" value={GEL(monthSpend)} />
             {cod && cod.history.length > 0 && (
               <Link href="/app/cod" className="block pt-1 text-sm text-accent hover:underline">

@@ -224,6 +224,10 @@ enum OrderStatus {
   PICKED_UP // ამანათი აღებულია
   IN_TRANSIT // გზაშია
   DELIVERED // ჩაბარებულია
+  // მრავალამანათიანი შეკვეთა — ნაწილი ჩაბარდა (delivered > 0), დანარჩენი
+  // NOT_PICKED_UP/REFUSED/RETURN_REQUESTED/RETURNED/CANCELLED-ზეა. მხოლოდ
+  // [id]/parcels/deliver-ის ფინალიზაციით ინიშნება — არასდროს ხელით.
+  PARTIALLY_COMPLETED
   CANCELLED
   FAILED // მიტანა ჩაიშალა
 }

@@ -23,14 +23,16 @@ async function withMultiParcelEnabled<T>(fn: (mods: {
   createOrder: typeof import("@/app/api/orders/route").POST;
   pickup: typeof import("@/app/api/orders/[id]/parcels/pickup/route").PATCH;
   deliver: typeof import("@/app/api/orders/[id]/parcels/deliver/route").PATCH;
+  resolvePickup: typeof import("@/app/api/orders/[id]/parcels/resolve-pickup/route").PATCH;
 }) => Promise<T>): Promise<T> {
   vi.resetModules();
   vi.stubEnv("NEXT_PUBLIC_MULTI_PARCEL_ORDERS_ENABLED", "true");
   const { POST: createOrder } = await import("@/app/api/orders/route");
   const { PATCH: pickup } = await import("@/app/api/orders/[id]/parcels/pickup/route");
   const { PATCH: deliver } = await import("@/app/api/orders/[id]/parcels/deliver/route");
+  const { PATCH: resolvePickup } = await import("@/app/api/orders/[id]/parcels/resolve-pickup/route");
   try {
-    return await fn({ createOrder, pickup, deliver });
+    return await fn({ createOrder, pickup, deliver, resolvePickup });
   } finally {
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -137,7 +139,7 @@ describe("მრავალამანათიანი შეკვეთა
     });
   });
 
-  it("ჩაბარება — სრული (5/5): status DELIVERED, ფასი უცვლელი, driverEarning სრული", async () => {
+  it("ჩაბარება — სრული (5/5): status DELIVERED, snapshot ფასი უცვლელი, driverEarning სრული", async () => {
     await withMultiParcelEnabled(async ({ createOrder, pickup, deliver }) => {
       const c = await makeUser("CUSTOMER");
       const drv = await makeDriver({ approved: true });
@@ -154,8 +156,11 @@ describe("მრავალამანათიანი შეკვეთა
       const r = await call(deliver, { params: { id: orderId }, body: { deliveredCount: 5 } });
       expect(r.status).toBe(200);
       expect(r.body.order.status).toBe("DELIVERED");
+      // snapshot (price.*) არასდროს არ იცვლება — ესეც სრულ ჩაბარებაზეც
       expect(r.body.order.price.delivery).toBe(originalDeliveryPrice);
       expect(r.body.order.paymentStatus).toBe("PAID");
+      expect(r.body.order.parcelFinance.earnedTotal).toBe(r.body.order.parcelFinance.originalTotal);
+      expect(r.body.order.parcelFinance.waivedAmount).toBe(0);
 
       const earning = await prisma.driverEarning.findFirst({ where: { orderId } });
       expect(earning).toBeTruthy();
@@ -163,7 +168,7 @@ describe("მრავალამანათიანი შეკვეთა
     });
   });
 
-  it("ჩაბარება — ნაწილობრივი (3/5): პროპორციული ფასი/COD/driverFee, CustomerAdjustment თითო ვერ-ჩაბარებულზე", async () => {
+  it("ჩაბარება — ნაწილობრივი (3/5): PARTIALLY_COMPLETED, snapshot ფასი უცვლელი, parcelFinance პროპორციული, CustomerAdjustment თითო ვერ-ჩაბარებულზე", async () => {
     await withMultiParcelEnabled(async ({ createOrder, pickup, deliver }) => {
       const c = await makeUser("CUSTOMER");
       const drv = await makeDriver({ approved: true });
@@ -186,11 +191,17 @@ describe("მრავალამანათიანი შეკვეთა
         body: { deliveredCount: 3, reason: "RECIPIENT_REFUSED", note: "არ იყო სახლში" },
       });
       expect(r.status).toBe(200);
-      expect(r.body.order.status).toBe("DELIVERED");
-      // deliveryPrice 5 → 3/5-ის წილი = 3
-      expect(r.body.order.price.delivery).toBe(3);
+      expect(r.body.order.status).toBe("PARTIALLY_COMPLETED");
+      // snapshot (price.delivery/driverFee) არასდროს არ იცვლება — მაშინაც, თუ ნაწილობრივია
+      expect(r.body.order.price.delivery).toBe(5);
+      expect(r.body.order.price.driverFee).toBe(2.5);
+      // COD/collectAmount ოპერაციულად საჭიროა (remittance) — ეს განახლდება ფაქტობრივზე
       expect(r.body.order.collectAmount).toBe(60); // 100 * 3/5
-      expect(r.body.order.price.driverFee).toBe(1.5); // 2.5 * 3/5
+      // parcelFinance — derived, ფაქტობრივად შესრულებული ნაწილი
+      expect(r.body.order.parcelFinance.originalTotal).toBe(5);
+      expect(r.body.order.parcelFinance.earnedTotal).toBe(3);
+      expect(r.body.order.parcelFinance.earnedDriverFee).toBe(1.5);
+      expect(r.body.order.parcelFinance.waivedAmount).toBe(2);
 
       const parcels = await prisma.orderParcel.findMany({ where: { orderId }, orderBy: { sequenceNo: "asc" } });
       expect(parcels.filter((p) => p.status === "DELIVERED")).toHaveLength(3);
@@ -201,10 +212,19 @@ describe("მრავალამანათიანი შეკვეთა
       expect(adjustments.every((a) => a.parcelId != null)).toBe(true);
       const sumAdjust = adjustments.reduce((s, a) => s + Number(a.amount), 0);
       expect(Math.round(sumAdjust * 100) / 100).toBe(2); // 5 - 3 = 2
+
+      // COD remittance query ხედავს PARTIALLY_COMPLETED-საც
+      const { GET: codView } = await import("@/app/api/dispatch/cod/route");
+      actAs(session(await makeUser("DISPATCHER")));
+      const codRes = await call(codView, {});
+      const row = (codRes.body.outstanding as { customerId: string; gross: number }[]).find(
+        (rr) => rr.customerId === c.id,
+      );
+      expect(row?.gross).toBe(60);
     });
   });
 
-  it("ჩაბარება — 0/5 → status FAILED, driverEarning არ იქმნება", async () => {
+  it("ჩაბარება — 0/5 → status FAILED, snapshot ფასი უცვლელი, driverEarning არ იქმნება", async () => {
     await withMultiParcelEnabled(async ({ createOrder, pickup, deliver }) => {
       const c = await makeUser("CUSTOMER");
       const drv = await makeDriver({ approved: true });
@@ -223,10 +243,234 @@ describe("მრავალამანათიანი შეკვეთა
       });
       expect(r.status).toBe(200);
       expect(r.body.order.status).toBe("FAILED");
-      expect(r.body.order.price.delivery).toBe(0);
+      // snapshot (price.delivery) უცვლელია FAILED-ზეც
+      expect(r.body.order.price.delivery).toBe(5);
+      expect(r.body.order.parcelFinance.earnedTotal).toBe(0);
+      expect(r.body.order.parcelFinance.waivedAmount).toBe(5);
 
       const earning = await prisma.driverEarning.findFirst({ where: { orderId } });
       expect(earning).toBeNull();
+    });
+  });
+
+  it("დისპეჩერის resolve-pickup: WRITE_OFF მხოლოდ დარჩენილს (NOT_PICKED_UP) ჩამოწერს, PICKED_UP ხელუხლებელია", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 5 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 3, reason: "ორი არავინ იყო" } });
+
+      actAs(session(disp));
+      const noReason = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "" },
+      });
+      expect(noReason.status).toBe(422);
+
+      const r = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "მომხმარებელმა თქვა აღარ სჭირდება" },
+      });
+      expect(r.status).toBe(200);
+
+      const parcels = await prisma.orderParcel.findMany({ where: { orderId }, orderBy: { sequenceNo: "asc" } });
+      expect(parcels.filter((p) => p.status === "PICKED_UP")).toHaveLength(3);
+      expect(parcels.filter((p) => p.status === "CANCELLED")).toHaveLength(2);
+      expect(parcels.find((p) => p.status === "CANCELLED")?.failureNote).toBe(
+        "მომხმარებელმა თქვა აღარ სჭირდება",
+      );
+
+      const events = await prisma.orderParcelEvent.findMany({
+        where: { parcelId: { in: parcels.filter((p) => p.status === "CANCELLED").map((p) => p.id) } },
+      });
+      expect(events.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("დისპეჩერის resolve-pickup: REASSIGN მხოლოდ PICKED_UP-დან დაშვებული, აბრუნებს EN_ROUTE_PICKUP-ზე", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 4 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+
+      actAs(session(disp));
+      const tooEarly = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "REASSIGN", reason: "ცდა" },
+      });
+      expect(tooEarly.status).toBe(409); // ჯერ არაფერი აღებულა — order.status EN_ROUTE_PICKUP
+
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 2, reason: "ორი დაკეტილი" } });
+
+      actAs(session(disp));
+      const r = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "REASSIGN", reason: "კურიერს ვთხოვე კიდევ სცადოს" },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.order.status).toBe("EN_ROUTE_PICKUP");
+
+      // PICKED_UP პარსელები არ შეცვლილა
+      const parcels = await prisma.orderParcel.findMany({ where: { orderId } });
+      expect(parcels.filter((p) => p.status === "PICKED_UP")).toHaveLength(2);
+      expect(parcels.filter((p) => p.status === "NOT_PICKED_UP")).toHaveLength(2);
+    });
+  });
+
+  it("0 ჩაბარდა, მაგრამ NOT_PICKED_UP დარჩა → deliver დაბლოკილია (409), FAILED ვერ დაინიშნება ვერ-გადაწყვეტილი პრობლემით", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 5 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+
+      actAs(session(drv.user));
+      // 3/5 აღებული, 2 დარჩა NOT_PICKED_UP
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 3, reason: "ორი დაკეტილი" } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+
+      // driver-ს არაფერი აქვს ჩასაბარებელი 3-დან — ცდილობს 0/3-ს დაადასტუროს,
+      // მაგრამ 2 ამანათის ბედი ჯერ არ არის დახურული → დაბლოკილია
+      const blocked = await call(deliver, {
+        params: { id: orderId },
+        body: { deliveredCount: 0, reason: "RECIPIENT_UNAVAILABLE" },
+      });
+      expect(blocked.status).toBe(409);
+
+      const midway = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+      expect(midway.status).toBe("IN_TRANSIT"); // არ დაფინალდა, არ გამხდარა FAILED
+
+      // დისპეჩერი წყვეტს დარჩენილი 2-ის ბედს (ჩამოწერა)
+      actAs(session(disp));
+      const resolved = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "მომხმარებელი ვეღარ დაუკავშირდა" },
+      });
+      expect(resolved.status).toBe(200);
+
+      // ახლა ყველა ამანათის ბედი დახურულია (3 PICKED_UP + 2 CANCELLED) — deliver დაშვებულია
+      actAs(session(drv.user));
+      const r = await call(deliver, {
+        params: { id: orderId },
+        body: { deliveredCount: 0, reason: "RECIPIENT_UNAVAILABLE" },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.order.status).toBe("FAILED");
+    });
+  });
+
+  it("driver ვერ ჩააბარებს NOT_PICKED_UP ან უკვე საბოლოო სტატუსის ამანათს — eligible მხოლოდ PICKED_UP-ია", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 3 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      // მხოლოდ 1 აიღო — 2 დარჩა NOT_PICKED_UP
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 1, reason: "ორი დაკეტილი" } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+      // დისპეჩერი ჩამოწერს დარჩენილ 2-ს (ბედი დახურულია), ისე რომ eligible-ს
+      // მხოლოდ PICKED_UP (1) დარჩეს
+      actAs(session(disp));
+      await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "ვეღარ დაუკავშირდნენ" },
+      });
+      // 2 ჩაბარებულის მოთხოვნა, როცა eligible მხოლოდ 1-ია (2 უკვე CANCELLED) → 422
+      actAs(session(drv.user));
+      const r = await call(deliver, { params: { id: orderId }, body: { deliveredCount: 2 } });
+      expect(r.status).toBe(422);
+    });
+  });
+
+  it("ორმაგი deliver request ვერ შექმნის ორმაგ CustomerAdjustment/DriverEarning-ს — მეორე 409-ია", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver }) => {
+      const c = await makeUser("CUSTOMER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, {
+        body: orderBody({ parcelCount: 4, collectAmount: 40 }),
+      });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 4 } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+
+      const body = { deliveredCount: 2, reason: "RECIPIENT_REFUSED" as const };
+      const r1 = await call(deliver, { params: { id: orderId }, body });
+      expect(r1.status).toBe(200);
+      expect(r1.body.order.status).toBe("PARTIALLY_COMPLETED");
+
+      // იმავე request-ის განმეორება — order აღარ არის IN_TRANSIT → 409, არაფერი ორმაგდება
+      const r2 = await call(deliver, { params: { id: orderId }, body });
+      expect(r2.status).toBe(409);
+
+      const adjustments = await prisma.customerAdjustment.findMany({ where: { orderId } });
+      expect(adjustments).toHaveLength(2); // და არა 4
+
+      const earnings = await prisma.driverEarning.findMany({ where: { orderId } });
+      expect(earnings).toHaveLength(1); // და არა 2
+
+      // codAmount = (CASH ? earnedTotalPrice : 0) + earnedCollect = 2.5 + (40 * 2/4) = 22.5 — ერთხელ დაერიცხა
+      const drvProfile = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+      expect(Number(drvProfile.cashOnHand)).toBe(22.5);
+    });
+  });
+
+  it("resolve-pickup — მხოლოდ DISPATCHER-ს აქვს წვდომა; ყველა მოქმედება OrderEvent-შიც ჩაიწერება", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, resolvePickup }) => {
+      const c = await makeUser("CUSTOMER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 3 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 1, reason: "ორი დაკეტილი" } });
+
+      // კურიერი ვერ ხმარობს resolve-pickup-ს
+      const asDriver = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "ცდა" },
+      });
+      expect(asDriver.status).toBe(403);
+
+      // კლიენტიც ვერ
+      actAs(session(c));
+      const asCustomer = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "ცდა" },
+      });
+      expect(asCustomer.status).toBe(403);
+
+      const disp = await makeUser("DISPATCHER");
+      actAs(session(disp));
+      const r = await call(resolvePickup, {
+        params: { id: orderId },
+        body: { action: "WRITE_OFF", reason: "საბოლოოდ ჩამოწერილია" },
+      });
+      expect(r.status).toBe(200);
+
+      const events = await prisma.orderEvent.findMany({ where: { orderId }, orderBy: { createdAt: "desc" } });
+      expect(events[0].note).toContain("ჩამოწერილია");
+      expect(events[0].actorId).toBe(disp.id);
     });
   });
 

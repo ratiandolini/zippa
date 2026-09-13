@@ -13,7 +13,7 @@ export function GET() {
 
     // COD-ის მქონე ჩაბარებული, ჯერ არ გადარიცხული შეკვეთები
     const codOrders = await prisma.order.findMany({
-      where: { status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
+      where: { status: { in: ["DELIVERED", "PARTIALLY_COMPLETED"] }, collectAmount: { gt: 0 }, codRemittanceId: null },
       select: {
         customerId: true,
         collectAmount: true,
@@ -128,7 +128,7 @@ export function POST(req: Request) {
     //    ორმაგი remittance / ორმაგი chargeSettled ვერ შეიქმნება. ──
     const rem = await prisma.$transaction(async (tx) => {
       const codOrders = await tx.order.findMany({
-        where: { customerId, status: "DELIVERED", collectAmount: { gt: 0 }, codRemittanceId: null },
+        where: { customerId, status: { in: ["DELIVERED", "PARTIALLY_COMPLETED"] }, collectAmount: { gt: 0 }, codRemittanceId: null },
         select: { id: true, collectAmount: true, codCommission: true },
       });
       const chargeOrders = await tx.order.findMany({

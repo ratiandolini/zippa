@@ -16,6 +16,7 @@ import { api } from "@/lib/fetcher";
 import { ProofPhoto } from "@/components/proof-photo";
 import { ParcelPickupConfirm } from "@/components/parcel-pickup-confirm";
 import { ParcelDeliverConfirm } from "@/components/parcel-deliver-confirm";
+import { OrderParcelList } from "@/components/order-parcel-list";
 import type { OrderDTO } from "@/lib/serialize";
 import type { OrderStatus, OrderFailureReason } from "@prisma/client";
 
@@ -220,6 +221,12 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         {acceptedAt && <span>დაადასტურე: {fmtDateTime(acceptedAt)}</span>}
         {pickedUpAt && <span>აიღე: {fmtDateTime(pickedUpAt)}</span>}
       </div>
+
+      {order.isMultiParcel && order.parcels.length > 0 && (
+        <div className="mt-2">
+          <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} finance={order.parcelFinance} />
+        </div>
+      )}
 
       {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && order.deliveryProof === "PHOTO" && (
         <div className="mt-3">

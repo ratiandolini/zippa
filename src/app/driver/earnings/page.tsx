@@ -19,7 +19,7 @@ export default function EarningsPage() {
   const pendingSettlement = settlements.find((s) => s.status === "PENDING");
 
   const delivered = orders
-    .filter((o) => o.status === "DELIVERED")
+    .filter((o) => o.status === "DELIVERED" || o.status === "PARTIALLY_COMPLETED")
     .sort((a, b) => (b.deliveredAt ?? "").localeCompare(a.deliveredAt ?? ""));
 
   async function settle() {
@@ -156,8 +156,15 @@ export default function EarningsPage() {
                     <td className="px-5 py-3">
                       {o.deliveredAt ? fmtDate(o.deliveredAt) : "—"}
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{o.trackingNumber}</td>
-                    <td className="px-5 py-3 font-medium tabular-nums">{GEL(o.price.driverFee)}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                      {o.trackingNumber}
+                      {o.status === "PARTIALLY_COMPLETED" && (
+                        <span className="ml-1 text-amber-700">(ნაწილობრივ)</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 font-medium tabular-nums">
+                      {GEL(o.parcelFinance ? o.parcelFinance.earnedDriverFee : o.price.driverFee)}
+                    </td>
                     <td className="px-5 py-3 text-muted-foreground">
                       ნაღდი
                     </td>

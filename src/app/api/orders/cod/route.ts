@@ -11,7 +11,7 @@ export function GET() {
     const pending = await prisma.order.findMany({
       where: {
         customerId: session.sub,
-        status: "DELIVERED",
+        status: { in: ["DELIVERED", "PARTIALLY_COMPLETED"] },
         collectAmount: { gt: 0 },
         codRemittanceId: null,
       },

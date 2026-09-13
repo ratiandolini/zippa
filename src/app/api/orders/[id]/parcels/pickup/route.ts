@@ -45,24 +45,29 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     const shouldAdvance = toPickup.length > 0 && order.status === "EN_ROUTE_PICKUP";
 
     const updated = await prisma.$transaction(async (tx) => {
+      // თითო ამანათზე compare-and-swap (status მატჩი იმაზე, რაც ამ request-ის
+      // დაწყებამდე წავიკითხეთ) — პარალელური/განმეორებითი მოთხოვნა იმავე
+      // ამანათს მეორედ ვერ გადაამუშავებს (ორმაგი pickupAttempts/event).
       for (const p of toPickup) {
-        await tx.orderParcel.update({
-          where: { id: p.id },
+        const claimed = await tx.orderParcel.updateMany({
+          where: { id: p.id, status: p.status },
           data: { status: "PICKED_UP", pickedUpAt: new Date(), pickupAttempts: { increment: 1 } },
         });
+        if (claimed.count === 0) continue;
         await tx.orderParcelEvent.create({
           data: { parcelId: p.id, status: "PICKED_UP", actorId: session.sub },
         });
       }
       for (const p of toRetry) {
-        await tx.orderParcel.update({
-          where: { id: p.id },
+        const claimed = await tx.orderParcel.updateMany({
+          where: { id: p.id, status: p.status },
           data: {
             status: "NOT_PICKED_UP",
             pickupAttempts: { increment: 1 },
             failureNote: body.reason,
           },
         });
+        if (claimed.count === 0) continue;
         await tx.orderParcelEvent.create({
           data: { parcelId: p.id, status: "NOT_PICKED_UP", note: body.reason, actorId: session.sub },
         });

@@ -9,10 +9,21 @@ import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
 import { sendSms, smsTemplates } from "@/lib/sms";
 
 // Phase 2 — მრავალამანათიანი შეკვეთის ჩაბარების რაოდენობრივი დადასტურება.
-// ერთჯერადი, საბოლოო ნაბიჯი: ამ endpoint-ის შემდეგ Order.status DELIVERED/FAILED-ზეა
-// და ფასი/COD/კურიერის ანაზღაურება პროპორციულადაა გადაანგარიშებული რეალურად
-// ჩაბარებული რაოდენობის მიხედვით (Order-შექმნისას ალოკირებული allocatedDeliveryPrice/
-// allocatedDriverFee/codAmount-ის ჯამებით — არა ხელახალი წონა-გამოთვლით).
+// ერთჯერადი, საბოლოო ნაბიჯი. Order.status სამი შესაძლებლობიდან ერთზეა:
+//   DELIVERED            — ყველა ამანათი ჩაბარდა
+//   PARTIALLY_COMPLETED  — ზოგი ჩაბარდა, ზოგი დარჩა (NOT_PICKED_UP/REFUSED/
+//                          RETURN_REQUESTED/FAILED/CANCELLED)
+//   FAILED               — არცერთი არ ჩაბარდა
+// Order.deliveryPrice/driverFee/totalPrice/codFee/partnerCost/companyMargin
+// შექმნის-დროინდელი snapshot-ია და აქ არასდროს არ იცვლება (ფინანსური ისტორია
+// არ იკარგება — ეს ღირებულებები ყოველთვის საწყისს აჩვენებს). ფაქტობრივად
+// შესრულებული ნაწილის თანხა მხოლოდ derived (გამოთვლილი) სახით გამოდის
+// serializeOrder()-ის `parcelFinance`-ში, OrderParcel.allocatedDeliveryPrice/
+// allocatedDriverFee-ის ჯამებიდან. Order.collectAmount/codCommission/codAmount
+// კი ოპერაციულად საჭირო ცვლადებია (COD remittance/დისპეჩერის cashOnHand-ს
+// ემსახურება) და აქ განახლდება ფაქტობრივად ჩაბარებულის მიხედვით — თითოეული
+// OrderParcel-ის საწყისი codAmount/allocated-წილი კვლავ უცვლელად ინახება,
+// ასე რომ საწყისი მთლიანი თანხა ყოველთვის აღდგენადია (sum(parcels.*)).
 export function PATCH(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     if (!MULTI_PARCEL_ORDERS_ENABLED) return fail(404, "ვერ მოიძებნა");
@@ -32,6 +43,19 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
 
     if (order.status !== "IN_TRANSIT")
       throw new ApiError(409, "ამ ეტაპზე ჩაბარების დადასტურება არ შეიძლება");
+
+    // FAILED უნდა ნიშნავდეს "ყველა ამანათის საკითხი საბოლოოდ დახურულია" — არა უბრალოდ
+    // "არცერთი არ ჩაბარდა". თუ ჯერ კიდევ არსებობს ვერ-აღებული (PENDING/NOT_PICKED_UP)
+    // ამანათი, ჩაბარება ვერ დაფინალდება მანამ, სანამ დისპეჩერი არ გადაწყვეტს მის
+    // ბედს (/parcels/resolve-pickup — ხელახლა მინიჭება ან ჩამოწერა).
+    const unresolvedPickup = order.parcels.filter(
+      (p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP",
+    );
+    if (unresolvedPickup.length > 0)
+      throw new ApiError(
+        409,
+        `ჯერ ${unresolvedPickup.length} ვერ-აღებული ამანათის საკითხი გადაწყვიტე (დისპეჩერთან — ხელახლა მინიჭება ან ჩამოწერა), მერე დაადასტურე ჩაბარება`,
+      );
 
     const eligible = order.parcels
       .filter((p) => p.status === "PICKED_UP")
@@ -58,7 +82,17 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
     const failStatus = body.reason ? DELIVERY_REASON_TO_STATUS[body.reason] : "FAILED";
     const failReason = body.reason ? DELIVERY_REASON_TO_FAILURE[body.reason] : "OTHER";
 
-    const { updated, deliveredCount, undeliveredCount } = await prisma.$transaction(async (tx) => {
+    const { updated, deliveredCount, undeliveredCount, earnedDriverFee } = await prisma.$transaction(async (tx) => {
+      // ატომური compare-and-swap — იგივე შეკვეთაზე ორი პარალელური/განმეორებითი
+      // request-ი მეორედ ვერ გაატარებს ფინალიზაციას (ორმაგი CustomerAdjustment/
+      // DriverEarning/cashOnHand-ის თავიდან ასაცილებლად).
+      const claimed = await tx.order.updateMany({
+        where: { id: order.id, status: "IN_TRANSIT" },
+        data: { status: "IN_TRANSIT" },
+      });
+      if (claimed.count === 0)
+        throw new ApiError(409, "შეკვეთის სტატუსი უკვე შეიცვალა — განაახლე გვერდი");
+
       const now = new Date();
       for (const p of toDeliver) {
         await tx.orderParcel.update({
@@ -103,34 +137,30 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
 
       const ratio = order.parcelCount > 0 ? delivered.length / order.parcelCount : 0;
       const earnedCodFee = round2(Number(order.codFee) * ratio);
-      const earnedPartnerCost = round2(Number(order.partnerCost) * ratio);
       const earnedCodCommission = round2(Number(order.codCommission) * ratio);
       const earnedTotalPrice = round2(earnedDeliveryPrice + earnedCodFee);
       const earnedCodAmount = round2(
         (order.paymentMethod === "CASH" ? earnedTotalPrice : 0) + earnedCollect,
       );
-      const earnedCompanyMargin = round2(
-        earnedTotalPrice + earnedCodCommission - earnedDriverFee - earnedPartnerCost,
-      );
-
-      const newOrderStatus = delivered.length > 0 ? "DELIVERED" : "FAILED";
+      const newOrderStatus =
+        delivered.length === 0
+          ? "FAILED"
+          : delivered.length === order.parcelCount
+            ? "DELIVERED"
+            : "PARTIALLY_COMPLETED";
 
       const o = await tx.order.update({
         where: { id: order.id },
         data: {
           status: newOrderStatus,
-          deliveryPrice: earnedDeliveryPrice,
-          codFee: earnedCodFee,
-          totalPrice: earnedTotalPrice,
-          driverFee: earnedDriverFee,
-          partnerCost: earnedPartnerCost,
-          companyMargin: earnedCompanyMargin,
+          // deliveryPrice/driverFee/totalPrice/codFee/partnerCost/companyMargin
+          // — შექმნის snapshot, აქ არ იცვლება (იხ. ფაილის თავი).
           collectAmount: earnedCollect,
           codCommission: earnedCodCommission,
           codAmount: earnedCodAmount,
           returnFee,
-          ...(newOrderStatus === "DELIVERED" ? { deliveredAt: now } : {}),
-          ...(newOrderStatus === "DELIVERED" && order.paymentMethod === "CASH"
+          ...(newOrderStatus !== "FAILED" ? { deliveredAt: now } : {}),
+          ...(newOrderStatus !== "FAILED" && order.paymentMethod === "CASH"
             ? { paymentStatus: "PAID" }
             : {}),
           ...(newOrderStatus === "FAILED" ? { failureReason: failReason } : {}),
@@ -151,6 +181,12 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       for (const p of undelivered) {
         const amount = Number(p.allocatedDeliveryPrice);
         if (amount <= 0) continue;
+        const reasonLabel =
+          p.failureReason != null
+            ? FAILURE_REASON_LABEL[p.failureReason]
+            : p.status === "CANCELLED"
+              ? `ჩამოწერილი${p.failureNote ? ` — ${p.failureNote}` : ""}`
+              : "ვერ აღებულა";
         await tx.customerAdjustment.create({
           data: {
             customerId: order.customerId,
@@ -158,9 +194,7 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
             parcelId: p.id,
             amount,
             kind: "REFUND",
-            reason: `ამანათი ${p.sequenceNo}/${order.parcelCount} — ${
-              p.failureReason ? FAILURE_REASON_LABEL[p.failureReason] : "ვერ აღებულა"
-            }`,
+            reason: `ამანათი ${p.sequenceNo}/${order.parcelCount} — ${reasonLabel}`,
           },
         });
       }
@@ -192,25 +226,31 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         }
       }
 
-      return { updated: o, deliveredCount: delivered.length, undeliveredCount: undelivered.length };
+      return {
+        updated: o,
+        deliveredCount: delivered.length,
+        undeliveredCount: undelivered.length,
+        earnedDriverFee,
+      };
     });
 
+    const fullyDelivered = undeliveredCount === 0;
     await notifyDispatchers({
-      title: deliveredCount > 0 ? "ჩაბარება დასრულდა" : "მიტანა ჩაიშალა",
+      title: deliveredCount === 0 ? "მიტანა ჩაიშალა" : fullyDelivered ? "ჩაბარება დასრულდა" : "ნაწილობრივ შესრულდა",
       body: `${order.trackingNumber} — ჩაბარებული ${deliveredCount}/${order.parcelCount}${
         undeliveredCount > 0 ? `, დარჩენილი/დასაბრუნებელი ${undeliveredCount}` : ""
       }`,
       data: { orderId: order.id },
     });
     await notify(order.customerId, {
-      title: deliveredCount > 0 ? "ამანათები ჩაბარდა" : "მიტანა ვერ შესრულდა",
+      title: deliveredCount === 0 ? "მიტანა ვერ შესრულდა" : fullyDelivered ? "ამანათები ჩაბარდა" : "ამანათები ნაწილობრივ ჩაბარდა",
       body: `${order.trackingNumber} — ${deliveredCount}/${order.parcelCount} ჩაბარებულია`,
       data: { orderId: order.id },
     });
     if (order.driverId && deliveredCount > 0) {
       await notifyDriver(order.driverId, {
         title: "მიტანა დასრულდა",
-        body: `${order.trackingNumber} — დაგერიცხა ${Number(updated.driverFee)} ₾`,
+        body: `${order.trackingNumber} — დაგერიცხა ${earnedDriverFee} ₾`,
         data: { orderId: order.id },
       });
     }

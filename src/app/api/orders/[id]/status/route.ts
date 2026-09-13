@@ -6,6 +6,7 @@ import {
   FREE_CANCEL_STATUSES,
   PAID_CANCEL_STATUSES,
   POST_PICKUP_STATUSES,
+  TERMINAL_ORDER_STATUSES,
   CANCEL_FEE_GEL,
   FAILED_TRIP_DRIVER_GEL,
   CANCEL_EN_ROUTE_DRIVER_GEL,
@@ -60,16 +61,26 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       return fail(403, "წვდომა აკრძალულია");
 
     // ── ტერმინალური სტატუსი — ცვლილება აღარ შეიძლება ──
-    const TERMINAL: OrderStatus[] = ["DELIVERED", "CANCELLED", "FAILED"];
-    if (TERMINAL.includes(order.status as OrderStatus))
+    if (TERMINAL_ORDER_STATUSES.includes(order.status as OrderStatus))
       throw new ApiError(409, "შეკვეთა დასრულებულია — სტატუსი ვეღარ იცვლება");
 
     // მრავალამანათიან შეკვეთაზე აღება/ჩაბარება/ჩაშლა მხოლოდ რაოდენობრივი
     // დადასტურების endpoint-ებით ხდება (/parcels/pickup, /parcels/deliver) —
     // აქედან დაბლოკილია, რომ item-level აღრიცხვა არასდროს გვერდი აუარონ.
-    // ლეგასი (isMultiParcel=false) შეკვეთაზე ეს პირობა არასდროს არ ეშვება.
-    if (order.isMultiParcel && ["PICKED_UP", "DELIVERED", "FAILED"].includes(body.status))
-      throw new ApiError(409, "მრავალამანათიან შეკვეთაზე გამოიყენე ამანათების დადასტურების ფორმა");
+    // ასევე დაბლოკილია მთლიან-შეკვეთაზე დაფუძნებული post-pickup გაუქმება
+    // (POST_PICKUP_STATUSES) — მთელი deliveryPrice-ის ჩამოწერა არასწორია, თუ
+    // მხოლოდ ნაწილი აიღეს; ამისთვის დისპეჩერს აქვს [id]/parcels/resolve-pickup
+    // (მხოლოდ დარჩენილ, არაღებულ რაოდენობაზე). ლეგასი შეკვეთაზე ეს პირობები
+    // არასდროს არ ეშვება (isMultiParcel ყოველთვის false).
+    if (
+      order.isMultiParcel &&
+      (["PICKED_UP", "DELIVERED", "FAILED"].includes(body.status) ||
+        (body.status === "CANCELLED" && POST_PICKUP_STATUSES.includes(order.status as OrderStatus)))
+    )
+      throw new ApiError(
+        409,
+        "მრავალამანათიან შეკვეთაზე ამ ეტაპზე გამოიყენე ამანათების დადასტურების/მართვის ფორმა",
+      );
 
     // ── დისპეჩერს ამ endpoint-იდან შეუძლია მხოლოდ გაუქმება/დაბრუნება ──
     // (კურიერის ნაბიჯებს კურიერი ატარებს; ხელით წინსვლა დაშვებული არაა)

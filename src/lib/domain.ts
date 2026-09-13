@@ -33,9 +33,19 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PICKED_UP: "აღებული",
   IN_TRANSIT: "გზაშია",
   DELIVERED: "ჩაბარებული",
+  PARTIALLY_COMPLETED: "ნაწილობრივ შესრულებული",
   CANCELLED: "გაუქმებული",
   FAILED: "ჩაიშალა",
 };
+
+// შეკვეთის ციკლი დასრულებულია — შემდგომი status-ცვლილება ვეღარ ხდება ჩვეულებრივი
+// /status route-ით (PARTIALLY_COMPLETED-ს მხოლოდ [id]/parcels/deliver ანიჭებს).
+export const TERMINAL_ORDER_STATUSES: OrderStatus[] = [
+  "DELIVERED",
+  "PARTIALLY_COMPLETED",
+  "CANCELLED",
+  "FAILED",
+];
 
 /** კურიერის მიერ ნებადართული შემდეგი სტატუსები */
 export const DRIVER_NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {

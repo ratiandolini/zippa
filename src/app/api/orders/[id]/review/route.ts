@@ -12,7 +12,8 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
     const order = await prisma.order.findUnique({ where: { id: params.id }, include: { review: true } });
     if (!order) return fail(404, "შეკვეთა ვერ მოიძებნა");
     if (order.customerId !== session.sub) return fail(403, "წვდომა აკრძალულია");
-    if (order.status !== "DELIVERED") throw new ApiError(409, "შეფასება მხოლოდ ჩაბარების შემდეგ");
+    if (order.status !== "DELIVERED" && order.status !== "PARTIALLY_COMPLETED")
+      throw new ApiError(409, "შეფასება მხოლოდ ჩაბარების შემდეგ");
     if (order.review) throw new ApiError(409, "შეფასება უკვე დატოვე");
     if (!order.driverId) throw new ApiError(409, "შეკვეთას კურიერი არ ჰყავდა");
 

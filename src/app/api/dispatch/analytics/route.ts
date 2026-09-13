@@ -41,13 +41,13 @@ export function GET() {
     let totalRevenue = 0;
     let codCommissionTotal = 0;
     let deliveredCount = 0;
-    let endedCount = 0; // DELIVERED + FAILED + CANCELLED
+    let endedCount = 0; // DELIVERED + PARTIALLY_COMPLETED + FAILED + CANCELLED
 
     for (const o of orders) {
       const ci = idx(o.createdAt.toISOString());
       if (ci >= 0) days[ci].orders++;
       statusCount[o.status] = (statusCount[o.status] ?? 0) + 1;
-      if (["DELIVERED", "FAILED", "CANCELLED"].includes(o.status)) endedCount++;
+      if (["DELIVERED", "PARTIALLY_COMPLETED", "FAILED", "CANCELLED"].includes(o.status)) endedCount++;
       if (o.status === "DELIVERED" && o.deliveredAt) {
         const di = idx(o.deliveredAt.toISOString());
         if (di >= 0) {

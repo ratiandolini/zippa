@@ -226,6 +226,15 @@ export const parcelDeliverSchema = z.object({
 
 export type ParcelDeliverInput = z.infer<typeof parcelDeliverSchema>;
 
+// დისპეჩერის მარტივი ქმედება დარჩენილ (PENDING/NOT_PICKED_UP) რაოდენობაზე —
+// უკვე PICKED_UP/DELIVERED ამანათს არასდროს ეხება.
+export const resolvePickupSchema = z.object({
+  action: z.enum(["REASSIGN", "WRITE_OFF"]),
+  reason: z.string().trim().min(1, "მიუთითე მიზეზი").max(300),
+});
+
+export type ResolvePickupInput = z.infer<typeof resolvePickupSchema>;
+
 // დისპეჩერის ხელით ფასის შესწორება (PENDING / ASSIGNED შეკვეთაზე)
 export const PRICE_ADJUST_REASONS = [
   "არასწორად მითითებული წონა",

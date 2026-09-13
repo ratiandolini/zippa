@@ -142,7 +142,7 @@ function Detail({ id }: { id: string }) {
           )}
           {order.deliveryProof === "PIN" &&
             order.deliveryPin &&
-            !["DELIVERED", "CANCELLED", "FAILED"].includes(order.status) && (
+            !["DELIVERED", "PARTIALLY_COMPLETED", "CANCELLED", "FAILED"].includes(order.status) && (
               <div className="rounded-lg border border-accent/40 bg-accent/[0.06] px-4 py-3">
                 <div className="text-sm font-medium">მიტანის კოდი</div>
                 <div className="mt-1 font-mono text-3xl font-bold tracking-[0.3em] text-accent">
@@ -182,7 +182,11 @@ function Detail({ id }: { id: string }) {
             </CardContent>
           </Card>
           {MULTI_PARCEL_ORDERS_ENABLED && order.parcels.length > 0 && (
-            <OrderParcelList parcels={order.parcels} summary={order.parcelSummary} />
+            <OrderParcelList
+              parcels={order.parcels}
+              summary={order.parcelSummary}
+              finance={order.parcelFinance}
+            />
           )}
         </div>
         <div className="space-y-6">
@@ -237,7 +241,13 @@ function Detail({ id }: { id: string }) {
                     : " ამანათი ბრუნდება."}
                 </div>
               )}
-              {["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (
+              {order.status === "PARTIALLY_COMPLETED" && (
+                <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  ნაწილობრივ შესრულდა — {order.parcelSummary.delivered}/{order.parcelSummary.total} ჩაბარებულია.
+                  {order.returnFee > 0 && ` დაბრუნების საფასური ${GEL(order.returnFee)}.`}
+                </div>
+              )}
+              {!order.isMultiParcel && ["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(order.status) && (
                 <div className="pt-2">
                   <ReturnRequest order={order} onDone={() => mutate()} />
                 </div>
@@ -256,7 +266,7 @@ function Detail({ id }: { id: string }) {
             </Card>
           )}
 
-          {order.status === "DELIVERED" && (
+          {(order.status === "DELIVERED" || order.status === "PARTIALLY_COMPLETED") && (
             <Card>
               <CardHeader>
                 <CardTitle>{order.review ? "შენი შეფასება" : "შეაფასე კურიერი"}</CardTitle>

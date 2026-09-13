@@ -60,16 +60,17 @@ export function POST(req: Request) {
       const ids = testUsers.map((u) => u.id);
       const dp = await prisma.driverProfile.findMany({
         where: { userId: { in: ids } },
-        select: { id: true },
+        select: { id: true, userId: true },
       });
       const dpIds = dp.map((d) => d.id);
+      const userIdByDriverProfileId = new Map(dp.map((d) => [d.id, d.userId]));
 
       // production-ში არასდროს წავშალოთ DELIVERED ან ფინანსური ჩანაწერის მქონე შეკვეთა
       const orderWhere: Record<string, unknown> = {
         OR: [{ customerId: { in: ids } }, { driverId: { in: dpIds } }],
       };
       if (process.env.NODE_ENV === "production") {
-        orderWhere.status = { not: "DELIVERED" };
+        orderWhere.status = { notIn: ["DELIVERED", "PARTIALLY_COMPLETED"] };
         orderWhere.earnings = { none: {} };
         orderWhere.payment = { is: null };
         orderWhere.codRemittanceId = null;
@@ -79,8 +80,26 @@ export function POST(req: Request) {
       const delOrders = await prisma.order.deleteMany({
         where: orderWhere as never,
       });
+
+      // დაცული (production-ში გადარჩენილი — DELIVERED/PARTIALLY_COMPLETED/ფინანსური
+      // ჩანაწერის მქონე) შეკვეთის მფლობელი/კურიერი @zippa.test-იც არ უნდა წაიშალოს —
+      // თორემ Order_customerId_fkey/Order_driverId_fkey დაირღვევა.
+      const survivingOrders = await prisma.order.findMany({
+        where: { OR: [{ customerId: { in: ids } }, { driverId: { in: dpIds } }] },
+        select: { customerId: true, driverId: true },
+      });
+      const protectedUserIds = new Set<string>(survivingOrders.map((o) => o.customerId));
+      for (const o of survivingOrders) {
+        if (!o.driverId) continue;
+        const uid = userIdByDriverProfileId.get(o.driverId);
+        if (uid) protectedUserIds.add(uid);
+      }
+      const deletableIds = ids.filter((id) => !protectedUserIds.has(id));
       const delUsers = await prisma.user.deleteMany({
-        where: { email: { endsWith: "@zippa.test" } },
+        where: {
+          email: { endsWith: "@zippa.test" },
+          id: { in: deletableIds },
+        },
       });
 
       // ობოლი შეტყობინებები — რომელთა orderId აღარ არსებობს (მაგ. წაშლილი სატესტო შეკვეთები)

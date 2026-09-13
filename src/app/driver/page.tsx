@@ -18,7 +18,10 @@ export default function DriverHome() {
 
   const active = orders.filter((o) => ACTIVE.includes(o.status));
   const deliveredToday = orders.filter(
-    (o) => o.status === "DELIVERED" && o.deliveredAt && new Date(o.deliveredAt).toDateString() === new Date().toDateString(),
+    (o) =>
+      (o.status === "DELIVERED" || o.status === "PARTIALLY_COMPLETED") &&
+      o.deliveredAt &&
+      new Date(o.deliveredAt).toDateString() === new Date().toDateString(),
   );
   const online = driver?.status !== "OFFLINE";
 

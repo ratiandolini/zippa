@@ -11,6 +11,7 @@ const tone: Record<OrderStatus, "neutral" | "amber" | "blue" | "violet" | "accen
   PICKED_UP: "violet",
   IN_TRANSIT: "accent",
   DELIVERED: "green",
+  PARTIALLY_COMPLETED: "amber",
   CANCELLED: "red",
   FAILED: "red",
 };
