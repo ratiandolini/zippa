@@ -187,7 +187,11 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
     // (customer, driver, dispatcher — ერთი და იგივე derivation ყველგან).
     parcelSummary: {
       total: o.parcelCount,
-      pickedUp: o.parcels.filter((p) => p.status !== "PENDING" && p.status !== "NOT_PICKED_UP").length,
+      // CANCELLED (დისპეჩერის write-off) მხოლოდ PENDING/NOT_PICKED_UP-დან მოდის —
+      // ანუ ფაქტობრივად არასდროს აღებულა. "აღებული" ამიტომ ცალკეა გამორიცხული.
+      pickedUp: o.parcels.filter(
+        (p) => !["PENDING", "NOT_PICKED_UP", "CANCELLED"].includes(p.status),
+      ).length,
       delivered: o.parcels.filter((p) => p.status === "DELIVERED").length,
       // ჯერ კიდევ საქმის კურსშია — ხელახლა ასაღებია
       remaining: o.parcels.filter((p) => p.status === "PENDING" || p.status === "NOT_PICKED_UP").length,

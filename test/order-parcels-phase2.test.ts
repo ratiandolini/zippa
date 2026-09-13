@@ -285,6 +285,17 @@ describe("მრავალამანათიანი შეკვეთა
         "მომხმარებელმა თქვა აღარ სჭირდება",
       );
 
+      // parcelSummary.pickedUp — ჩამოწერილი (CANCELLED, ფაქტობრივად არასდროს აღებული)
+      // არ უნდა ითვლებოდეს "აღებულში"
+      const after = await call(getOrder, { params: { id: orderId } });
+      expect(after.body.order.parcelSummary).toEqual({
+        total: 5,
+        pickedUp: 3,
+        delivered: 0,
+        remaining: 0,
+        returning: 2,
+      });
+
       const events = await prisma.orderParcelEvent.findMany({
         where: { parcelId: { in: parcels.filter((p) => p.status === "CANCELLED").map((p) => p.id) } },
       });
