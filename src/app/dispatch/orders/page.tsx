@@ -391,7 +391,7 @@ function OrderCard({ order, onChange }: { order: OrderDTO; onChange: () => void 
       )}
       {MULTI_PARCEL_ORDERS_ENABLED && order.isMultiParcel && order.parcelSummary.awaitingReturn > 0 && (
         <div className="mt-2">
-          <ParcelReturnConfirm order={order} onChange={onChange} />
+          <ParcelReturnConfirm order={order} mode="dispatcher" onChange={onChange} />
         </div>
       )}
 

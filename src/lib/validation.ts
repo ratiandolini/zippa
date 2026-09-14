@@ -228,10 +228,14 @@ export type ParcelDeliverInput = z.infer<typeof parcelDeliverSchema>;
 
 // დაბრუნების ფაქტობრივი დადასტურება — RETURN_REQUESTED ამანათი ფიზიკურად
 // უკვე დაუბრუნდა გამგზავნს. მიზეზი/დრო უკვე ცნობილია (ჩაბარების მცდელობიდან) —
-// აქ მხოლოდ დამატებითი შენიშვნაა არჩევითი.
+// აქ მხოლოდ დამატებითი შენიშვნაა არჩევითი. კურიერისთვის ფოტო სავალდებულოა
+// (route-ში მოწმდება, multipart-ის file ველი) — დისპეჩერს override-ზე მხოლოდ
+// `reason` სავალდებულოა.
 export const parcelReturnConfirmSchema = z.object({
   returnedCount: z.number().int().min(0).max(300),
   note: z.string().trim().max(300).optional(),
+  // მხოლოდ დისპეჩერის override-ზე — რატომ ადასტურებს ხელით, ფოტოს გარეშე
+  reason: z.string().trim().max(300).optional(),
 });
 
 export type ParcelReturnConfirmInput = z.infer<typeof parcelReturnConfirmSchema>;

@@ -855,6 +855,12 @@ model OrderParcel {
   cancelledAt       DateTime?
   proofPhotoUrl     String?
 
+  // დაბრუნების მტკიცებულება — ცალკე ველი, დელივერის proofPhotoUrl-ს არასდროს
+  // არ ეხება/გადაფარავს. სავალდებულოა კურიერის დაბრუნების დადასტურებაზე
+  // ([id]/parcels/return-confirm); დისპეჩერის override-ს არასდროს არ შლის.
+  returnProofPhotoUrl String?
+  returnProofAt       DateTime?
+
   // COD — თითო ამანათის საკუთარი ასაღები თანხა (Order.collectAmount
   // მრავალამანათიან შეკვეთაზე ხდება ამათი ჯამის rollup, არა წყარო)
   codAmount Decimal @default(0) @db.Decimal(10, 2)

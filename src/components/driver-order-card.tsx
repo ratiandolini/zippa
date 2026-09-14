@@ -229,7 +229,7 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
         </div>
       )}
       {order.isMultiParcel && order.parcelSummary.awaitingReturn > 0 && (
-        <ParcelReturnConfirm order={order} onChange={onChange} />
+        <ParcelReturnConfirm order={order} mode="driver" onChange={onChange} />
       )}
 
       {["PICKED_UP", "IN_TRANSIT"].includes(order.status) && order.deliveryProof === "PHOTO" && (

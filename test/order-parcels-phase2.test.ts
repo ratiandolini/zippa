@@ -1,10 +1,46 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import sharp from "sharp";
 import { resetDb, prisma, call, makeUser, makeDriver, actAs, session } from "./helpers";
 import { PATCH as assign } from "@/app/api/orders/[id]/assign/route";
 import { PATCH as setStatus } from "@/app/api/orders/[id]/status/route";
 import { GET as getOrder } from "@/app/api/orders/[id]/route";
 
+// დაბრუნების ფოტოს ატვირთვა [id]/parcels/return-confirm-ში sharp-ს/blob-საცავს
+// მოითხოვს — ტესტებში ვმოკავთ ისევე, როგორც test/photo.test.ts-ში.
+vi.mock("@/lib/storage", () => ({
+  putProofFile: vi.fn(async (key: string) => ({ url: `/uploads/${key}` })),
+  getProofFile: vi.fn(async () => ({ body: new Uint8Array([255, 216, 255, 217]), contentType: "image/jpeg" })),
+}));
+
 beforeEach(resetDb);
+
+/** [id]/parcels/return-confirm — multipart/form-data (route არასდროს JSON-ს არ კითხულობს). */
+async function callReturnConfirm(
+  handler: typeof import("@/app/api/orders/[id]/parcels/return-confirm/route").PATCH,
+  orderId: string,
+  opts: { returnedCount: number; note?: string; reason?: string; withPhoto?: boolean },
+) {
+  const fd = new FormData();
+  fd.append("returnedCount", String(opts.returnedCount));
+  if (opts.note) fd.append("note", opts.note);
+  if (opts.reason) fd.append("reason", opts.reason);
+  if (opts.withPhoto) {
+    const png = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    fd.append("file", new Blob([png], { type: "image/png" }), "r.png");
+  }
+  const req = new Request("http://test.local/api", {
+    method: "PATCH",
+    body: fd,
+    headers: { "x-forwarded-for": `10.9.${Math.floor(Math.random() * 250)}.1` },
+  });
+  const res = await handler(req, { params: { id: orderId } });
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, body };
+}
 
 const orderBody = (over: Record<string, unknown> = {}) => ({
   sender: { name: "მა რი", phone: "+995599111111" },
@@ -562,9 +598,13 @@ describe("მრავალამანათიანი შეკვეთა
       let adj = await prisma.customerAdjustment.findMany({ where: { orderId } });
       expect(adj.filter((a) => a.kind === "RETURN_FEE")).toHaveLength(0);
 
-      const noneYet = await call(returnConfirm, {
-        params: { id: orderId },
-        body: { returnedCount: 1 },
+      // ფოტოს გარეშე კურიერი ვერ ადასტურებს დაბრუნებას
+      const noPhoto = await callReturnConfirm(returnConfirm, orderId, { returnedCount: 1 });
+      expect(noPhoto.status).toBe(422);
+
+      const noneYet = await callReturnConfirm(returnConfirm, orderId, {
+        returnedCount: 1,
+        withPhoto: true,
       });
       expect(noneYet.status).toBe(200);
       expect(noneYet.body.order.parcelSummary.awaitingReturn).toBe(1);
@@ -576,18 +616,124 @@ describe("მრავალამანათიანი შეკვეთა
       // allocatedDeliveryPrice თითო ამანათზე = 5/4 = 1.25; returnFee = 1.25*0.5 = 0.625 → 0.63
       expect(Number(adj[0].amount)).toBeCloseTo(-0.63, 2);
 
+      // ფოტო/დროც შენახულია — ცალკე ველებში, delivery-ს proofPhotoUrl-ს არ ეხება
+      const returnedParcel = await prisma.orderParcel.findFirstOrThrow({
+        where: { orderId, status: "RETURNED" },
+      });
+      expect(returnedParcel.returnProofPhotoUrl).toContain("return-proofs/");
+      expect(returnedParcel.returnProofAt).not.toBeNull();
+      expect(returnedParcel.proofPhotoUrl).toBeNull(); // delivery-proof ველი ხელუხლებელია
+
       // დანარჩენი 1-იც დაბრუნდა
-      const rest = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 1 } });
+      const rest = await callReturnConfirm(returnConfirm, orderId, {
+        returnedCount: 1,
+        withPhoto: true,
+      });
       expect(rest.status).toBe(200);
       expect(rest.body.order.parcelSummary.awaitingReturn).toBe(0);
       expect(rest.body.order.parcelSummary.returned).toBe(2);
 
       // idempotent — აღარაფერია დასაბრუნებელი, მესამე request 409-ია, ორმაგი დარიცხვა არ ხდება
-      const again = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 1 } });
+      const again = await callReturnConfirm(returnConfirm, orderId, {
+        returnedCount: 1,
+        withPhoto: true,
+      });
       expect(again.status).toBe(409);
 
       const finalAdj = await prisma.customerAdjustment.findMany({ where: { orderId, kind: "RETURN_FEE" } });
       expect(finalAdj).toHaveLength(2); // ზუსტად ორი — თითო ამანათზე ერთხელ
+    });
+  });
+
+  it("დაბრუნების ფოტო — proxy path serializeOrder-ში, GET route წვდომას ამოწმებს (owner/dispatcher/unrelated)", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, returnConfirm }) => {
+      const { GET: getReturnPhoto } = await import(
+        "@/app/api/orders/[id]/parcels/[parcelId]/return-photo/route"
+      );
+      const c = await makeUser("CUSTOMER");
+      const drv = await makeDriver({ approved: true });
+      const otherDrv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 2 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 2 } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+      await call(deliver, { params: { id: orderId }, body: { deliveredCount: 0, reason: "RECIPIENT_REFUSED" } });
+      const ret = await callReturnConfirm(returnConfirm, orderId, { returnedCount: 1, withPhoto: true });
+      expect(ret.status).toBe(200);
+
+      const parcelId = ret.body.order.parcels.find((p: { status: string }) => p.status === "RETURNED").id as string;
+
+      // owner driver — access
+      const asDriver = await getReturnPhoto(new Request("http://test.local"), { params: { id: orderId, parcelId } });
+      expect(asDriver.status).toBe(200);
+
+      // dispatcher — access
+      actAs(session(await makeUser("DISPATCHER")));
+      const asDisp = await getReturnPhoto(new Request("http://test.local"), { params: { id: orderId, parcelId } });
+      expect(asDisp.status).toBe(200);
+
+      // customer owner — access
+      actAs(session(c));
+      const asCustomer = await getReturnPhoto(new Request("http://test.local"), { params: { id: orderId, parcelId } });
+      expect(asCustomer.status).toBe(200);
+
+      // unrelated driver — no access
+      actAs(session(otherDrv.user));
+      const asOther = await getReturnPhoto(new Request("http://test.local"), { params: { id: orderId, parcelId } });
+      expect(asOther.status).toBe(403);
+    });
+  });
+
+  it("დისპეჩერის override — მიზეზი სავალდებულო, audit-ში ცალსახად აღინიშნება, კურიერის ფოტო არ ეშლება", async () => {
+    await withMultiParcelEnabled(async ({ createOrder, pickup, deliver, returnConfirm }) => {
+      const c = await makeUser("CUSTOMER");
+      const disp = await makeUser("DISPATCHER");
+      const drv = await makeDriver({ approved: true });
+      actAs(session(c));
+      const created = await call(createOrder, { body: orderBody({ parcelCount: 2 }) });
+      const orderId = created.body.order.id as string;
+      await toEnRoutePickup(orderId, drv);
+      actAs(session(drv.user));
+      await call(pickup, { params: { id: orderId }, body: { pickedUpCount: 2 } });
+      await call(setStatus, { params: { id: orderId }, body: { status: "IN_TRANSIT" } });
+      await call(deliver, { params: { id: orderId }, body: { deliveredCount: 0, reason: "RECIPIENT_REFUSED" } });
+
+      // დისპეჩერი მიზეზის გარეშე ვერ ადასტურებს
+      actAs(session(disp));
+      const noReason = await callReturnConfirm(returnConfirm, orderId, { returnedCount: 1 });
+      expect(noReason.status).toBe(422);
+
+      // მიზეზით — დაშვებულია, ფოტოს გარეშეც
+      const r = await callReturnConfirm(returnConfirm, orderId, {
+        returnedCount: 1,
+        reason: "კურიერმა დაკარგა წვდომა აპლიკაციაზე, ოფისში პირადად ჩამოტანა დაადასტურა ტელეფონით",
+      });
+      expect(r.status).toBe(200);
+
+      const events = await prisma.orderParcelEvent.findMany({
+        where: { status: "RETURNED" },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(events[0].note).toContain("დისპეჩერი");
+      expect(events[0].note).toContain("override");
+      expect(events[0].actorId).toBe(disp.id);
+
+      const returnedByOverride = await prisma.orderParcel.findFirstOrThrow({
+        where: { orderId, status: "RETURNED" },
+      });
+      expect(returnedByOverride.returnProofPhotoUrl).toBeNull(); // ფოტო არ იყო — არც შექმნილა
+
+      // მეორე ამანათს კურიერი ფოტოთი ადასტურებს — override-ს ეს არ შეხებია
+      actAs(session(drv.user));
+      const r2 = await callReturnConfirm(returnConfirm, orderId, { returnedCount: 1, withPhoto: true });
+      expect(r2.status).toBe(200);
+      const withPhoto = await prisma.orderParcel.findFirstOrThrow({
+        where: { orderId, status: "RETURNED", id: { not: returnedByOverride.id } },
+      });
+      expect(withPhoto.returnProofPhotoUrl).not.toBeNull();
     });
   });
 
@@ -670,8 +816,8 @@ describe("მრავალამანათიანი შეკვეთა
         cancelled: 3,
       });
 
-      // ორივე უარი-თქმული ბრუნდება გამგზავნთან
-      const ret = await call(returnConfirm, { params: { id: orderId }, body: { returnedCount: 2 } });
+      // ორივე უარი-თქმული ბრუნდება გამგზავნთან — კურიერი ფოტოთი ადასტურებს
+      const ret = await callReturnConfirm(returnConfirm, orderId, { returnedCount: 2, withPhoto: true });
       expect(ret.status).toBe(200);
       expect(ret.body.order.parcelSummary).toEqual({
         total: 12,

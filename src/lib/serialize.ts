@@ -272,6 +272,11 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
       cancelledAt: p.cancelledAt?.toISOString() ?? null,
       // ნედლი blob URL — Phase 2+-ის დაცული proxy endpoint-ის გარეშე არასდროს არ გაცემა
       proofPhotoUrl: null as string | null,
+      // დაბრუნების მტკიცებულება — დაცული proxy path, ნედლი blob URL არასდროს
+      returnProofPhotoUrl: p.returnProofPhotoUrl
+        ? `/api/orders/${o.id}/parcels/${p.id}/return-photo`
+        : null,
+      returnProofAt: p.returnProofAt?.toISOString() ?? null,
     })),
   };
 }

@@ -112,6 +112,16 @@ export function OrderParcelList({
                   {p.failureNote ? ` — ${p.failureNote}` : ""}
                 </div>
               )}
+              {p.returnProofPhotoUrl && (
+                <a
+                  href={p.returnProofPhotoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  📷 დაბრუნების ფოტო{p.returnProofAt ? ` — ${new Date(p.returnProofAt).toLocaleString("ka-GE")}` : ""}
+                </a>
+              )}
             </div>
             <ParcelStatusBadge status={p.status} />
           </div>
