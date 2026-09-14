@@ -7,10 +7,19 @@ import { OrderRow } from "@/components/order-row";
 import { useOrders } from "@/lib/hooks";
 import { ACTIVE_ORDER_STATUSES as ACTIVE } from "@/lib/domain";
 
+// QA fix — PARTIALLY_COMPLETED მრავალამანათიანი შეკვეთა, რომელსაც ჯერ კიდევ
+// აქვს დასაბრუნებელი (awaitingReturn > 0) ამანათი, აქტიურ სიაში რჩება — თორემ
+// კურიერს დაბრუნების დადასტურების/ფოტოს ატვირთვის ფორმაზე წვდომა ეკარგება
+// (ეს ფორმა მხოლოდ DriverOrderCard-ზეა, არა ისტორიის უბრალო OrderRow-ზე).
+function needsDriverAttention(o: { status: string; parcelSummary?: { awaitingReturn: number } }) {
+  if (ACTIVE.includes(o.status as never)) return true;
+  return o.status === "PARTIALLY_COMPLETED" && (o.parcelSummary?.awaitingReturn ?? 0) > 0;
+}
+
 export default function DriverOrdersPage() {
   const { orders, isLoading, mutate } = useOrders("", 12000);
-  const active = orders.filter((o) => ACTIVE.includes(o.status));
-  const past = orders.filter((o) => !ACTIVE.includes(o.status));
+  const active = orders.filter(needsDriverAttention);
+  const past = orders.filter((o) => !needsDriverAttention(o));
 
   return (
     <>

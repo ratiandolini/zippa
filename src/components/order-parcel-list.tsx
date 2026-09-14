@@ -23,34 +23,34 @@ export function OrderParcelList({
     <div className="space-y-2 rounded-lg border border-border p-4">
       <p className="text-sm font-medium">ამანათები ({parcels.length})</p>
       {summary && (
-        <div className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-center text-xs sm:grid-cols-7">
-          <div>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-2 rounded-md bg-muted/40 px-2 py-2 text-center text-xs sm:grid-cols-4">
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums">{summary.total}</div>
-            <div className="text-muted-foreground">სულ</div>
+            <div className="break-words text-muted-foreground">სულ</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums">{summary.pickedUp}</div>
-            <div className="text-muted-foreground">აღებული</div>
+            <div className="break-words text-muted-foreground">აღებული</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums text-green-700">{summary.delivered}</div>
-            <div className="text-muted-foreground">ჩაბარებული</div>
+            <div className="break-words text-muted-foreground">ჩაბარებული</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums text-amber-700">{summary.awaitingReturn}</div>
-            <div className="text-muted-foreground">დასაბრუნებელი</div>
+            <div className="break-words text-muted-foreground">დასაბრუნებელი</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums">{summary.returned}</div>
-            <div className="text-muted-foreground">დაბრუნებული</div>
+            <div className="break-words text-muted-foreground">დაბრუნებული</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums">{summary.notPickedUp}</div>
-            <div className="text-muted-foreground">ვერ აღებული</div>
+            <div className="break-words text-muted-foreground">ვერ აღებული</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold tabular-nums text-muted-foreground">{summary.cancelled}</div>
-            <div className="text-muted-foreground">ჩამოწერილი</div>
+            <div className="break-words text-muted-foreground">ჩამოწერილი</div>
           </div>
         </div>
       )}
