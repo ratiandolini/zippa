@@ -28,15 +28,50 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
 
     if (body.amount && body.amount > 0 && !body.reason)
       throw new ApiError(422, "მიუთითე მიზეზი");
+    // Audit fix (R1) — მრავალამანათიან შეკვეთაზე ledger-based დაბრუნების
+    // საფასურის გაუქმებას წერილობითი მიზეზი სავალდებულოა (append-only
+    // reversal ჩანაწერი მხოლოდ ამ მიზეზით იქმნება).
+    if (body.waiveReturnFee && order.isMultiParcel && !body.reason)
+      throw new ApiError(422, "დაბრუნების საფასურის გაუქმებას მიზეზი სჭირდება");
 
-    const { waived, adjusted, deduped } = await prisma.$transaction(async (tx) => {
+    const { waived, waivedLedgerAmount, adjusted, deduped } = await prisma.$transaction(async (tx) => {
       // ── შეკვეთის row-ს ჩავკეტავთ — პარალელური adjust იმავე შეკვეთაზე სერიულდება,
       //    ე.ი. dupe-შემოწმება ხედავს უკვე commit-ულ დარიცხვას. ──
       await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${order.id} FOR UPDATE`;
 
-      // ── ატომური waive — მხოლოდ თუ returnFee ისევ დასარიცხია და ჯერ არ გასწორებულა ──
       let waived = false;
-      if (body.waiveReturnFee) {
+      let waivedLedgerAmount = 0;
+      if (body.waiveReturnFee && order.isMultiParcel) {
+        // ── მრავალამანათიანი შეკვეთა — RETURN_FEE ledger-ჩანაწერების გაუქმება.
+        //    ორიგინალი ჩანაწერი (amount/kind/reason) არასდროს არ იცვლება/იშლება —
+        //    მხოლოდ settledAt ინიშნება (რომ განმეორებით არ დაექვემდებაროს), და
+        //    ერთი დადებითი, append-only reversal იქმნება თითო ჩანაწერზე. ──
+        const unsettled = await tx.customerAdjustment.findMany({
+          where: { orderId: order.id, kind: "RETURN_FEE", settledAt: null },
+        });
+        for (const row of unsettled) {
+          const claimed = await tx.customerAdjustment.updateMany({
+            where: { id: row.id, settledAt: null },
+            data: { settledAt: new Date() },
+          });
+          if (claimed.count === 0) continue; // პარალელურად უკვე დაჭერილი
+          const fee = -Number(row.amount); // row.amount უარყოფითია (customer owes)
+          await tx.customerAdjustment.create({
+            data: {
+              customerId: order.customerId,
+              orderId: order.id,
+              parcelId: row.parcelId,
+              amount: fee,
+              kind: "RETURN_FEE_WAIVED",
+              reason: `დისპეჩერის გაუქმება — ${body.reason}`,
+              createdById: session.sub,
+            },
+          });
+          waived = true;
+          waivedLedgerAmount = Math.round((waivedLedgerAmount + fee) * 100) / 100;
+        }
+      } else if (body.waiveReturnFee) {
+        // ── ლეგასი ერთამანათიანი შეკვეთა — Order.returnFee ველი ──
         const w = await tx.order.updateMany({
           where: { id: order.id, returnFee: { gt: 0 }, chargeSettledAt: null },
           data: { returnFee: 0 },
@@ -87,7 +122,7 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       }
 
       if (!waived && !adjusted && !deduped) throw new ApiError(400, "არაფერი შესაცვლელი");
-      return { waived, adjusted, deduped };
+      return { waived, waivedLedgerAmount, adjusted, deduped };
     });
 
     if (waived || adjusted) {
@@ -98,7 +133,11 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
             create: {
               status: order.status,
               note: [
-                waived ? "ჩაშლის საფასური გაუქმდა" : null,
+                waived && order.isMultiParcel
+                  ? `დაბრუნების საფასური გაუქმდა (${GEL(waivedLedgerAmount)}) — ${body.reason}`
+                  : waived
+                    ? "ჩაშლის საფასური გაუქმდა"
+                    : null,
                 adjusted ? `მომხმარებელს დაერიცხა ${GEL(adjusted)} (${KIND_LABEL[body.kind ?? "GOODWILL"]})` : null,
               ]
                 .filter(Boolean)
@@ -119,6 +158,6 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       });
     }
 
-    return ok({ ok: true, waived, adjusted, deduped });
+    return ok({ ok: true, waived, waivedLedgerAmount, adjusted, deduped });
   });
 }

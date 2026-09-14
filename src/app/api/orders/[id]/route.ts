@@ -5,6 +5,7 @@ import { editOrderSchema } from "@/lib/validation";
 import { calculatePrice, resolveCityId, estimateDelivery } from "@/lib/pricing";
 import { getSetting } from "@/lib/settings";
 import { notify, notifyDispatchers, notifyDriver } from "@/lib/notify";
+import { reallocateParcels } from "@/lib/parcels";
 import type { Prisma } from "@prisma/client";
 
 // რომელ სტატუსებზეა შეკვეთის რედაქტირება დაშვებული
@@ -115,6 +116,25 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       data.paymentMethod ||
       data.collectAmount !== undefined;
 
+    // Audit fix (B3) — მრავალამანათიან შეკვეთაზე ფასის ცვლილება დაშვებულია
+    // მხოლოდ მანამ, სანამ ყველა ამანათი კვლავ PENDING-ია (pickup დაუწყებელი) —
+    // თორემ OrderParcel.allocated*-ის ხელახლა გაანგარიშება უკვე დამუშავებულ
+    // (PICKED_UP/DELIVERED/...) ამანათებს გადააწერდა არასწორ თანხას.
+    let multiParcelRows: { id: string }[] = [];
+    if (priceAffecting && order.isMultiParcel) {
+      const parcels = await prisma.orderParcel.findMany({
+        where: { orderId: order.id },
+        orderBy: { sequenceNo: "asc" },
+        select: { id: true, status: true },
+      });
+      if (parcels.some((p) => p.status !== "PENDING"))
+        throw new ApiError(
+          409,
+          "ამანათები უკვე დამუშავებულია — ფასის/წონის/COD-ის ცვლილება ვერ მოხერხდება ამ ეტაპზე",
+        );
+      multiParcelRows = parcels;
+    }
+
     if (data.weightKg != null) upd.weightKg = data.weightKg;
     if (data.paymentMethod) upd.paymentMethod = data.paymentMethod;
 
@@ -164,19 +184,36 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       upd.estimatedDeliveryAt = eta;
     }
 
-    const updated = await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        ...upd,
-        events: {
-          create: {
-            status: order.status,
-            note: "შეკვეთა დარედაქტირდა",
-            actorId: session.sub,
+    const updated = await prisma.$transaction(async (tx) => {
+      const o = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          ...upd,
+          events: {
+            create: {
+              status: order.status,
+              note:
+                priceAffecting && order.isMultiParcel
+                  ? `შეკვეთა დარედაქტირდა — ${multiParcelRows.length} ამანათის ალოკაცია ხელახლა გამოთვლილია (მიტანა ${upd.deliveryPrice} ₾, კურიერი ${upd.driverFee} ₾, COD ${upd.collectAmount ?? Number(order.collectAmount)} ₾)`
+                  : "შეკვეთა დარედაქტირდა",
+              actorId: session.sub,
+            },
           },
         },
-      },
-      include: orderInclude,
+        include: orderInclude,
+      });
+
+      if (priceAffecting && order.isMultiParcel && multiParcelRows.length > 0) {
+        const netCollectAmount =
+          data.collectAmount !== undefined ? (data.collectAmount ?? 0) : Number(order.collectAmount);
+        await reallocateParcels(tx, multiParcelRows, {
+          deliveryPrice: Number(upd.deliveryPrice),
+          driverFee: Number(upd.driverFee),
+          collectAmount: netCollectAmount,
+        });
+      }
+
+      return o;
     });
 
     // შეტყობინებები

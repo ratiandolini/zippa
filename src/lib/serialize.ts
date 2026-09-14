@@ -31,7 +31,10 @@ export const orderInclude = {
   // ერთადერთი წყარო, არა UI-გამოთვლა). ლეგასი შეკვეთაზეც შეიძლება არსებობდეს
   // ძველი REFUND/COMPENSATION/GOODWILL ჩანაწერი — ეს ველი მხოლოდ parcelFinance-ს
   // ემსახურება და customer-ისთვის ცალკე არ ბრუნდება.
-  adjustments: { select: { amount: true, kind: true, parcelId: true, settledAt: true } },
+  adjustments: {
+    select: { amount: true, kind: true, parcelId: true, settledAt: true, reason: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  },
 } satisfies Prisma.OrderInclude;
 
 type OrderWith = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -233,10 +236,25 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
               Math.round(delivered.reduce((s, p) => s + num(p.allocatedDriverFee), 0) * 100) / 100;
             const originalTotal = num(o.totalPrice);
 
-            const charges = o.adjustments.filter((a) => a.kind === "DELIVERY_CHARGE" || a.kind === "RETURN_FEE");
-            const sum = (rows: typeof charges) => Math.round(rows.reduce((s, a) => s - num(a.amount), 0) * 100) / 100;
-            const finalPayable = sum(charges);
-            const unsettledPayable = sum(charges.filter((a) => !a.settledAt));
+            // Audit fix (B1/R1) — receipt/UI-ისთვის საჩვენებელი ჩაშლა, სრულად
+            // ლეჯერიდან (CustomerAdjustment) წამოსული — არა ცოცხალი გამოთვლა.
+            // DELIVERY_CHARGE/RETURN_FEE ჩანაწერების amount უარყოფითია (კლიენტი
+            // ევალება); RETURN_FEE_WAIVED-ის amount დადებითია (კრედიტი უკან).
+            type LedgerRow = (typeof o.adjustments)[number];
+            const byKind = (k: string) => o.adjustments.filter((a) => a.kind === k);
+            const sumAbs = (rows: LedgerRow[]) =>
+              Math.round(rows.reduce((s, a) => s + Math.abs(num(a.amount)), 0) * 100) / 100;
+            const netOf = (rows: LedgerRow[]) =>
+              Math.round(rows.reduce((s, a) => s - num(a.amount), 0) * 100) / 100;
+
+            const deliveryChargeRows = byKind("DELIVERY_CHARGE");
+            const returnFeeRows = byKind("RETURN_FEE");
+            const returnFeeWaivedRows = byKind("RETURN_FEE_WAIVED");
+            const ledgerRows = [...deliveryChargeRows, ...returnFeeRows, ...returnFeeWaivedRows];
+
+            const deliveredCharge = sumAbs(deliveryChargeRows); // მიტანის საფასური შესრულებულ ნაწილზე
+            const returnFeeCharged = sumAbs(returnFeeRows); // დაბრუნების საფასური, დარიცხულის მიხედვით (waiver-მდე)
+            const returnFeeWaived = sumAbs(returnFeeWaivedRows); // დისპეჩერის მიერ გაუქმებული ნაწილი
             const waivedAmount = Math.round((originalTotal - earnedDeliveryPrice) * 100) / 100;
 
             return {
@@ -245,14 +263,30 @@ export function serializeOrder(o: OrderWith, viewer: OrderViewer = "DISPATCHER")
               originalDriverFee: num(o.driverFee),
               earnedDeliveryPrice,
               earnedDriverFee,
-              waivedAmount,
-              // ჯამური, ლეჯერიდან წამოსული (არა UI-გამოთვლილი) საბოლოო თანხა
-              finalPayable,
-              unsettledPayable,
-              settled: charges.length > 0 && unsettledPayable === 0,
+              waivedAmount, // ჩაუბარებელი ნაწილის ღირებულება (ინფორმაციული)
+              deliveredCharge,
+              returnFeeCharged,
+              returnFeeWaived,
+              // ჯამური, ლეჯერიდან წამოსული (არა UI-გამოთვლილი) საბოლოო გადასახდელი
+              finalPayable: netOf(ledgerRows),
+              unsettledPayable: netOf(ledgerRows.filter((a) => !a.settledAt)),
+              settled: ledgerRows.length > 0 && netOf(ledgerRows.filter((a) => !a.settledAt)) === 0,
             };
           })()
         : null,
+    // Audit fix (R3) — დისპეჩერს ხელით ანაზღაურების დამატებამდე უნდა შეეძლოს
+    // დაინახოს, რა ავტომატური DELIVERY_CHARGE/RETURN_FEE(_WAIVED) ჩანაწერები
+    // უკვე არსებობს ამ შეკვეთაზე — რომ არ დაადუბლიროს. მხოლოდ დისპეჩერს.
+    parcelLedger: isDispatcher
+      ? o.adjustments.map((a) => ({
+          kind: a.kind,
+          amount: num(a.amount),
+          parcelId: a.parcelId,
+          reason: a.reason,
+          settledAt: a.settledAt?.toISOString() ?? null,
+          createdAt: a.createdAt.toISOString(),
+        }))
+      : [],
     parcels: o.parcels.map((p) => ({
       id: p.id,
       sequenceNo: p.sequenceNo,

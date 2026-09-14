@@ -101,26 +101,74 @@ export default function ReceiptPage() {
         {order.description && <Row l="აღწერა" v={order.description} />}
         <Row l="ნივთის ღირებულება" v={order.parcelValue != null ? GEL(order.parcelValue) : "—"} />
         <Row l="მანძილი" v={`${order.distanceKm} კმ`} />
-        <Row l="მიტანის საფასური" v={GEL(order.price.delivery)} />
-        {order.collectAmount > 0 && (
-          <>
-            <Row l="მიმღებისგან ასაღები (ნივთი)" v={GEL(order.collectAmount)} />
-            <Row l="ჩვენი საკომისიო თანხის აღებაზე" v={`−${GEL(order.codCommission)}`} />
-          </>
-        )}
         <Row l="გადახდის მეთოდი" v={PAYMENT_METHOD_LABEL[order.paymentMethod]} />
-        {order.cancelFee > 0 && <Row l="გაუქმების საფასური" v={GEL(order.cancelFee)} />}
-        {order.returnFee > 0 && <Row l="დაბრუნების საფასური" v={GEL(order.returnFee)} />}
 
-        <div className="mt-3 flex justify-between border-t-2 border-gray-800 pt-2 text-base font-bold">
-          <span>სულ (მიტანა)</span>
-          <span className="tabular-nums">{GEL(order.price.total)}</span>
-        </div>
-        {order.collectAmount > 0 && (
-          <div className="mt-1 flex justify-between text-sm text-gray-600">
-            <span>გამგზავნს ერგება (ნივთის თანხა − საკომისიო)</span>
-            <span className="tabular-nums">{GEL(order.collectAmount - order.codCommission)}</span>
-          </div>
+        {/* Audit fix (B1) — მრავალამანათიან, დასრულებულ შეკვეთაზე ქვითარი იმ
+            ლეჯერს ეყრდნობა, რასაც COD/remittance რეალურად იყენებს (parcelFinance),
+            არა საწყისი შექმნის-დროინდელ price snapshot-ს. */}
+        {order.isMultiParcel && order.parcelFinance ? (
+          <>
+            <Row l="საწყისი შეკვეთის თანხა" v={GEL(order.parcelFinance.originalTotal)} />
+            <Row
+              l={`ჩაბარებული ნაწილის საფასური (${order.parcelSummary.delivered}/${order.parcelSummary.total})`}
+              v={GEL(order.parcelFinance.deliveredCharge)}
+            />
+            {order.parcelFinance.returnFeeCharged > 0 && (
+              <Row l="დაბრუნების საფასური" v={GEL(order.parcelFinance.returnFeeCharged)} />
+            )}
+            {order.parcelFinance.returnFeeWaived > 0 && (
+              <Row l="დაბრუნების საფასურის გაუქმება" v={`−${GEL(order.parcelFinance.returnFeeWaived)}`} />
+            )}
+            {order.parcelFinance.waivedAmount > 0 && (
+              <Row l="ვერ-ჩაბარებული ნაწილის ღირებულება (არ ერიცხება)" v={GEL(order.parcelFinance.waivedAmount)} />
+            )}
+            {order.collectAmount > 0 && (
+              <>
+                <Row l="მიმღებისგან ასაღები (ნივთი, ჩაბარებულზე)" v={GEL(order.collectAmount)} />
+                <Row l="ჩვენი საკომისიო თანხის აღებაზე" v={`−${GEL(order.codCommission)}`} />
+              </>
+            )}
+
+            <div className="mt-3 flex justify-between border-t-2 border-gray-800 pt-2 text-base font-bold">
+              <span>საბოლოო გადასახდელი</span>
+              <span className="tabular-nums">{GEL(order.parcelFinance.finalPayable)}</span>
+            </div>
+            <div className="mt-1 flex justify-between text-xs text-gray-500">
+              <span>{order.parcelFinance.settled ? "ანგარიშსწორებულია" : "ჯერ არ არის ანგარიშსწორებული"}</span>
+              <span className="tabular-nums">
+                {order.parcelFinance.unsettledPayable !== 0 && `გადასახდელი: ${GEL(order.parcelFinance.unsettledPayable)}`}
+              </span>
+            </div>
+            {order.collectAmount > 0 && (
+              <div className="mt-1 flex justify-between text-sm text-gray-600">
+                <span>გამგზავნს ერგება (ნივთის თანხა − საკომისიო)</span>
+                <span className="tabular-nums">{GEL(order.collectAmount - order.codCommission)}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <Row l="მიტანის საფასური" v={GEL(order.price.delivery)} />
+            {order.collectAmount > 0 && (
+              <>
+                <Row l="მიმღებისგან ასაღები (ნივთი)" v={GEL(order.collectAmount)} />
+                <Row l="ჩვენი საკომისიო თანხის აღებაზე" v={`−${GEL(order.codCommission)}`} />
+              </>
+            )}
+            {order.cancelFee > 0 && <Row l="გაუქმების საფასური" v={GEL(order.cancelFee)} />}
+            {order.returnFee > 0 && <Row l="დაბრუნების საფასური" v={GEL(order.returnFee)} />}
+
+            <div className="mt-3 flex justify-between border-t-2 border-gray-800 pt-2 text-base font-bold">
+              <span>სულ (მიტანა)</span>
+              <span className="tabular-nums">{GEL(order.price.total)}</span>
+            </div>
+            {order.collectAmount > 0 && (
+              <div className="mt-1 flex justify-between text-sm text-gray-600">
+                <span>გამგზავნს ერგება (ნივთის თანხა − საკომისიო)</span>
+                <span className="tabular-nums">{GEL(order.collectAmount - order.codCommission)}</span>
+              </div>
+            )}
+          </>
         )}
 
         <div className="mt-6 text-xs text-gray-400">

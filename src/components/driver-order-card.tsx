@@ -193,22 +193,35 @@ export function DriverOrderCard({ order, onChange }: { order: OrderDTO; onChange
 
       {order.codAmount > 0 ? (
         <div className="mt-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-[11px]">
-          {order.payerSide === "SENDER" && order.price.total > 0 && (
+          {/* Audit fix (B2) — მრავალამანათიან შეკვეთაზე აღებისას გამგზავნისგან
+              არაფერი არ იკრიბება — საბოლოო თანხა (parcelFinance.finalPayable)
+              ცნობილია მხოლოდ ჩაბარების/დაბრუნების დასრულების შემდეგ, ისე რომ
+              აღებისას აღებული სრული საწყისი თანხა + შემდეგ ლეჯერის დარიცხვა
+              ორმაგ გადახდას არ გამოწვევდეს. */}
+          {!order.isMultiParcel && order.payerSide === "SENDER" && order.price.total > 0 && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">აღებისას გამგზავნისგან</span>
               <span className="font-medium tabular-nums">{GEL(order.price.total)}</span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">ჩაბარებისას მიმღებისგან</span>
-            <span className="font-medium tabular-nums">
-              {GEL(
-                order.payerSide === "SENDER"
-                  ? order.codAmount - order.price.total
-                  : order.codAmount,
-              )}
-            </span>
-          </div>
+          {order.isMultiParcel && order.payerSide === "SENDER" && (
+            <div className="text-muted-foreground">
+              აღებისას გამგზავნისგან არაფერი არ იკრიბება — საბოლოო თანხა დაითვლება მიტანის/დაბრუნების
+              დასრულების შემდეგ.
+            </div>
+          )}
+          {!order.isMultiParcel && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">ჩაბარებისას მიმღებისგან</span>
+              <span className="font-medium tabular-nums">
+                {GEL(
+                  order.payerSide === "SENDER"
+                    ? order.codAmount - order.price.total
+                    : order.codAmount,
+                )}
+              </span>
+            </div>
+          )}
           {order.collectAmount > 0 && (
             <div className="mt-0.5 text-accent">მათ შორის ნივთის ღირებულება {GEL(order.collectAmount)}</div>
           )}

@@ -767,23 +767,36 @@ function AdjustForm({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [amount, setAmount] = useState(order.returnFee > 0 ? String(order.price.delivery) : "");
+  const hasLegacyReturnFee = order.returnFee > 0;
+  const unsettledLedgerReturnFee =
+    order.isMultiParcel && order.parcelLedger
+      ? order.parcelLedger.filter((a) => a.kind === "RETURN_FEE" && !a.settledAt)
+      : [];
+  const canWaiveReturnFee = hasLegacyReturnFee || unsettledLedgerReturnFee.length > 0;
+
+  const [amount, setAmount] = useState(hasLegacyReturnFee ? String(order.price.delivery) : "");
   const [reason, setReason] = useState("");
+  const [waive, setWaive] = useState(canWaiveReturnFee);
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const amt = parseFloat(amount);
+  const hasExistingLedger = order.isMultiParcel && (order.parcelLedger?.length ?? 0) > 0;
 
   async function save() {
-    if (!(amt > 0)) return setErr("შეავსე თანხა");
+    if (!(amt > 0) && !waive) return setErr("შეავსე თანხა ან მონიშნე დაბრუნების საფასურის გაუქმება");
     if (reason.trim().length < 3) return setErr("მიუთითე მიზეზი");
+    // Audit fix (R3) — თუ ამ შეკვეთაზე უკვე არსებობს ავტომატური ლეჯერ-ჩანაწერი,
+    // დამატებითი ხელით დარიცხვის დაფიქსირებამდე დისპეჩერს ცალკე ვათხოვებთ დადასტურებას.
+    if (hasExistingLedger && !confirmed)
+      return setErr("დაადასტურე, რომ იხედავ არსებულ ავტომატურ ჩანაწერებს ზემოთ");
     setBusy(true);
     setErr(null);
     try {
       await api(`/api/orders/${order.id}/adjust`, "POST", {
-        amount: amt,
-        kind: "COMPENSATION",
+        ...(amt > 0 ? { amount: amt, kind: "COMPENSATION" } : {}),
         reason: reason.trim(),
-        waiveReturnFee: order.returnFee > 0,
+        waiveReturnFee: waive,
       });
       onDone();
     } catch (e) {
@@ -797,6 +810,25 @@ function AdjustForm({
   return (
     <div className="mt-2 space-y-2 rounded-md border border-accent/40 bg-accent/[0.05] p-2.5">
       <div className="text-[11px] font-medium">ანაზღაურება მომხმარებელს</div>
+
+      {hasExistingLedger && (
+        <div className="rounded-md bg-muted/60 p-1.5 text-[11px]">
+          <div className="mb-1 font-medium text-muted-foreground">
+            ამ შეკვეთაზე უკვე არსებული ავტომატური ჩანაწერები:
+          </div>
+          <div className="space-y-0.5">
+            {order.parcelLedger!.map((a, i) => (
+              <div key={i} className="flex justify-between gap-2">
+                <span className="truncate text-muted-foreground">
+                  {a.kind} {a.settledAt ? "· ანგარიშსწორებული" : "· გადასახდელი"}
+                </span>
+                <span className="tabular-nums">{GEL(a.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <label className="block text-[11px] text-muted-foreground">
         თანხა ₾ (ჩაირიცხება „მიღებულ თანხებში")
         <input
@@ -817,8 +849,20 @@ function AdjustForm({
           onChange={(e) => setReason(e.target.value)}
         />
       </label>
-      {order.returnFee > 0 && (
-        <p className="text-[11px] text-muted-foreground">დაბრუნების საფასური ({GEL(order.returnFee)}) ჩამოიწერება.</p>
+      {canWaiveReturnFee && (
+        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <input type="checkbox" checked={waive} onChange={(e) => setWaive(e.target.checked)} />
+          დაბრუნების საფასურის გაუქმება
+          {hasLegacyReturnFee
+            ? ` (${GEL(order.returnFee)})`
+            : ` (${GEL(unsettledLedgerReturnFee.reduce((s, a) => s - a.amount, 0))})`}
+        </label>
+      )}
+      {hasExistingLedger && (
+        <label className="flex items-center gap-1.5 text-[11px] font-medium">
+          <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+          დავადასტურე ზემოთ არსებული ჩანაწერების დათვალიერება
+        </label>
       )}
       {err && <div className="text-[11px] text-destructive">{err}</div>}
       <div className="flex gap-2">

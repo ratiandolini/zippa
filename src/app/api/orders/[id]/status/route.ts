@@ -180,6 +180,32 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
         include: orderInclude,
       });
 
+      // Audit fix (R2) — მრავალამანათიანი შეკვეთის pickup-მდელი გაუქმება: ყველა
+      // ჯერ-არ-აღებული ამანათი (PENDING/NOT_PICKED_UP) გადადის CANCELLED-ზე,
+      // ცალკე OrderParcelEvent-ით. ამ დროისთვის ვერც ერთი ამანათი არ არის
+      // PICKED_UP/DELIVERED (isPostPickupCancel ზემოთ უკვე დაბლოკილია
+      // isMultiParcel-ზე), ამიტომ არც მიტანის საფასური, არც დაბრუნების საფასური,
+      // არც COD, არც კურიერის ანაზღაურება არასდროს იქმნება ამ განშტოებაში.
+      if (body.status === "CANCELLED" && order.isMultiParcel) {
+        const stillOpen = await tx.orderParcel.findMany({
+          where: { orderId: order.id, status: { in: ["PENDING", "NOT_PICKED_UP"] } },
+        });
+        for (const p of stillOpen) {
+          await tx.orderParcel.update({
+            where: { id: p.id },
+            data: { status: "CANCELLED", cancelledAt: new Date() },
+          });
+          await tx.orderParcelEvent.create({
+            data: {
+              parcelId: p.id,
+              status: "CANCELLED",
+              note: "შეკვეთის გაუქმება — ამანათი აღების წინ",
+              actorId: session.sub,
+            },
+          });
+        }
+      }
+
       if (body.status === "DELIVERED" && order.driverId) {
         const gross = Number(order.totalPrice);
         const driverAmount = Number(order.driverFee); // სნეპშოტი შეკვეთის შექმნიდან
