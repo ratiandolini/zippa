@@ -2,15 +2,37 @@
 const PROVIDER = (process.env.EMAIL_PROVIDER || "LOG").toUpperCase();
 const FROM = process.env.EMAIL_FROM || "Zippa <onboarding@resend.dev>";
 
+// category — Sentry-ში დასალოგებელი უსაფრთხო, არა-მგრმნობიარე სტატუსი.
+// არასდროს არ შეიცავს ელფოსტის მისამართს, კოდს, key-ს, ან provider-ის raw pასუხს.
+export type EmailFailureCategory =
+  | "missing_api_key"
+  | "auth_error"
+  | "validation_error"
+  | "rate_limited"
+  | "provider_error"
+  | "unknown_http_error"
+  | "network_error";
+
 export interface EmailResult {
   ok: boolean;
   provider: string;
   info?: string;
+  category?: EmailFailureCategory;
+  httpStatus?: number;
+}
+
+function categorizeHttpStatus(status: number): EmailFailureCategory {
+  if (status === 401 || status === 403) return "auth_error";
+  if (status === 400 || status === 422) return "validation_error";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "provider_error";
+  return "unknown_http_error";
 }
 
 async function sendViaResend(to: string, subject: string, text: string): Promise<EmailResult> {
   const key = process.env.RESEND_API_KEY;
-  if (!key) return { ok: false, provider: "RESEND", info: "RESEND_API_KEY არ არის" };
+  if (!key)
+    return { ok: false, provider: "RESEND", info: "RESEND_API_KEY არ არის", category: "missing_api_key" };
 
   const html = `<div style="font-family:sans-serif;font-size:15px;color:#111"><p>${text
     .replace(/&/g, "&amp;")
@@ -33,9 +55,20 @@ async function sendViaResend(to: string, subject: string, text: string): Promise
       }),
     });
     const body = await res.text();
-    return { ok: res.ok, provider: "RESEND", info: body.slice(0, 200) };
+    return {
+      ok: res.ok,
+      provider: "RESEND",
+      info: body.slice(0, 200),
+      httpStatus: res.status,
+      category: res.ok ? undefined : categorizeHttpStatus(res.status),
+    };
   } catch (e) {
-    return { ok: false, provider: "RESEND", info: e instanceof Error ? e.message : "error" };
+    return {
+      ok: false,
+      provider: "RESEND",
+      info: e instanceof Error ? e.message : "error",
+      category: "network_error",
+    };
   }
 }
 

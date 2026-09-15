@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db";
 import { handle, ok, throttle } from "@/lib/api";
 import { forgotSchema } from "@/lib/validation";
@@ -29,10 +30,21 @@ export function POST(req: Request) {
           },
         });
         const tpl = emailTemplates.resetCode(code);
-        await Promise.all([
+        const [, emailResult] = await Promise.all([
           sendSms(user.phone, smsTemplates.resetCode(code)),
           sendEmail(user.email, tpl.subject, tpl.text),
         ]);
+        // მხოლოდ უსაფრთხო, არა-მგრმნობიარე ველები — არასდროს ელფოსტა/კოდი/
+        // key/token/provider-ის raw პასუხი. კლიენტის პასუხი უცვლელია (§3).
+        if (!emailResult.ok) {
+          Sentry.captureMessage("password-reset email send failed", {
+            level: "warning",
+            tags: {
+              email_provider: emailResult.provider,
+              email_failure_category: emailResult.category ?? "unknown",
+            },
+          });
+        }
       }
     }
 
