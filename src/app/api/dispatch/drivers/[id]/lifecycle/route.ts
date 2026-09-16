@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, throttle, ApiError } from "@/lib/api";
 import { driverLifecycleActionSchema } from "@/lib/validation";
-import { driverHasActiveOrders, getDriverHistoryBlockers } from "@/lib/driver-lifecycle";
+import {
+  driverHasActiveOrders,
+  getDriverHistoryBlockers,
+  recordLifecycleTransition,
+  type LifecycleTarget,
+} from "@/lib/driver-lifecycle";
 
 // დისპეჩერის მართული კურიერის lifecycle: SUSPEND/ARCHIVE/REACTIVATE/DELETE.
 // ეს ცალკეა isApproved-გან (ვერიფიკაცია) და status-გან (ონლაინ/ოფლაინ) —
@@ -92,54 +97,20 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       }
     }
 
-    if (body.action === "SUSPEND" || body.action === "ARCHIVE") {
-      await prisma.$transaction([
-        prisma.driverProfile.update({
-          where: { id: driver.id },
-          data: { lifecycleStatus: TARGET_STATUS[body.action] as never },
+    if (body.action === "SUSPEND" || body.action === "ARCHIVE" || body.action === "REACTIVATE") {
+      const target: LifecycleTarget = body.action === "REACTIVATE" ? "ACTIVE" : TARGET_STATUS[body.action] as LifecycleTarget;
+      await prisma.$transaction((tx) =>
+        recordLifecycleTransition(tx, {
+          driverId: driver.id,
+          userId: driver.userId,
+          target,
+          reason: body.reason,
+          actorId: session.sub,
+          driverNameSnapshot: driver.user.name,
+          driverPhoneSnapshot: driver.user.phone,
         }),
-        // login-ის დაბლოკვა + არსებული სესიის დაუყოვნებელი მოკვდინება —
-        // getSession() ყოველ request-ზე ამოწმებს isActive-ს და tokenVersion-ს.
-        prisma.user.update({
-          where: { id: driver.userId },
-          data: { isActive: false, tokenVersion: { increment: 1 } },
-        }),
-        prisma.driverLifecycleEvent.create({
-          data: {
-            driverId: driver.id,
-            actorId: session.sub,
-            action: TARGET_STATUS[body.action],
-            reason: body.reason,
-            driverNameSnapshot: driver.user.name,
-            driverPhoneSnapshot: driver.user.phone,
-          },
-        }),
-      ]);
-      return ok({ lifecycleStatus: TARGET_STATUS[body.action] });
-    }
-
-    if (body.action === "REACTIVATE") {
-      await prisma.$transaction([
-        prisma.driverProfile.update({
-          where: { id: driver.id },
-          data: { lifecycleStatus: "ACTIVE" },
-        }),
-        prisma.user.update({
-          where: { id: driver.userId },
-          data: { isActive: true },
-        }),
-        prisma.driverLifecycleEvent.create({
-          data: {
-            driverId: driver.id,
-            actorId: session.sub,
-            action: "REACTIVATED",
-            reason: body.reason,
-            driverNameSnapshot: driver.user.name,
-            driverPhoneSnapshot: driver.user.phone,
-          },
-        }),
-      ]);
-      return ok({ lifecycleStatus: "ACTIVE" });
+      );
+      return ok({ lifecycleStatus: target });
     }
 
     // DELETE — permanent. Event პირველად იწერება (driverId ჯერ კიდევ ვალიდურია),

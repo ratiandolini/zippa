@@ -159,7 +159,9 @@ describe("კურიერის დეაქტივაცია", () => {
     actAs(session(disp));
 
     // ხელზე ნაღდი — ვერ დეაქტივდება
-    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
+    expect(
+      (await call(deactivateDriver, { params: { id: drv.profile.id }, body: { reason: "ტესტი" } })).status,
+    ).toBe(409);
 
     // ნაღდი ჩააბარა
     actAs(session(drv.user));
@@ -168,20 +170,38 @@ describe("კურიერის დეაქტივაცია", () => {
     await call(reviewSettlement, { params: { id: (s.body.settlement as { id: string }).id }, body: { action: "CONFIRM" } });
 
     // ანაზღაურება ისევ ღიაა — payout ფლაგის გარეშე 409
-    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
+    expect(
+      (await call(deactivateDriver, { params: { id: drv.profile.id }, body: { reason: "ტესტი" } })).status,
+    ).toBe(409);
 
-    // payout=1 → იხდის და თიშავს
-    const r = await call(deactivateDriver, { params: { id: drv.profile.id }, query: { payout: "1" } });
+    // reason-ის გარეშე → 422 (mandatory)
+    expect(
+      (await call(deactivateDriver, { params: { id: drv.profile.id }, query: { payout: "1" } })).status,
+    ).toBe(422);
+
+    // payout=1 + reason → იხდის და თიშავს
+    const r = await call(deactivateDriver, {
+      params: { id: drv.profile.id },
+      query: { payout: "1" },
+      body: { reason: "კურიერი წყვეტს თანამშრომლობას" },
+    });
     expect(r.status).toBe(200);
     expect((r.body as { paidOut: number }).paidOut).toBe(5);
 
     const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
     expect(dp.status).toBe("OFFLINE");
+    expect(dp.lifecycleStatus).toBe("ARCHIVED");
     expect(Number(dp.unpaidEarnings)).toBe(0);
     const u = await prisma.user.findUniqueOrThrow({ where: { id: drv.user.id } });
     expect(u.isActive).toBe(false);
     expect(u.tokenVersion).toBe(1);
     expect(await prisma.payout.count({ where: { driverId: drv.profile.id } })).toBe(1);
+
+    const event = await prisma.driverLifecycleEvent.findFirstOrThrow({
+      where: { driverId: drv.profile.id },
+    });
+    expect(event.action).toBe("ARCHIVED");
+    expect(event.reason).toBe("კურიერი წყვეტს თანამშრომლობას");
   });
 
   it("მიმდინარე შეკვეთით → 409", async () => {
@@ -192,6 +212,27 @@ describe("კურიერის დეაქტივაცია", () => {
     const o = (await call(createOrder, { body: body() })).body.order as { id: string };
     actAs(session(disp));
     await call(assign, { params: { id: o.id }, body: { driverId: drv.profile.id } });
-    expect((await call(deactivateDriver, { params: { id: drv.profile.id } })).status).toBe(409);
+    expect(
+      (await call(deactivateDriver, { params: { id: drv.profile.id }, body: { reason: "ტესტი" } })).status,
+    ).toBe(409);
+  });
+
+  it("reason-ის გარეშე → 422, კურიერი უცვლელი რჩება (ლეგასი bypass არ არსებობს)", async () => {
+    const drv = await makeDriver({ approved: true });
+    const r = await call(deactivateDriver, { params: { id: drv.profile.id } });
+    expect(r.status).toBe(422);
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: drv.profile.id } });
+    expect(dp.lifecycleStatus).toBe("ACTIVE");
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: drv.user.id } });
+    expect(u.isActive).toBe(true);
+    expect(await prisma.driverLifecycleEvent.count({ where: { driverId: drv.profile.id } })).toBe(0);
+  });
+
+  it("უკვე დაარქივებულ კურიერზე ხელახლა → 409 (idempotent, ლეგასი-გავლითაც)", async () => {
+    const drv = await makeDriver({ approved: true });
+    const r1 = await call(deactivateDriver, { params: { id: drv.profile.id }, body: { reason: "პირველი" } });
+    expect(r1.status).toBe(200);
+    const r2 = await call(deactivateDriver, { params: { id: drv.profile.id }, body: { reason: "მეორე" } });
+    expect(r2.status).toBe(409);
   });
 });

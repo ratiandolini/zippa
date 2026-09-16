@@ -1,5 +1,59 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ACTIVE_ORDER_STATUSES } from "@/lib/domain";
+
+type Db = PrismaClient | Prisma.TransactionClient;
+
+export type LifecycleTarget = "SUSPENDED" | "ARCHIVED" | "ACTIVE";
+const EVENT_ACTION: Record<LifecycleTarget, string> = {
+  SUSPENDED: "SUSPENDED",
+  ARCHIVED: "ARCHIVED",
+  ACTIVE: "REACTIVATED",
+};
+
+/**
+ * ერთადერთი წერტილი, სადაც lifecycleStatus იცვლება — user.isActive/tokenVersion-ის
+ * (login-ბლოკი + სესიის მოკვდინება getSession()-ის მეშვეობით) და DriverLifecycleEvent
+ * აუდიტის ჩანაწერთან ერთად, ატომურად. ნებისმიერი მომხმარებელი ამ ფუნქციაზე უნდა
+ * გადიოდეს — legacy DELETE-ის ჩათვლით — რომ აუდიტი/mandatory reason/სესია-კვდომა
+ * არსად არ გამოტოვდეს.
+ */
+export async function recordLifecycleTransition(
+  db: Db,
+  args: {
+    driverId: string;
+    userId: string;
+    target: LifecycleTarget;
+    reason: string;
+    actorId?: string;
+    driverNameSnapshot: string;
+    driverPhoneSnapshot: string;
+    /** დამატებითი DriverProfile ველები ერთსა და იმავე update-ში (მაგ. status/unpaidEarnings legacy-დან) */
+    extraProfileData?: Prisma.DriverProfileUpdateInput;
+  },
+) {
+  await db.driverProfile.update({
+    where: { id: args.driverId },
+    data: { lifecycleStatus: args.target, ...args.extraProfileData },
+  });
+  await db.user.update({
+    where: { id: args.userId },
+    data:
+      args.target === "ACTIVE"
+        ? { isActive: true }
+        : { isActive: false, tokenVersion: { increment: 1 } },
+  });
+  await db.driverLifecycleEvent.create({
+    data: {
+      driverId: args.driverId,
+      actorId: args.actorId,
+      action: EVENT_ACTION[args.target],
+      reason: args.reason,
+      driverNameSnapshot: args.driverNameSnapshot,
+      driverPhoneSnapshot: args.driverPhoneSnapshot,
+    },
+  });
+}
 
 /** true — კურიერს აქვს მიმდინარე (დაუსრულებელი) შეკვეთა — lifecycle-ქმედება ბლოკავს */
 export async function driverHasActiveOrders(driverId: string): Promise<boolean> {

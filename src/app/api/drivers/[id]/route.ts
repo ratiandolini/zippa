@@ -2,13 +2,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireRole, handle, ok, fail, ApiError } from "@/lib/api";
 import { notify } from "@/lib/notify";
-import { ACTIVE_ORDER_STATUSES } from "@/lib/domain";
+import { driverHasActiveOrders, recordLifecycleTransition } from "@/lib/driver-lifecycle";
 
 const schema = z.object({
   isApproved: z.boolean().optional(),
   vehicleType: z.enum(["BIKE", "MOTORCYCLE", "CAR", "VAN"]).optional(),
   vehicleNumber: z.string().trim().max(20).optional(),
   cityId: z.string().cuid().nullable().optional(),
+});
+
+const legacyDeactivateSchema = z.object({
+  reason: z.string().trim().min(3, "მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)").max(500),
 });
 
 export function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -134,19 +138,24 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
   });
 }
 
-// კურიერის დეაქტივაცია (ანგარიშის გაუქმება). ?payout=1 → ჯერ გადაუხდის დარჩენილ ანაზღაურებას.
+// კურიერის დეაქტივაცია (ლეგასი — ახლა lifecycle-სისტემის ARCHIVE-ზე დელეგირდება,
+// იმავე mandatory-reason/active-order/audit ერანტიით). ?payout=1 → ჯერ გადაუხდის
+// დარჩენილ ანაზღაურებას — ეს დამატებითი convenience-ნაბიჯია ARCHIVE-ის წინ,
+// ცალკე lifecycle-ის endpoint-ს ეს არ აქვს.
 export function DELETE(req: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     const session = await requireRole("DISPATCHER");
     const payoutFirst = new URL(req.url).searchParams.get("payout") === "1";
+    const { reason } = legacyDeactivateSchema.parse(await req.json().catch(() => ({})));
 
-    const dp = await prisma.driverProfile.findUnique({ where: { id: params.id } });
-    if (!dp) return fail(404, "კურიერი ვერ მოიძებნა");
-
-    const activeCount = await prisma.order.count({
-      where: { driverId: dp.id, status: { in: ACTIVE_ORDER_STATUSES } },
+    const dp = await prisma.driverProfile.findUnique({
+      where: { id: params.id },
+      include: { user: { select: { name: true, phone: true } } },
     });
-    if (activeCount > 0)
+    if (!dp) return fail(404, "კურიერი ვერ მოიძებნა");
+    if (dp.lifecycleStatus === "ARCHIVED") return fail(409, "კურიერი უკვე დაარქივებულია");
+
+    if (await driverHasActiveOrders(dp.id))
       throw new ApiError(409, "კურიერს აქვს მიმდინარე შეკვეთა — ჯერ გადაანაწილე ან დაასრულე");
 
     const unpaid = Number(dp.unpaidEarnings);
@@ -177,13 +186,15 @@ export function DELETE(req: Request, { params }: { params: { id: string } }) {
           data: { isSettled: true },
         });
       }
-      await tx.driverProfile.update({
-        where: { id: dp.id },
-        data: { status: "OFFLINE", isApproved: false, unpaidEarnings: 0 },
-      });
-      await tx.user.update({
-        where: { id: dp.userId },
-        data: { isActive: false, tokenVersion: { increment: 1 } },
+      await recordLifecycleTransition(tx, {
+        driverId: dp.id,
+        userId: dp.userId,
+        target: "ARCHIVED",
+        reason,
+        actorId: session.sub,
+        driverNameSnapshot: dp.user.name,
+        driverPhoneSnapshot: dp.user.phone,
+        extraProfileData: { status: "OFFLINE", isApproved: false, unpaidEarnings: 0 },
       });
     });
 
