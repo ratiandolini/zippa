@@ -20,6 +20,7 @@ import {
   EARNING_KIND_LABEL,
   DRIVER_LIFECYCLE_LABEL,
   DRIVER_LIFECYCLE_ACTION_LABEL,
+  driverPendingLifecycleLabel,
 } from "@/lib/domain";
 import type { SettlementStatus } from "@prisma/client";
 import type { VehicleType } from "@prisma/client";
@@ -115,7 +116,9 @@ function DriverLifecyclePanel({ driverId }: { driverId: string }) {
         <CardTitle className="flex items-center justify-between">
           <span>კურიერის სტატუსი</span>
           <Badge tone={LIFECYCLE_TONE[data.lifecycleStatus]}>
-            {DRIVER_LIFECYCLE_LABEL[data.lifecycleStatus]}
+            {data.isApproved
+              ? DRIVER_LIFECYCLE_LABEL[data.lifecycleStatus]
+              : driverPendingLifecycleLabel(data.lifecycleStatus)}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -150,9 +153,8 @@ function DriverLifecyclePanel({ driverId }: { driverId: string }) {
             <>
               <Button
                 size="sm"
-                disabled={busy || !data.isApproved}
+                disabled={busy}
                 onClick={() => run("REACTIVATE", "აღდგენის მიზეზი (სავალდებულო):")}
-                title={!data.isApproved ? "საჭიროა დამტკიცებული ვერიფიკაცია" : undefined}
               >
                 აღდგენა
               </Button>
@@ -169,12 +171,16 @@ function DriverLifecyclePanel({ driverId }: { driverId: string }) {
           {data.lifecycleStatus === "ARCHIVED" && (
             <Button
               size="sm"
-              disabled={busy || !data.isApproved}
+              disabled={busy}
               onClick={() => run("REACTIVATE", "აღდგენის მიზეზი (სავალდებულო):")}
-              title={!data.isApproved ? "საჭიროა დამტკიცებული ვერიფიკაცია" : undefined}
             >
               აღდგენა
             </Button>
+          )}
+          {!data.isApproved && data.lifecycleStatus !== "ACTIVE" && (
+            <p className="w-full text-xs text-muted-foreground">
+              აღდგენის შემდეგ კურიერი კვლავ დასამტკიცებელი გახდება — თავად აღდგენა დამტკიცებას არ ნიშნავს.
+            </p>
           )}
           {data.canDelete && (
             <Button

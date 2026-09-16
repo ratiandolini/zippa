@@ -171,6 +171,17 @@ export const DRIVER_LIFECYCLE_LABEL: Record<DriverLifecycleStatus, string> = {
   ARCHIVED: "დაარქივებული",
 };
 
+// ჯერ არ დამტკიცებული (isApproved=false) კურიერისთვის — lifecycle-ის მიხედვით
+// გასაგები ჩვენება: ACTIVE-ზე ჯერ კიდევ ჩვეულებრივი "დასამტკიცებელია", ხოლო
+// SUSPENDED/ARCHIVED-ზე დამტკიცება არ ჯერდება, სანამ არ აღდგება.
+export const DRIVER_PENDING_ACTIVE_LABEL = "აქტიური, დამტკიცებას ელოდება";
+export const DRIVER_PENDING_BLOCKED_LABEL =
+  "დაბლოკილი / არქივშია — დამტკიცება შეუძლებელია, ჯერ აღადგინე";
+
+export function driverPendingLifecycleLabel(lifecycleStatus: DriverLifecycleStatus): string {
+  return lifecycleStatus === "ACTIVE" ? DRIVER_PENDING_ACTIVE_LABEL : DRIVER_PENDING_BLOCKED_LABEL;
+}
+
 export const DRIVER_LIFECYCLE_ACTION_LABEL: Record<string, string> = {
   SUSPENDED: "დაბლოკილია",
   ARCHIVED: "დაარქივებულია",

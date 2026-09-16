@@ -250,7 +250,7 @@ describe("driver lifecycle — reactivation", () => {
     expect(lr.status).toBe(200);
   });
 
-  it("REACTIVATE დაუმტკიცებელ (isApproved=false) კურიერზე → 422", async () => {
+  it("REACTIVATE დაუმტკიცებელ (isApproved=false) კურიერზეც მუშაობს — არ საჭიროებს დამტკიცებას, თუმცა isApproved უცვლელი რჩება", async () => {
     const dispatcher = await makeDispatcher();
     const { profile } = await makeDriver({ approved: false });
     await prisma.driverProfile.update({ where: { id: profile.id }, data: { lifecycleStatus: "SUSPENDED" } });
@@ -260,7 +260,11 @@ describe("driver lifecycle — reactivation", () => {
       params: { id: profile.id },
       body: { action: "REACTIVATE", reason: "ტესტი" },
     });
-    expect(r.status).toBe(422);
+    expect(r.status).toBe(200);
+
+    const dp = await prisma.driverProfile.findUniqueOrThrow({ where: { id: profile.id } });
+    expect(dp.lifecycleStatus).toBe("ACTIVE");
+    expect(dp.isApproved).toBe(false); // აღდგენა დამტკიცებას არ ნიშნავს
   });
 
   it("იმავე სტატუსში ხელახლა ერთი და იმავე action → 409 (idempotent)", async () => {

@@ -22,7 +22,18 @@ export function GET(req: Request) {
     const where: Prisma.DriverProfileWhereInput = pending
       ? { isApproved: false }
       : { isApproved: true };
-    if (!pending) {
+    if (pending) {
+      // lifecycle=all — ასევე დაბლოკილი/დაარქივებული (ჯერ არ დამტკიცებული) კურიერები,
+      // რომ roster-გვერდს შესძლოს ორ სექციად გაყოფა (ჩვეულებრივი "დასამტკიცებელი" vs
+      // "საჭიროებს აღდგენას"). ნაგულისხმევი (param არაა) — მხოლოდ ACTIVE, ჩვეულებრივი
+      // მოქმედებადი "დასამტკიცებელი" კანდიდატები, თორემ დაბლოკილი/დაარქივებული
+      // კურიერი ჩვეულებრივ დასამტკიცებელ სიაში "გაჟონავს" და ცალსახად მოქმედებადი ჩანდება.
+      if (lifecycleParam !== "all") where.lifecycleStatus = "ACTIVE";
+    } else {
+      // lifecycle: "all" — roster-გვერდი (ყველა, SUSPENDED/ARCHIVED-ის ჩათვლით).
+      // ნაგულისხმევი (param არაა) — ACTIVE მხოლოდ: ეს ის ერთადერთი endpoint-ია,
+      // საიდანაც აირჩევა assign-picker-ისთვისაც (dispatch/orders), ამიტომ
+      // SUSPENDED/ARCHIVED კურიერი აქედან არასდროს არ უნდა "გაჟონოს" ნაგულისხმევად.
       if (lifecycleParam !== "all") where.lifecycleStatus = "ACTIVE";
       if (onlyAvailable) where.status = "AVAILABLE";
       else if (working) where.status = { in: ["AVAILABLE", "BUSY"] };

@@ -7,8 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDrivers } from "@/lib/hooks";
-import { api } from "@/lib/fetcher";
-import { DRIVER_STATUS_LABEL, VEHICLE_LABEL, GEL, DRIVER_LIFECYCLE_LABEL } from "@/lib/domain";
+import { api, HttpError } from "@/lib/fetcher";
+import {
+  DRIVER_STATUS_LABEL,
+  VEHICLE_LABEL,
+  GEL,
+  DRIVER_LIFECYCLE_LABEL,
+  driverPendingLifecycleLabel,
+} from "@/lib/domain";
 import type { VehicleType } from "@prisma/client";
 
 const tone = { AVAILABLE: "green", BUSY: "accent", OFFLINE: "neutral" } as const;
@@ -18,16 +24,40 @@ export default function DriversPage() {
   // lifecycle=all — roster-გვერდზე დაბლოკილი/დაარქივებული კურიერებიც ჩანს
   // (მართვისთვის); assign-picker (dispatch/orders) ნაგულისხმევად ACTIVE-ს იძლევა.
   const { drivers, isLoading: loadingAll } = useDrivers("?lifecycle=all", 15000);
-  const { drivers: pending, mutate: mutatePending, isLoading: loadingPending } =
-    useDrivers("?pending=1", 15000);
+  // pending&lifecycle=all — ყველა ჯერ არ დამტკიცებული, lifecycle-ის მიუხედავად;
+  // ორ სექციად იყოფა ქვემოთ (ჩვეულებრივი დასამტკიცებელი vs საჭიროებს აღდგენას).
+  const { drivers: pendingAll, mutate: mutatePending, isLoading: loadingPending } =
+    useDrivers("?pending=1&lifecycle=all", 15000);
+  const pending = pendingAll.filter((d) => d.lifecycleStatus === "ACTIVE");
+  const pendingBlocked = pendingAll.filter((d) => d.lifecycleStatus !== "ACTIVE");
   const isLoading = loadingAll || loadingPending;
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   async function approve(id: string) {
     setBusy(id);
     try {
       await api(`/api/drivers/${id}`, "PATCH", { isApproved: true });
       mutatePending();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reactivate(id: string) {
+    const reason = prompt("აღდგენის მიზეზი (სავალდებულო):");
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      setError("მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)");
+      return;
+    }
+    setError("");
+    setBusy(id);
+    try {
+      await api(`/api/dispatch/drivers/${id}/lifecycle`, "POST", { action: "REACTIVATE", reason });
+      await mutatePending();
+    } catch (e) {
+      setError(e instanceof HttpError ? e.message : "შეცდომა");
     } finally {
       setBusy(null);
     }
@@ -64,8 +94,44 @@ export default function DriversPage() {
         </Card>
       )}
 
+      {pendingBlocked.length > 0 && (
+        <Card className="mb-6 border-border bg-muted/30">
+          <CardHeader>
+            <CardTitle>საჭიროებს აღდგენას ({pendingBlocked.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingBlocked.map((d) => (
+              <div
+                key={d.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3"
+              >
+                <div>
+                  <div className="font-medium">{d.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {d.phone} · {VEHICLE_LABEL[d.vehicleType as VehicleType] ?? d.vehicleType}
+                    {d.vehicleNumber ? ` · ${d.vehicleNumber}` : ""}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {driverPendingLifecycleLabel(d.lifecycleStatus)}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy === d.id}
+                  onClick={() => reactivate(d.id)}
+                >
+                  {busy === d.id ? "…" : "აღდგენა"}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+
       {isLoading && <p className="text-sm text-muted-foreground">იტვირთება…</p>}
-      {!isLoading && drivers.length === 0 && pending.length === 0 && (
+      {!isLoading && drivers.length === 0 && pending.length === 0 && pendingBlocked.length === 0 && (
         <Card>
           <CardContent className="p-10 text-center text-sm text-muted-foreground">
             ჯერ არ არის რეგისტრირებული კურიერი.

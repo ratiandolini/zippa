@@ -78,12 +78,10 @@ export function POST(req: Request, { params }: { params: { id: string } }) {
       }
     }
 
-    if (body.action === "REACTIVATE" && !driver.isApproved) {
-      throw new ApiError(
-        422,
-        "აღდგენა შესაძლებელია მხოლოდ დამტკიცებული (ვერიფიცირებული) კურიერისთვის — ჯერ დაამტკიცე ვერიფიკაცია",
-      );
-    }
+    // REACTIVATE ყოველთვის ხელმისაწვდომია, isApproved-ის მიუხედავად — მხოლოდ
+    // lifecycleStatus-ს აბრუნებს ACTIVE-ზე. isApproved აქ არასდროს არ იცვლება,
+    // ამიტომ დამტკიცების საკითხი (login/assignment-ის რეალური გატი) ცალკე რჩება —
+    // ეს არ "ითვლება" დამტკიცებად, მხოლოდ ხსნის დაბლოკვას/დაარქივებას.
 
     if (body.action === "DELETE") {
       const blockers = await getDriverHistoryBlockers(driver.id);

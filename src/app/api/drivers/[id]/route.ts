@@ -126,7 +126,10 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       },
     });
 
-    if (!wasApproved && updated.isApproved) {
+    // "შეგიძლია ჩაირთო ხაზზე..." მხოლოდ მაშინ, თუ ანგარიში ფაქტობრივად
+    // გამოსაყენებელია — დამტკიცება მარტო არაფერს არ იძლევა, თუ კურიერი
+    // ამასობაში დაბლოკილი/დაარქივებულია (lifecycleStatus !== ACTIVE).
+    if (!wasApproved && updated.isApproved && updated.lifecycleStatus === "ACTIVE") {
       await notify(updated.userId, {
         type: "SYSTEM",
         title: "პროფილი დამტკიცდა",
