@@ -21,7 +21,8 @@ export function PATCH(req: Request, { params }: { params: { id: string } }) {
       where: { id: driverId },
       include: { user: { select: { name: true } } },
     });
-    if (!driver || !driver.isApproved) throw new ApiError(400, "კურიერი არ არის ხელმისაწვდომი");
+    if (!driver || !driver.isApproved || driver.lifecycleStatus !== "ACTIVE")
+      throw new ApiError(400, "კურიერი არ არის ხელმისაწვდომი");
 
     const updated = await prisma.$transaction(async (tx) => {
       const o = await tx.order.update({

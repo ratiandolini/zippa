@@ -60,6 +60,7 @@ export function GET(_req: Request, { params }: { params: { id: string } }) {
         vehicleNumber: d.vehicleNumber,
         isApproved: d.isApproved,
         status: d.status,
+        lifecycleStatus: d.lifecycleStatus,
         rating: d.ratingAvg,
         ratingCount: d.ratingCount,
         totalDeliveries: d.totalDeliveries,

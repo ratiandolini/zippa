@@ -21,7 +21,8 @@ export function POST(req: Request) {
       where: { id: driverId },
       include: { user: { select: { name: true } } },
     });
-    if (!driver || !driver.isApproved) throw new ApiError(400, "კურიერი არ არის ხელმისაწვდომი");
+    if (!driver || !driver.isApproved || driver.lifecycleStatus !== "ACTIVE")
+      throw new ApiError(400, "კურიერი არ არის ხელმისაწვდომი");
 
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },

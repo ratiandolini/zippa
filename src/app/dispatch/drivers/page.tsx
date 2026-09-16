@@ -8,13 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDrivers } from "@/lib/hooks";
 import { api } from "@/lib/fetcher";
-import { DRIVER_STATUS_LABEL, VEHICLE_LABEL, GEL } from "@/lib/domain";
+import { DRIVER_STATUS_LABEL, VEHICLE_LABEL, GEL, DRIVER_LIFECYCLE_LABEL } from "@/lib/domain";
 import type { VehicleType } from "@prisma/client";
 
 const tone = { AVAILABLE: "green", BUSY: "accent", OFFLINE: "neutral" } as const;
+const lifecycleTone = { ACTIVE: "green", SUSPENDED: "red", ARCHIVED: "neutral" } as const;
 
 export default function DriversPage() {
-  const { drivers, isLoading: loadingAll } = useDrivers("", 15000);
+  // lifecycle=all — roster-გვერდზე დაბლოკილი/დაარქივებული კურიერებიც ჩანს
+  // (მართვისთვის); assign-picker (dispatch/orders) ნაგულისხმევად ACTIVE-ს იძლევა.
+  const { drivers, isLoading: loadingAll } = useDrivers("?lifecycle=all", 15000);
   const { drivers: pending, mutate: mutatePending, isLoading: loadingPending } =
     useDrivers("?pending=1", 15000);
   const isLoading = loadingAll || loadingPending;
@@ -82,6 +85,7 @@ export default function DriversPage() {
                 <th className="px-5 py-3 font-medium">მიტანები</th>
                 <th className="px-5 py-3 font-medium">ნაღდი ხელზე</th>
                 <th className="px-5 py-3 font-medium">სტატუსი</th>
+                <th className="px-5 py-3 font-medium">ანგარიში</th>
               </tr>
             </thead>
             <tbody>
@@ -106,6 +110,11 @@ export default function DriversPage() {
                   <td className="px-5 py-3 tabular-nums">{GEL(d.cashOnHand)}</td>
                   <td className="px-5 py-3">
                     <Badge tone={tone[d.status]}>{DRIVER_STATUS_LABEL[d.status]}</Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge tone={lifecycleTone[d.lifecycleStatus]}>
+                      {DRIVER_LIFECYCLE_LABEL[d.lifecycleStatus]}
+                    </Badge>
                   </td>
                 </tr>
               ))}

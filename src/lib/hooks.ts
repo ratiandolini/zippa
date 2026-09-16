@@ -12,6 +12,7 @@ export interface DriverListItem {
   vehicleNumber: string | null;
   isApproved: boolean;
   status: "AVAILABLE" | "BUSY" | "OFFLINE";
+  lifecycleStatus: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
   city: string | null;
   rating: number;
   ratingCount: number;

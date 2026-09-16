@@ -337,3 +337,9 @@ export const driverVerificationReviewSchema = z.object({
   action: z.enum(["APPROVE", "CHANGES_REQUESTED", "REJECT", "SUSPEND"]),
   message: z.string().trim().max(1000).optional(),
 });
+
+// დისპეჩერის drivers-lifecycle ქმედება — reason ყოველთვის სავალდებულო.
+export const driverLifecycleActionSchema = z.object({
+  action: z.enum(["SUSPEND", "ARCHIVE", "REACTIVATE", "DELETE"]),
+  reason: z.string().trim().min(3, "მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)").max(500),
+});

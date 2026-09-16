@@ -10,6 +10,7 @@ import type {
   OrderFailureReason,
   SettlementStatus,
   ParcelStatus,
+  DriverLifecycleStatus,
 } from "@prisma/client";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -162,6 +163,19 @@ export const DRIVER_STATUS_LABEL: Record<DriverStatus, string> = {
   OFFLINE: "ოფლაინ",
   AVAILABLE: "თავისუფალი",
   BUSY: "დაკავებული",
+};
+
+export const DRIVER_LIFECYCLE_LABEL: Record<DriverLifecycleStatus, string> = {
+  ACTIVE: "აქტიური",
+  SUSPENDED: "დაბლოკილი",
+  ARCHIVED: "დაარქივებული",
+};
+
+export const DRIVER_LIFECYCLE_ACTION_LABEL: Record<string, string> = {
+  SUSPENDED: "დაბლოკილია",
+  ARCHIVED: "დაარქივებულია",
+  REACTIVATED: "აღდგენილია",
+  DELETED: "წაშლილია",
 };
 
 export const VEHICLE_LABEL: Record<VehicleType, string> = {

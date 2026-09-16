@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { useCities } from "@/lib/hooks";
 import { PageHeader } from "@/components/app-shell";
@@ -11,8 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Stat } from "@/components/stat";
-import { jsonFetcher, api } from "@/lib/fetcher";
-import { GEL, VEHICLE_LABEL, DRIVER_STATUS_LABEL, fmtDate, SETTLEMENT_STATUS_LABEL, EARNING_KIND_LABEL } from "@/lib/domain";
+import { jsonFetcher, api, HttpError } from "@/lib/fetcher";
+import {
+  GEL,
+  VEHICLE_LABEL,
+  DRIVER_STATUS_LABEL,
+  fmtDate,
+  SETTLEMENT_STATUS_LABEL,
+  EARNING_KIND_LABEL,
+  DRIVER_LIFECYCLE_LABEL,
+  DRIVER_LIFECYCLE_ACTION_LABEL,
+} from "@/lib/domain";
 import type { SettlementStatus } from "@prisma/client";
 import type { VehicleType } from "@prisma/client";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
@@ -60,6 +68,158 @@ interface DriverDetail {
   };
 }
 
+interface LifecycleData {
+  lifecycleStatus: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  isApproved: boolean;
+  hasActiveOrders: boolean;
+  canDelete: boolean;
+  blockers: { category: string; label: string; count: number }[];
+  events: { id: string; action: string; reason: string; createdAt: string }[];
+}
+
+const LIFECYCLE_TONE = { ACTIVE: "green", SUSPENDED: "red", ARCHIVED: "neutral" } as const;
+
+function DriverLifecyclePanel({ driverId }: { driverId: string }) {
+  const { data, mutate } = useSWR<LifecycleData>(
+    `/api/dispatch/drivers/${driverId}/lifecycle`,
+    jsonFetcher,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!data) return null;
+
+  async function run(action: "SUSPEND" | "ARCHIVE" | "REACTIVATE" | "DELETE", promptLabel: string) {
+    const reason = prompt(promptLabel);
+    if (reason === null) return; // გაუქმებულია
+    if (reason.trim().length < 3) {
+      setError("მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    try {
+      await api(`/api/dispatch/drivers/${driverId}/lifecycle`, "POST", { action, reason });
+      await mutate();
+      if (action === "DELETE") window.location.href = "/dispatch/drivers";
+    } catch (e) {
+      setError(e instanceof HttpError ? e.message : "შეცდომა");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>კურიერის სტატუსი</span>
+          <Badge tone={LIFECYCLE_TONE[data.lifecycleStatus]}>
+            {DRIVER_LIFECYCLE_LABEL[data.lifecycleStatus]}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {data.hasActiveOrders && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            კურიერს აქვს მიმდინარე შეკვეთა — სტატუსის შეცვლა დაბლოკილია, სანამ არ გადანაწილდება/დასრულდება.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {data.lifecycleStatus === "ACTIVE" && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || data.hasActiveOrders}
+                onClick={() => run("SUSPEND", "დაბლოკვის მიზეზი (სავალდებულო):")}
+              >
+                დაბლოკვა
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || data.hasActiveOrders}
+                onClick={() => run("ARCHIVE", "დაარქივების მიზეზი (სავალდებულო):")}
+              >
+                დაარქივება
+              </Button>
+            </>
+          )}
+          {data.lifecycleStatus === "SUSPENDED" && (
+            <>
+              <Button
+                size="sm"
+                disabled={busy || !data.isApproved}
+                onClick={() => run("REACTIVATE", "აღდგენის მიზეზი (სავალდებულო):")}
+                title={!data.isApproved ? "საჭიროა დამტკიცებული ვერიფიკაცია" : undefined}
+              >
+                აღდგენა
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || data.hasActiveOrders}
+                onClick={() => run("ARCHIVE", "დაარქივების მიზეზი (სავალდებულო):")}
+              >
+                დაარქივება
+              </Button>
+            </>
+          )}
+          {data.lifecycleStatus === "ARCHIVED" && (
+            <Button
+              size="sm"
+              disabled={busy || !data.isApproved}
+              onClick={() => run("REACTIVATE", "აღდგენის მიზეზი (სავალდებულო):")}
+              title={!data.isApproved ? "საჭიროა დამტკიცებული ვერიფიკაცია" : undefined}
+            >
+              აღდგენა
+            </Button>
+          )}
+          {data.canDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-destructive text-destructive hover:bg-destructive/10"
+              disabled={busy}
+              onClick={() => {
+                if (!confirm("ეს ქმედება საბოლოოა და ვერ დაბრუნდება. ნამდვილად წაიშალოს კურიერი?")) return;
+                run("DELETE", "წაშლის მიზეზი (სავალდებულო):");
+              }}
+            >
+              სამუდამო წაშლა
+            </Button>
+          )}
+        </div>
+        {!data.canDelete && data.blockers.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            წაშლა შეუძლებელია — არსებობს: {data.blockers.map((b) => `${b.label} (${b.count})`).join(", ")}.
+            სამაგიეროდ დააარქივე.
+          </p>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {data.events.length > 0 && (
+          <div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">ისტორია</div>
+            {data.events.map((e) => (
+              <div key={e.id} className="border-b border-border py-1.5 text-sm last:border-0">
+                <div className="flex justify-between">
+                  <span className="font-medium">
+                    {DRIVER_LIFECYCLE_ACTION_LABEL[e.action] ?? e.action}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{fmtDate(e.createdAt)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{e.reason}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function Stars({ n }: { n: number }) {
   return (
     <span className="tabular-nums text-amber-500">
@@ -76,7 +236,6 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
     { refreshInterval: 20000 },
   );
   const { cities } = useCities();
-  const router = useRouter();
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -112,28 +271,6 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
   async function setCity(cityId: string) {
     await api(`/api/drivers/${d.id}`, "PATCH", { cityId: cityId || null });
     mutate();
-  }
-
-  async function deactivate() {
-    if (!confirm(`ნამდვილად გსურს ${d.name}-ის ანგარიშის გაუქმება? კურიერი ვეღარ შევა სისტემაში.`))
-      return;
-    let payout = false;
-    if (d.unpaidEarnings > 0) {
-      const yes = confirm(
-        `კურიერს ერგება ${GEL(d.unpaidEarnings)} ანაზღაურება. გადავუხადოთ ახლავე? (გაუქმება → OK, დატოვება → Cancel და ჯერ გადაუხადე ცალკე)`,
-      );
-      if (!yes) return;
-      payout = true;
-    }
-    setBusy(true);
-    setMsg(null);
-    try {
-      await api(`/api/drivers/${d.id}${payout ? "?payout=1" : ""}`, "DELETE");
-      router.push("/dispatch/drivers");
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "შეცდომა");
-      setBusy(false);
-    }
   }
 
   return (
@@ -186,7 +323,7 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
       })()}
 
       <Card className="mb-6">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+        <CardContent className="flex flex-wrap items-center gap-4 p-5">
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">ქალაქი</span>
             <select
@@ -202,18 +339,11 @@ export default function DriverDetailPage({ params }: { params: { id: string } })
               ))}
             </select>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:bg-destructive/10"
-            disabled={busy}
-            onClick={deactivate}
-          >
-            ანგარიშის გაუქმება
-          </Button>
         </CardContent>
       </Card>
       {msg && <p className="mb-4 text-sm text-destructive">{msg}</p>}
+
+      <DriverLifecyclePanel driverId={d.id} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

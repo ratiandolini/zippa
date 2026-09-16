@@ -99,14 +99,26 @@ enum VehicleType {
   VAN
 }
 
+// დისპეჩერის მართული ცხოვრების ციკლი — დამოუკიდებელი isApproved-გან (ვერიფიკაცია)
+// და status-გან (ონლაინ/ოფლაინ). ACTIVE→SUSPENDED/ARCHIVED მხოლოდ მიმდინარე
+// შეკვეთის არარსებობისას; SUSPENDED/ARCHIVED ორივე ბლოკავს login-ს/სესიას
+// (user.isActive=false + tokenVersion increment — არსებული getSession()
+// მექანიზმი, იხ. DELETE /api/drivers/[id]).
+enum DriverLifecycleStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
 model DriverProfile {
-  id            String       @id @default(cuid())
-  userId        String       @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicleType   VehicleType  @default(MOTORCYCLE)
-  vehicleNumber String?
-  status        DriverStatus @default(OFFLINE)
-  isApproved    Boolean      @default(false) // დისპეჩერი ამტკიცებს ახალ კურიერს
+  id              String                @id @default(cuid())
+  userId          String                @unique
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType     VehicleType           @default(MOTORCYCLE)
+  vehicleNumber   String?
+  status          DriverStatus          @default(OFFLINE)
+  isApproved      Boolean               @default(false) // დისპეჩერი ამტკიცებს ახალ კურიერს
+  lifecycleStatus DriverLifecycleStatus @default(ACTIVE)
 
   // მიმდინარე ლოკაცია
   currentLat        Float?
@@ -133,10 +145,33 @@ model DriverProfile {
   settlements CashSettlement[]
   payouts     Payout[]
 
-  verification DriverVerification?
+  verification    DriverVerification?
+  lifecycleEvents DriverLifecycleEvent[]
 
   @@index([status])
   @@index([cityId])
+  @@index([lifecycleStatus])
+}
+
+// დისპეჩერის lifecycle-ქმედებების append-only ჟურნალი (SUSPEND/ARCHIVE/
+// REACTIVATE/DELETE). driverId onDelete:SetNull — permanent DELETE-ის შემდეგაც
+// აუდიტი გადარჩენილია (denormalized snapshot-ით ვინაობის დასადგენად).
+model DriverLifecycleEvent {
+  id       String         @id @default(cuid())
+  driverId String?
+  driver   DriverProfile? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  actorId  String? // დისპეჩერი, ვინც ქმედება შესრულა
+
+  action String // SUSPENDED | ARCHIVED | REACTIVATED | DELETED
+  reason String // სავალდებულო — ყოველთვის ივსება API validation-ით
+
+  // ვინაობის ასლი — გადარჩება driverId=null-ის შემდეგაც (permanent delete)
+  driverNameSnapshot  String?
+  driverPhoneSnapshot String?
+
+  createdAt DateTime @default(now())
+
+  @@index([driverId])
 }
 
 // ─────────────────────────────────────────────

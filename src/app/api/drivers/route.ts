@@ -13,12 +13,20 @@ export function GET(req: Request) {
     const onlyAvailable = url.searchParams.get("available") === "1";
     const working = url.searchParams.get("working") === "1"; // ხაზზე მყოფი (AVAILABLE ან BUSY)
     const pending = url.searchParams.get("pending") === "1";
+    // lifecycle: "all" — roster-გვერდი (ყველა, SUSPENDED/ARCHIVED-ის ჩათვლით).
+    // ნაგულისხმევი (param არაა) — ACTIVE მხოლოდ: ეს ის ერთადერთი endpoint-ია,
+    // საიდანაც აირჩევა assign-picker-ისთვისაც (dispatch/orders), ამიტომ
+    // SUSPENDED/ARCHIVED კურიერი აქედან არასდროს არ უნდა "გაჟონოს" ნაგულისხმევად.
+    const lifecycleParam = url.searchParams.get("lifecycle");
 
     const where: Prisma.DriverProfileWhereInput = pending
       ? { isApproved: false }
       : { isApproved: true };
-    if (!pending && onlyAvailable) where.status = "AVAILABLE";
-    else if (!pending && working) where.status = { in: ["AVAILABLE", "BUSY"] };
+    if (!pending) {
+      if (lifecycleParam !== "all") where.lifecycleStatus = "ACTIVE";
+      if (onlyAvailable) where.status = "AVAILABLE";
+      else if (working) where.status = { in: ["AVAILABLE", "BUSY"] };
+    }
 
     const drivers = await prisma.driverProfile.findMany({
       where,
@@ -48,6 +56,7 @@ export function GET(req: Request) {
       vehicleNumber: d.vehicleNumber,
       isApproved: d.isApproved,
       status: d.status,
+      lifecycleStatus: d.lifecycleStatus,
       city: d.city?.name ?? null,
       rating: d.ratingAvg,
       ratingCount: d.ratingCount,
