@@ -33,12 +33,60 @@ export default function DriversPage() {
   const isLoading = loadingAll || loadingPending;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // დასამტკიცებელ კურიერზე წაშლის მცდელობის 409 (ისტორია არსებობს) — ინლაინ
+  // ახსნა + "არქივში გადატანა" ალტერნატივა, თითო კურიერზე ცალკე.
+  const [deleteBlocked, setDeleteBlocked] = useState<Record<string, string>>({});
 
   async function approve(id: string) {
     setBusy(id);
     try {
       await api(`/api/drivers/${id}`, "PATCH", { isApproved: true });
       mutatePending();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deletePending(id: string) {
+    const reason = prompt("წაშლის მიზეზი (სავალდებულო):");
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      setError("მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)");
+      return;
+    }
+    if (!confirm("ეს ქმედება საბოლოოა და ვერ დაბრუნდება. ნამდვილად წაიშალოს კურიერი?")) return;
+    setError("");
+    setDeleteBlocked((m) => ({ ...m, [id]: "" }));
+    setBusy(id);
+    try {
+      await api(`/api/dispatch/drivers/${id}/lifecycle`, "POST", { action: "DELETE", reason });
+      await mutatePending();
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 409) {
+        setDeleteBlocked((m) => ({ ...m, [id]: e.message }));
+      } else {
+        setError(e instanceof HttpError ? e.message : "შეცდომა");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function archiveInstead(id: string) {
+    const reason = prompt("დაარქივების მიზეზი (სავალდებულო):");
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      setError("მიზეზი სავალდებულოა (მინ. 3 სიმბოლო)");
+      return;
+    }
+    setError("");
+    setBusy(id);
+    try {
+      await api(`/api/dispatch/drivers/${id}/lifecycle`, "POST", { action: "ARCHIVE", reason });
+      setDeleteBlocked((m) => ({ ...m, [id]: "" }));
+      await mutatePending();
+    } catch (e) {
+      setError(e instanceof HttpError ? e.message : "შეცდომა");
     } finally {
       setBusy(null);
     }
@@ -76,18 +124,45 @@ export default function DriversPage() {
             {pending.map((d) => (
               <div
                 key={d.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3"
+                className="rounded-lg border border-border bg-background px-4 py-3"
               >
-                <div>
-                  <div className="font-medium">{d.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {d.phone} · {VEHICLE_LABEL[d.vehicleType as VehicleType] ?? d.vehicleType}
-                    {d.vehicleNumber ? ` · ${d.vehicleNumber}` : ""}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{d.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {d.phone} · {VEHICLE_LABEL[d.vehicleType as VehicleType] ?? d.vehicleType}
+                      {d.vehicleNumber ? ` · ${d.vehicleNumber}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={busy === d.id} onClick={() => approve(d.id)}>
+                      {busy === d.id ? "…" : "დამტკიცება"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-destructive text-destructive hover:bg-destructive/10"
+                      disabled={busy === d.id}
+                      onClick={() => deletePending(d.id)}
+                    >
+                      {busy === d.id ? "…" : "წაშლა"}
+                    </Button>
                   </div>
                 </div>
-                <Button size="sm" disabled={busy === d.id} onClick={() => approve(d.id)}>
-                  {busy === d.id ? "…" : "დამტკიცება"}
-                </Button>
+                {deleteBlocked[d.id] && (
+                  <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <p>{deleteBlocked[d.id]}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      disabled={busy === d.id}
+                      onClick={() => archiveInstead(d.id)}
+                    >
+                      არქივში გადატანა
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
